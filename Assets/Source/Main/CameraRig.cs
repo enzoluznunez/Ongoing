@@ -19,8 +19,6 @@ public static class CameraRig
 
     private const float MaxPitch = 75f;
 
-    // Where the head is and which way it faces across the floor, once the
-    // head's pose can be trusted (HeadPose.Settled).
     public static bool TryGetBasis(out Vector3 position, out Quaternion yaw)
     {
         position = Vector3.zero;
@@ -43,8 +41,6 @@ public static class CameraRig
         return v.sqrMagnitude > 1e-6f ? v.normalized : fallback;
     }
 
-    // Turned to face the viewer, tipped up or down toward their eyes, at
-    // most MaxPitch.
     public static bool TryFaceViewer(Vector3 position, out Quaternion rotation)
     {
         rotation = Quaternion.identity;

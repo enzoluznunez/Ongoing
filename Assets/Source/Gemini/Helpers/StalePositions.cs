@@ -6,7 +6,6 @@ public static class StalePositions
     [UnityEngine.RuntimeInitializeOnLoadMethod(UnityEngine.RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetStatics() => ClearAll();
 
-    // Only a reorder the user makes counts; one inside an agent call does not.
     public static void MarkDirty(bool columns)
     {
         if (!StateChannel.UserDriven) return;

@@ -72,8 +72,6 @@ public sealed class GetStatistics : AgenticTool<GetStatistics.Args> {
             return;
         }
 
-        // A paired metric is summarised a year at a time; the two are the same
-        // measure and comparing them is the point.
         result["metric"] = DataSource.GroupLabelAt(data, true, block);
         var years = new List<object>();
         for (int v = lo; v <= hi; v++) years.Add(LineEntry(data, true, v, rowMax, colMax));
@@ -91,8 +89,6 @@ public sealed class GetStatistics : AgenticTool<GetStatistics.Args> {
             return entry;
         }
 
-        // One row spans every metric, and they are in different units, so a single
-        // summary would average dollars with share counts. Report one per metric.
         var metrics = new List<object>();
         int blocks = data.GroupCount(true);
         for (int b = 0; b < blocks; b++) {

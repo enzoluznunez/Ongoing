@@ -1,7 +1,5 @@
 using UnityEngine;
 
-// Shared base for the tools that hand the sheet to the user's grab: Move, Rotate
-// and Scale. Each subclass only says how to arm the grab and how to report it.
 public abstract class GrabTool : Tool
 {
     private bool _armPending;
@@ -12,8 +10,6 @@ public abstract class GrabTool : Tool
 
     protected abstract void Arm();
 
-    // What this tool's grab adds to a sheet, added while the app loads
-    // (ManageSheets.PrepareRoom) rather than the first time the tool is used.
     protected virtual void PrepareSheet(CreateSheet sheet) { }
 
     protected override void OnToolStart()
@@ -32,8 +28,6 @@ public abstract class GrabTool : Tool
         sheetManager.OnSheetMoveCommitted -= OnSheetMoveCommitted;
     }
 
-    // Whether resetting this tool drops the sheet's moves, which puts it back
-    // in its place.
     protected virtual bool ReattachOnReset => false;
 
     protected override void OnResetTool()
@@ -53,10 +47,6 @@ public abstract class GrabTool : Tool
     {
         if (!Active || sheet == null || toolManager == null || sheetManager == null) return;
 
-        // A hold that changed nothing is no edit: one hand on a sheet the
-        // Rotate or Scale tool turns or sizes only with two, or a pinch let go
-        // where it was taken. Recorded, it would take an Undo press that does
-        // nothing, and a Move would cut the sheet loose from the map.
         Transform t = sheet.transform;
         if (MoveRecord.SamePose(t.localPosition, t.localRotation, t.localScale, prePos, preRot, preScale)) return;
 

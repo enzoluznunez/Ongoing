@@ -5,9 +5,6 @@ using Oculus.Interaction.HandGrab;
 using Oculus.Interaction.Input;
 using UnityEngine;
 
-// A one-hand grab that slides a body along its pinned axes and nowhere else:
-// no throw, kinematic throughout, one point of hold. The sort lines and the
-// maps are both taken hold of this way.
 public static class SlideGrab
 {
     public static (Grabbable grabbable, HandGrabInteractable handGrab) Attach(GameObject go, Rigidbody body,
@@ -20,9 +17,6 @@ public static class SlideGrab
         slide.InjectOptionalConstraints(limits);
 
         Grabbable grabbable = go.AddComponent<Grabbable>();
-        // Its target is otherwise set only when it starts, which a grabbable
-        // made switched off (a Sort handle put away) has not done: a
-        // transformer readied before then finds no transform and throws.
         grabbable.InjectOptionalTargetTransform(go.transform);
         grabbable.InjectOptionalRigidbody(body);
         grabbable.InjectOptionalThrowWhenUnselected(false);

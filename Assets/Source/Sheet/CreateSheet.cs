@@ -43,8 +43,6 @@ public class CreateSheet : MonoBehaviour
 
     private readonly List<BarTarget> _bars = new List<BarTarget>();
 
-    // The lines standing away from their own slot: mid-slide in a sort's
-    // reflow or held in a Sort drag. SheetRaycast looks at them wherever they are.
     private readonly HashSet<int> _offColumns = new HashSet<int>();
     private readonly HashSet<int> _offRows = new HashSet<int>();
     public IReadOnlyCollection<int> LinesOffSlot(bool columns) => columns ? _offColumns : _offRows;
@@ -64,15 +62,9 @@ public class CreateSheet : MonoBehaviour
     public int ColCount => colMax - colMin + 1;
     public float CellSize => _cellSize;
 
-    // How far apart lines stand along an axis: columns a bar and its gap apart,
-    // rows far enough apart that their titles, which run along the rows, never
-    // reach into one another.
     public float PitchOn(bool columns) => columns ? _cellSize : _rowPitch;
     public bool IsBuilt => _live.Count > 0;
 
-    // A grouped axis draws its lines in tight blocks — one metric's years sitting
-    // together — with an extra gap between blocks. Every index-to-position
-    // conversion in the app runs through these, so spacing lives in one place.
     public static float Raw(int line, float cellSize, int groupSize, float groupGap) =>
         line * cellSize + (groupSize > 1 ? (line / groupSize) * groupGap : 0f);
 
@@ -82,18 +74,11 @@ public class CreateSheet : MonoBehaviour
     public int GroupSizeOn(bool columns) => columns ? _groupSize : 1;
     public float GroupGapOn(bool columns) => columns ? _groupGap : 0f;
 
-    // A line stands at its slot: its place among every line, hidden ones
-    // included (DataSource.Slots), so a filtered line leaves its place empty
-    // and the rest stay where they were. Lines are still counted by their
-    // visible position everywhere else; only the place they stand at is the
-    // slot's. Copied at each build, so the sheet and its bars agree.
     private readonly List<int> _rowSlots = new List<int>();
     private readonly List<int> _colSlots = new List<int>();
     private int _rowSlotCount;
     private int _colSlotCount;
 
-    // The slot of the line at a visible position; past either end, slots run
-    // on one per line from the last one there is.
     public int SlotOf(bool columns, int line)
     {
         List<int> slots = columns ? _colSlots : _rowSlots;
@@ -103,10 +88,6 @@ public class CreateSheet : MonoBehaviour
         return slots[line];
     }
 
-    // The first and last slot the sheet spans: every slot when it holds the
-    // whole axis, so a hidden line at either end keeps the sheet its size and
-    // its middle where it was. What a poke on an empty place is measured
-    // against.
     public int FirstSlot(bool columns) =>
         (columns ? colMin : rowMin) <= 0 ? 0 : SlotOf(columns, columns ? colMin : rowMin);
 
@@ -123,12 +104,9 @@ public class CreateSheet : MonoBehaviour
 
     public float LineCoord(bool columns, int line) => SlotCoord(columns, SlotOf(columns, line));
 
-    // Where a slot stands, filled or not.
     public float SlotCoord(bool columns, int slot) =>
         Raw(slot, PitchOn(columns), GroupSizeOn(columns), GroupGapOn(columns)) - (columns ? CenterX : CenterZ);
 
-    // The visible position of the line at a slot, or -1 where the slot is
-    // empty because its line is filtered off.
     public int LineAtSlot(bool columns, int slot)
     {
         List<int> slots = columns ? _colSlots : _rowSlots;
@@ -153,7 +131,6 @@ public class CreateSheet : MonoBehaviour
         return lines - 1;
     }
 
-    // The slot a coordinate falls at, fractionally.
     public float SlotFraction(bool columns, float coord)
     {
         float cell = PitchOn(columns);
@@ -168,8 +145,6 @@ public class CreateSheet : MonoBehaviour
         float block = Mathf.Floor(p / pitch);
         float within = p - block * pitch;
 
-        // Inside a block the lines sit one cell apart; across the gap the fraction
-        // runs on smoothly to the next block's first line, so a drag never jumps.
         float edge = (size - 1) * cell;
         float step = within <= edge
             ? within / cell
@@ -178,10 +153,6 @@ public class CreateSheet : MonoBehaviour
         return block * size + step;
     }
 
-    // A block is one addressable unit along an axis: a whole metric on a grouped
-    // axis, a single line otherwise. Blocks are evenly pitched even when the lines
-    // inside them are not, so anything that drags or reorders can work in block
-    // space and stay the simple uniform problem it always was.
     public float BlockPitch(bool columns) => GroupSizeOn(columns) * PitchOn(columns) + GroupGapOn(columns);
 
     public int BlockMin(bool columns) => (columns ? colMin : rowMin) / GroupSizeOn(columns);
@@ -288,13 +259,10 @@ public class CreateSheet : MonoBehaviour
                 Vector3 center = new Vector3(LineCoord(true, vc), (lo + hi) * 0.5f, z);
                 Vector3 size = new Vector3(half * 2f, hi - lo, half * 2f);
                 cube.SetBox(center, size);
-                // A figure the company never reported is a gap in the row,
-                // where a plate would read as the smallest figure there is.
                 bool shown = has || !data.HasHeights;
                 _bars.Add(new BarTarget { cube = cube, center = center, size = size });
 
                 cube.SetColor(ColorFor(data, has, dRow, dCol));
-                // A pooled cube may have been lit as another row's bar.
                 cube.ClearHighlight();
                 cube.SetVisible(shown);
 
@@ -318,22 +286,13 @@ public class CreateSheet : MonoBehaviour
         _labels.Rebuild(this, data, rMin, rMax, cMin, cMax, cellSize, cubeSide, baseY, labels);
     }
 
-    // The size a sheet opens at, which ManageSheets builds as small as its
-    // titles stay legible: made any smaller, the titles go, and they come back
-    // once it is this size again.
     public const float DefaultScale = 1f;
-
-    public bool LabelsLegible => Mathf.Abs(RestScale.x) >= DefaultScale - 1e-3f;
-
-    private Vector3 RestScale => _swell.Rest(transform);
 
     private void LateUpdate()
     {
         if (_labels == null) return;
-        // Hidden, the titles are written a few each frame, so a sheet built
-        // while the one before it falls is ready to show when it is down.
         if (!_shown) { _labels.Pump(LabelBudgetMs); return; }
-        _labels.SetShown(LabelsLegible && _fall == null);
+        _labels.SetShown(_fall == null);
         _labels.FaceViewer(Time.unscaledDeltaTime);
     }
 
@@ -344,9 +303,6 @@ public class CreateSheet : MonoBehaviour
     private static readonly Unity.Profiling.ProfilerMarker ShowMarker =
         new Unity.Profiling.ProfilerMarker("CreateSheet.SetShown");
 
-    // Whether the sheet is up. A sheet put away or waiting to rise stays
-    // active and only stops drawing and taking hands and pokes: switching
-    // a whole sheet off and on again would remake every title's text.
     private bool _shown = true;
     private bool _pickable = true;
     private bool _grabWanted = true;
@@ -374,9 +330,6 @@ public class CreateSheet : MonoBehaviour
         if (on) StartPendingGrow();
     }
 
-    // Makes cubes and titles, hidden, up to these counts, within 'budgetMs'
-    // this frame, so no dataset this sheet shows later makes any. True once
-    // there are that many.
     public bool Reserve(Material material, int cubes, int labels, double budgetMs)
     {
         if (_material == null) _material = material;
@@ -392,11 +345,8 @@ public class CreateSheet : MonoBehaviour
 
     private float _pendingGrow = -1f;
 
-    // The bars a grow under way is raising, or null for all of them.
     private HashSet<CreateCube> _growing;
 
-    // The bars on the sheet as drawn: a line filtered off leaves as copies of
-    // these.
     public IReadOnlyList<CreateCube> LiveBars => _live;
 
     public void PlayGrow(float duration)
@@ -423,8 +373,6 @@ public class CreateSheet : MonoBehaviour
         _grow = StartCoroutine(GrowRoutine(duration));
     }
 
-    // A sheet leaving for another dataset: its bars sink into the base, its
-    // titles gone at once, and 'done' runs once they are down.
     private Coroutine _fall;
     private Action _fallDone;
 
@@ -441,7 +389,6 @@ public class CreateSheet : MonoBehaviour
         _fall = StartCoroutine(FallRoutine(duration));
     }
 
-    // Puts a fall under way straight down and runs what was waiting on it.
     public void CompleteFall()
     {
         if (_fall == null) return;
@@ -478,8 +425,6 @@ public class CreateSheet : MonoBehaviour
         FinishGrow();
     }
 
-    // Stands the growing bars full height; once the whole sheet stands, its
-    // bars take pokes again.
     private void FinishGrow()
     {
         ApplyGrow(1f);
@@ -488,18 +433,12 @@ public class CreateSheet : MonoBehaviour
         if (whole) SetBarsMoving(false);
     }
 
-    // The bars take no pokes while the whole sheet rises or falls, and take
-    // them again once it stands. A flag on each bar, with no collider behind
-    // it, so all of them come back in one frame for nothing.
     private void SetBarsMoving(bool moving)
     {
         for (int i = 0; i < _live.Count; i++) _live[i].SetMoving(moving);
     }
 
 
-    // Raises only the bars given up from the base, as a new sheet's bars rise,
-    // after 'delay' seconds flat: a line coming back onto the sheet grows in
-    // while the lines already there make room for it.
     public void PlayGrowOf(ICollection<CreateCube> bars, float duration, float delay)
     {
         if (duration <= 0f || bars == null || bars.Count == 0) return;
@@ -530,8 +469,6 @@ public class CreateSheet : MonoBehaviour
         }
     }
 
-    // A bar 'k' of the way grown out of the base at 'baseY', top and bottom
-    // alike, toward the box it stands in when grown.
     public static void GrowBar(CreateCube cube, Vector3 center, Vector3 size, float baseY, float k)
     {
         float half = size.y * 0.5f;
@@ -540,17 +477,12 @@ public class CreateSheet : MonoBehaviour
         cube.SetBox(new Vector3(center.x, (lo + hi) * 0.5f, center.z), new Vector3(size.x, hi - lo, size.z));
     }
 
-    // How far the further of a bar's top and bottom is from the base.
     public static float BarTravel(Vector3 center, Vector3 size, float baseY)
     {
         float half = size.y * 0.5f;
         return Mathf.Max(Mathf.Abs(center.y + half - baseY), Mathf.Abs(center.y - half - baseY));
     }
 
-    // The furthest the top or bottom of any bar travels growing from the
-    // base, or sinking into it, in the sheet's own units: of 'only' when
-    // given, else of every bar. What a grow, a fall or a filter's bars are
-    // timed by, the fastest-moving point being that one.
     public float GrowTravel(ICollection<CreateCube> only = null)
     {
         float most = 0f;
@@ -575,19 +507,25 @@ public class CreateSheet : MonoBehaviour
         }
     }
 
-    // A bar is drawn in the colour of the metro its row belongs to, which the
-    // sheet states per row, so reordering or filtering never repaints one.
-    // A metro with no colour of its own is grey on the map; its bars shade
-    // from black to white, so their value reads as every other metro's does.
     private static Color ColorFor(DataSource data, bool has, int dRow, int dCol)
     {
         if (!has) return NoData;
-        Color top = data.RowColorAt(dRow);
+        Color top = ColorModes.RowColor(data, dRow);
         if (Uncoloured(top)) top = Color.white;
         return Shade(top, data.GetColorFraction(dRow, dCol));
     }
 
-    // A metro left out of the palette, which the map and the sheet both draw in greys.
+    public void Repaint(DataSource data)
+    {
+        if (data == null || !data.IsLoaded) return;
+        for (int i = 0; i < _live.Count; i++)
+        {
+            CreateCube cube = _live[i];
+            if (cube == null || cube.dataRow < 0 || cube.dataCol < 0) continue;
+            cube.SetColor(ColorFor(data, data.HasValue(cube.dataRow, cube.dataCol), cube.dataRow, cube.dataCol));
+        }
+    }
+
     public static bool Uncoloured(Color c) => c.maxColorComponent < 0.01f;
 
     private static Color Shade(Color top, float t) =>
@@ -665,10 +603,6 @@ public class CreateSheet : MonoBehaviour
             if (_live[i] != null) _live[i].transform.localRotation = Quaternion.identity;
     }
 
-    // What the bars are lit with now, or null when that is not known (after a
-    // build). A tool re-sends its tint every frame the finger moves, so an
-    // unchanged one is not walked across every bar again. Axis 1 is columns,
-    // 2 rows, and 0 nothing lit.
     private (int axis, int min, int max, float swell)? _tint;
     private static readonly (int, int, int, float) Untinted = (0, 0, 0, 0f);
 
@@ -702,13 +636,9 @@ public class CreateSheet : MonoBehaviour
 
     public void ForgetGrabLook() => _swell.Forget(transform);
 
-    // Puts a sheet kept from an earlier dataset back as a fresh one would stand,
-    // so its cubes and labels can be built again in place rather than made anew.
-    // The Sort tool's handles on it were put away when the tool was.
     public void ResetForReuse(Vector3 localPosition, Quaternion localRotation, Vector3 localScale)
     {
         CompleteGrow();
-        // What waited on a fall still under way runs, or it would wait forever.
         CompleteFall();
         _bars.Clear();
         _wasGrabbed = false;
@@ -750,7 +680,6 @@ public class CreateSheet : MonoBehaviour
             _body.isKinematic = true;
             _body.useGravity = false;
         }
-        // The sheet's own, not a Sort handle's: those stand under the sheet too.
         if (_grabbable == null) _grabbable = GetComponent<Grabbable>();
         if (_grabbable != null && _grabbable.Transform == null)
             _grabbable.InjectOptionalTargetTransform(_grabbable.transform);
@@ -815,14 +744,6 @@ public class CreateSheet : MonoBehaviour
         if (_handGrab != null) _handGrab.enabled = on;
     }
 
-    // Stands the hand's grab on a child of its own, "Grip", that holds one box
-    // the size of the bars and nothing else. A grab takes as its own every
-    // collider under its body, and only the first time it is switched on; on
-    // the sheet's own body that was every Sort handle stood under the sheet
-    // by then, thousands on a large sheet, each measured against the hand
-    // every frame and moved by the physics while the sheet was held. The
-    // grab is still the sheet's: the sheet's Grabbable takes the hold and
-    // moves the sheet, the grip with it.
     private void MoveGrabToGrip()
     {
         HandGrabInteractable old = _handGrab;
@@ -863,9 +784,6 @@ public class CreateSheet : MonoBehaviour
         _grabbable.MaxGrabPoints = 1;
         if (_slide == null) return;
         _grabbable.InjectOptionalOneGrabTransformer(_slide);
-        // The grabbable readies only the transformers it holds when it starts;
-        // one put back after Rotate or Scale swapped it out must be readied
-        // here, or the first grab finds it bound to nothing.
         _slide.Initialize(_grabbable);
     }
 

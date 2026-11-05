@@ -32,9 +32,6 @@ public sealed class DescribeSheet : AgenticTool {
         result["rowRange"] = new List<object> { rowMin + 1, rowMax + 1 };
 
         if (data.IsGrouped(true)) {
-            // The columns come in pairs, so name the metrics once and say which
-            // cells sit under each; listing raw column titles would double the
-            // positions the model then has to address.
             int first = data.GroupOf(true, colMin);
             int last = data.GroupOf(true, colMax);
             var metrics = new List<object>();

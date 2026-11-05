@@ -8,8 +8,8 @@ public enum ConnectPolicy { OnFirstUse, OnIntent }
 
 public class GeminiClient : MonoBehaviour {
 
-    [Tooltip("Enable Google Search grounding. Requires a paid-tier (billing-enabled) Gemini API key; leave off on the free tier or the session will be rejected.")]
-    public bool enableWebSearch = false;
+    [Tooltip("Google Search grounding, always on. It needs a paid-tier (billing-enabled) Gemini API key: on the free tier the session is rejected and the assistant turns itself off.")]
+    public bool enableWebSearch = true;
 
     [Tooltip("When the Gemini SDK, mic permission and audio are initialised. OnFirstConnect defers all of it until the assistant is first needed.")]
     public InitPolicy initPolicy = InitPolicy.AtLaunch;
@@ -28,6 +28,24 @@ public class GeminiClient : MonoBehaviour {
     public event Action<GeminiStatus> StatusChanged;
     public event Action ContextWarning;
     public event Action ContextExhausted;
+
+    void OnEnable() => Settings.Changed += OnSettingChanged;
+
+    private void OnSettingChanged(Setting which) {
+        if (which == Setting.Language) {
+            Gemini.Reconfigure(fresh: true);
+            if (_ready && _active && isActiveAndEnabled) {
+                Gemini.Disconnect();
+                _ = ConnectNow();
+            }
+        }
+        else if (which == Setting.ExplanationLevel) {
+            Gemini.Reconfigure(fresh: false);
+            StateChannel.RecordState("explanationLevel",
+                "the user changed the explanation level; from now on: " +
+                SystemPrompt.Explanations(Settings.ExplanationLevel).Replace("# Explanations\n", "").Trim());
+        }
+    }
 
     async void Start() {
         if (initPolicy == InitPolicy.AtLaunch) {
@@ -108,6 +126,7 @@ public class GeminiClient : MonoBehaviour {
     }
 
     void OnDisable() {
+        Settings.Changed -= OnSettingChanged;
         if (_ready) Gemini.Disconnect();
     }
 

@@ -22,10 +22,9 @@ public sealed class CallScaleTool : AgenticTool<CallScaleTool.Args> {
     public override FunctionDeclaration Declaration => new FunctionDeclaration {
         Name = "CallScaleTool",
         Description = "Resize the sheet, as if the user grabbed it with both hands and moved them apart to enlarge " +
-                      "or together to shrink. It never goes above twice its built size, and never shrinks below a " +
-                      "hundredth of it, the same limits the user's hands have, so 'scale' in the result is the " +
-                      "size it actually reached. Its built size, scale 1, is the smallest at which its row and column " +
-                      "titles stay legible: below it the titles are hidden, and they come back at scale 1 or more.",
+                      "or together to shrink. Its built size is scale 1. It never goes above 1.25 times that, and never " +
+                      "shrinks below 0.75 times it, the same limits the user's hands have, so 'scale' in the result is " +
+                      "the size it actually reached.",
         Parameters = ParametersFor(typeof(Args))
     };
 
@@ -57,6 +56,5 @@ public sealed class CallScaleTool : AgenticTool<CallScaleTool.Args> {
         result["scale"] = System.Math.Round(after, 3);
         if (Mathf.Abs(after - before * mult) > 1e-3f)
             result["note"] = "The sheet reached its size limit and changed less than asked.";
-        result["titlesShown"] = after >= CreateSheet.DefaultScale - 1e-3f;
     }
 }

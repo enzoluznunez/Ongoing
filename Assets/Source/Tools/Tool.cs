@@ -31,8 +31,6 @@ public abstract class Tool : MonoBehaviour
         if (sheetManager != null) sheetManager.ClearHoverTint();
     }
 
-    // Lights the line under the finger: one row, or on a grouped column axis the
-    // whole metric the column belongs to.
     protected void TintLine(ReadSheets.Reading reading, bool columns, float swell = Style.PreviewSwell) =>
         TintLine(reading.sheet, columns, columns ? reading.visCol : reading.visRow, swell);
 

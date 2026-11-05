@@ -11,7 +11,7 @@ public class Tooltip : MonoBehaviour
     private const float UpOffsetFromAnchor = 0.05f;
     private const float NoticeDistanceFromCamera = 0.5f;
 
-    private const float TitleHeight = Style.Title + Style.SmallPadding;
+    private const float TitleHeight = Style.LayoutTitle + Style.SmallPadding;
     private const float ContentTop = Style.SmallPadding + TitleHeight + Style.SmallPadding;
     private const float ContentBottom = Style.SmallPadding;
     private const float Borders = Style.SmallBorder * 2f;
@@ -50,8 +50,6 @@ public class Tooltip : MonoBehaviour
 
         ApplyFonts();
 
-        // Hidden, not switched off, as the panels are: showing a notice then
-        // rebuilds no text or layout.
         if (_canvas != null) _canvas.enabled = false;
     }
 
@@ -61,8 +59,6 @@ public class Tooltip : MonoBehaviour
         Style.ApplyTitle(_titleLabel);
     }
 
-    // Whether a notice is up, and whether Prewarm is drawing the hidden canvas,
-    // unseen, so its text and layout are built at startup.
     private bool _shown;
     private bool _warming;
     private CanvasGroup _warmGroup;
@@ -84,7 +80,7 @@ public class Tooltip : MonoBehaviour
     private static void EnableWrap(TextMeshProUGUI label)
     {
         if (label == null) return;
-        label.enableWordWrapping = true;
+        label.textWrappingMode = TextWrappingModes.Normal;
         label.overflowMode = TextOverflowModes.Overflow;
     }
 
@@ -109,8 +105,6 @@ public class Tooltip : MonoBehaviour
         _settle = StartCoroutine(SettleHeight(_hintGroup, () => HeightFor(body)));
     }
 
-    // Re-measures the panel over the next few frames, while text and layout
-    // settle, for as long as 'group' is the one showing.
     private IEnumerator SettleHeight(GameObject group, Func<float> height)
     {
         yield return UILayout.Converge(

@@ -12,7 +12,6 @@ public class UIPressFeedback : MonoBehaviour
     private const float HapticAmplitude = 0.35f;
     private const float HapticSeconds = 0.04f;
 
-    // Two fingertips landing together, or a quick second poke, click once.
     private const float MinGapSeconds = 0.06f;
     private float _lastEmit = float.NegativeInfinity;
 
@@ -62,7 +61,7 @@ public class UIPressFeedback : MonoBehaviour
         if (now - _lastEmit < MinGapSeconds) return;
         _lastEmit = now;
 
-        if (_source != null && _click != null) _source.PlayOneShot(_click);
+        if (Settings.SoundEffects && _source != null && _click != null) _source.PlayOneShot(_click);
         OVRInput.SetControllerVibration(HapticFrequency, HapticAmplitude, OVRInput.Controller.Active);
         StopAllCoroutines();
         StartCoroutine(StopHaptic());

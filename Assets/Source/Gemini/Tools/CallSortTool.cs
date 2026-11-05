@@ -24,7 +24,6 @@ public sealed class CallSortTool : AgenticTool<CallSortTool.Args> {
              "give no other way of ordering with it."), Optional]
         public BreachFilters where;
 
-        // The breaches 'where' named, looked up before the call runs.
         internal BreachMatch matched;
     }
 
@@ -114,8 +113,6 @@ public sealed class CallSortTool : AgenticTool<CallSortTool.Args> {
         else if (wantsBy) RunBy(args, sort, data, isColumn, axis, result);
         else RunMove(args, sort, data, isColumn, axis, count, result);
 
-        // A call that failed reordered nothing, so it leaves the round's one
-        // reorder for the corrected call.
         if (result.ContainsKey("error")) lastSortRound[axisSlot] = stamped;
     }
 
@@ -126,8 +123,6 @@ public sealed class CallSortTool : AgenticTool<CallSortTool.Args> {
 
         if (!TryResolveLines(args.order, isColumn, 0, lineCount - 1, result, out List<int> wanted)) return;
 
-        // 'wanted' holds blocks. Emitting each block's lines together keeps the
-        // order group-aligned, which is the only shape the dataset will accept.
         IReadOnlyList<int> live = isColumn ? data.ColumnOrder : data.RowOrder;
         int size = data.GroupSize(isColumn);
         var target = new List<int>(lineCount);
@@ -148,7 +143,6 @@ public sealed class CallSortTool : AgenticTool<CallSortTool.Args> {
         Commit(sort, data, isColumn, axis, live, target, result);
     }
 
-    // The matching rows on the sheet first, in the order they stand, then the rest.
     private static void RunWhere(Args args, SortTool sort, DataSource data, Dictionary<string, object> result) {
         List<int> matching = args.matched.RowsOn(data, result);
 
@@ -197,9 +191,6 @@ public sealed class CallSortTool : AgenticTool<CallSortTool.Args> {
             return;
         }
 
-        // Ranking only means something within one metric. Ordering the metrics
-        // themselves by their numbers would compare different units, and ranking
-        // rows across every metric would add dollars to share counts.
         if (data.IsGrouped(isColumn)) {
             result["error"] = "The metrics are in different units, so they cannot be ranked against each other. " +
                 "Give 'order' with the metrics in the sequence you want instead.";
@@ -225,17 +216,11 @@ public sealed class CallSortTool : AgenticTool<CallSortTool.Args> {
             BlockSpan(!isColumn, crossBlock, 0, across - 1, out crossLo, out crossHi);
         }
 
-        // A named metric may cover more than one cell per row, so rank by the
-        // measure over its cells; a single cell reads the same either way.
         string crossMeasure = measure ?? "sum";
 
         IReadOnlyList<int> live = isColumn ? data.ColumnOrder : data.RowOrder;
         var visible = new HashSet<int>(live);
 
-        // Every line is ranked, the filtered ones too, so a line filtered off
-        // the sheet comes back where the sort puts it rather than where it was.
-        // A line is scored from its cells on the lines of the other axis that
-        // are on the sheet, whether or not it is on the sheet itself.
         int lo = hasLine ? crossLo : 0, hi = hasLine ? crossHi : across - 1;
         string scoreBy = hasLine ? (crossLo == crossHi ? "sum" : crossMeasure) : measure;
         var ranked = new List<KeyValuePair<double, int>>();
@@ -251,7 +236,6 @@ public sealed class CallSortTool : AgenticTool<CallSortTool.Args> {
             return;
         }
 
-        // Stable, so equal scores keep the order they had.
         var was = new Dictionary<int, int>(ranked.Count);
         for (int i = 0; i < ranked.Count; i++) was[ranked[i].Value] = i;
         ranked.Sort((a, b) => {
@@ -283,9 +267,6 @@ public sealed class CallSortTool : AgenticTool<CallSortTool.Args> {
         Commit(sort, data, isColumn, axis, live, target, result, full);
     }
 
-    // A line's score by its place in the data, from its cells on the other
-    // axis's lines lo..hi as they stand on the sheet: the score a line on the
-    // sheet would get, given to a filtered one too.
     private static bool TryDataScore(DataSource data, bool isColumn, int line, int lo, int hi,
         string measure, out double score) {
         IReadOnlyList<int> cross = isColumn ? data.RowOrder : data.ColumnOrder;

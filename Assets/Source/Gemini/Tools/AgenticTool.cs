@@ -33,8 +33,6 @@ public abstract class AgenticTool : Function {
     protected override Task<Dictionary<string, object>> Execute(Dictionary<string, object> args) =>
         Perform(args, result => Run(args ?? new Dictionary<string, object>(), result));
 
-    // Runs 'act' on the main thread as the assistant's call, and reads back
-    // what it did.
     protected async Task<Dictionary<string, object>> Perform(Dictionary<string, object> args,
         Action<Dictionary<string, object>> act) {
         var result = new Dictionary<string, object>();
@@ -99,17 +97,12 @@ public abstract class AgenticTool : Function {
 
     protected static Schema ParametersFor(System.Type args) => ToolArguments.Schema(args);
 
-    // A tool's schema without 'where': with no breach database to look one
-    // up in (BreachMatch), the model is not offered it. Once there is a local
-    // lookup, list the contract's names on it instead:
-    //     if (schema.Properties.TryGetValue("where", out Schema where)) BreachFilters.Named(where);
     protected static Schema WithNames(Schema schema) {
         schema.Properties.Remove("where");
         schema.Properties.Remove("whereDoes");
         return schema;
     }
 
-    // There is one sheet, so there is nothing to pick: the bounds are its bounds.
     private static CreateSheet ResolvedSheet() {
         ManageSheets mgr = Scene.Sheets;
         return mgr != null ? mgr.Sheet : null;
@@ -126,10 +119,6 @@ public abstract class AgenticTool : Function {
         return true;
     }
 
-    // On a grouped axis the agent addresses metrics, not raw columns: names match
-    // the metric, numbers count metrics, and the value returned is a block index.
-    // Rows and ungrouped columns have one line per block, so this is unchanged for
-    // them and every caller below reads the same either way.
     protected static bool TryResolveLine(object arg, bool columns, int min, int max,
         Dictionary<string, object> result, out int block) {
         block = -1;
@@ -167,7 +156,6 @@ public abstract class AgenticTool : Function {
 
         if (data == null) { result["error"] = "No dataset is open."; return false; }
 
-        // An exact name first, then, for three letters or more, the start of one.
         int found = -1, hits = 0;
         void Match(Func<string, bool> matches) {
             for (int b = blockMin; b <= blockMax; b++) {
@@ -195,13 +183,11 @@ public abstract class AgenticTool : Function {
         return false;
     }
 
-    // How many lines one block holds: a metric's on a grouped axis, else one.
     private static int GroupSize(bool columns) {
         var data = Scene.Data;
         return data != null ? data.GroupSize(columns) : 1;
     }
 
-    // The line span one block covers, clipped to the piece.
     protected static void BlockSpan(bool columns, int block, int min, int max, out int lo, out int hi) {
         int size = GroupSize(columns);
         lo = Math.Max(block * size, min);
@@ -316,7 +302,6 @@ public abstract class AgenticTool : Function {
         return false;
     }
 
-    // +1 for a turn to the right (clockwise seen from above), -1 to the left.
     protected static bool TryTurnSign(string direction, out float sign) {
         sign = direction == "right" ? 1f : direction == "left" ? -1f : 0f;
         return sign != 0f;
@@ -369,7 +354,6 @@ public abstract class AgenticTool : Function {
         Dictionary<string, object> result, out bool columns) {
         columns = false;
 
-        // Bound to 'columns' or 'rows' already (ToolArguments).
         if (axisArg != null) {
             columns = axisArg == "columns";
             result["axisFrom"] = "given";
@@ -386,7 +370,6 @@ public abstract class AgenticTool : Function {
         return false;
     }
 
-    // 'row' or 'rows', 'column' or 'columns', in any case.
     protected static bool TryParseAxis(string axis, out bool columns) {
         switch (axis?.Trim().ToLowerInvariant()) {
             case "column": case "columns": columns = true; return true;
@@ -437,7 +420,6 @@ public abstract class AgenticTool : Function {
         return true;
     }
 
-    // EnsureToolSelected, for a tool the call then works through itself.
     protected static bool EnsureToolSelected<T>(ToolType kind, T tool, Dictionary<string, object> result) where T : Tool {
         if (!EnsureToolSelected(kind, result)) return false;
         if (tool == null) { result["error"] = $"{kind} tool not found in scene."; return false; }
@@ -489,26 +471,14 @@ public abstract class AgenticTool : Function {
             if (TryCellValue(data, isColumn ? j : line, isColumn ? line : j, out double v)) acc.Add(v);
         return acc.TryScore(measure, out score);
     }
-
-    // A map tool's change is only seen with the map panel up, so it opens it.
-    protected static void OpenMap(MapCarousel maps, Dictionary<string, object> result) {
-        if (maps.IsOpen) return;
-        maps.SetOpen(true);
-        result["opened"] = "the map panel was closed, so it was opened";
-    }
 }
 
 public abstract class AgenticTool<TArgs> : AgenticTool where TArgs : class, new() {
 
     protected abstract void Run(TArgs args, Dictionary<string, object> result);
 
-    // What the arguments name that has to be fetched before the call can run,
-    // fetched off the main thread: a 'where' looked up. Null
-    // to go on, or why the call cannot.
     protected virtual Task<string> Prepare(TArgs args) => Task.FromResult<string>(null);
 
-    // Binds the arguments and prepares them here, off the main thread, and
-    // only then hops to it to run.
     protected sealed override async Task<Dictionary<string, object>> Execute(Dictionary<string, object> args) {
         var bound = ToolArguments.Bind(typeof(TArgs), args, out string error) as TArgs;
         if (bound != null) error = await Prepare(bound).ConfigureAwait(false);
@@ -518,12 +488,9 @@ public abstract class AgenticTool<TArgs> : AgenticTool where TArgs : class, new(
         }).ConfigureAwait(false);
     }
 
-    // Never reached: Execute binds the arguments and runs the typed Run.
     protected sealed override void Run(Dictionary<string, object> args, Dictionary<string, object> result) =>
         throw new NotSupportedException();
 
-    // Looks a 'where' up, for a tool that takes one; 'store' keeps the match
-    // on the arguments for Run.
     protected static async Task<string> LookUp(BreachFilters where, Action<BreachMatch> store) {
         if (where == null) return null;
         (BreachMatch match, string error) = await BreachMatch.Look(where).ConfigureAwait(false);

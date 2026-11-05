@@ -45,7 +45,6 @@ public class SheetTouch : MonoBehaviour
         }
     }
 
-    // Live, and within reach of the head: a parked interactor is not a finger.
     private bool Live(Fingertips.Source source)
     {
         if (!source.Live) return false;

@@ -15,18 +15,6 @@ public class ToolPanelUI : PanelUI
     private RectTransform _primaryRect;
     private RectTransform _panelRootRect;
 
-    // The panel's top part, the tool tiles, which keeps its size as the cards
-    // below it come and go; the maps stand beside it.
-    public RectTransform PrimaryRect => _primaryRect;
-
-    // The panel opens where the user looks, centred, or, when the map panel
-    // is open and in reach, left of it (MapCarousel.PlacePanelBeside), as
-    // the map opens right of this panel when this one is there. Either way
-    // it is put there at once: neither panel slides or fades into place. It
-    // is open from the moment it is asked to be, so anything that opens it
-    // can use it at once. The map panel and the sheet are neither moved nor
-    // hidden by it.
-
     private OptionsCard _toolCard;
     private OptionsCard _assistantCard;
     private readonly List<OptionsCard> _stack = new List<OptionsCard>();
@@ -44,11 +32,6 @@ public class ToolPanelUI : PanelUI
     private ButtonList _assistantSpeedRow;
     private int _assistantSpeedIndex;
 
-    // The order the tiles appear in, and the only thing that decides it: the grid
-    // is filled in this order regardless of how the buttons sit in the scene. The
-    // first row moves the sheet around the room, the second changes what it shows,
-    // and the assistant spans the third — so a row is one kind of verb and the
-    // grouping needs no label to explain it.
     public static readonly ToolType[] Tools =
     {
         ToolType.Move,
@@ -62,26 +45,9 @@ public class ToolPanelUI : PanelUI
 
     public static string Label(ToolType tool) => tool.ToString();
 
-    public static string Description(ToolType tool)
-    {
-        switch (tool)
-        {
-            case ToolType.Move:
-                return "Moves the sheet anywhere in the room.";
-            case ToolType.Rotate:
-                return "Turns the sheet to face any direction.";
-            case ToolType.Scale:
-                return "Makes the sheet larger or smaller.";
-            case ToolType.Profile:
-                return "Raises rows or columns above the sheet.";
-            case ToolType.Sort:
-                return "Reorders the rows and columns of the sheet.";
-            case ToolType.Filter:
-                return "Hides or shows rows and columns on the sheet.";
-            default:
-                return string.Empty;
-        }
-    }
+    private static string NameKey(ToolType tool) => $"tool.{Label(tool)}";
+
+    private static string DescriptionKey(ToolType tool) => $"tool.{Label(tool)}.desc";
 
     private class ToolButtonVisual
     {
@@ -118,6 +84,7 @@ public class ToolPanelUI : PanelUI
 
         if (toolManager != null)
             toolManager.OnToolChanged += OnToolChanged;
+        Strings.Changed += OnLanguageChanged;
 
         OnToolChanged(toolManager != null ? toolManager.SelectedTool : ToolType.None);
 
@@ -187,7 +154,6 @@ public class ToolPanelUI : PanelUI
 
     private void Start()
     {
-        // Laid out now, while the panel is shut, not on first open.
         ResolveLayoutNow();
 
         if (ManageDatasets.Instance != null)
@@ -200,6 +166,7 @@ public class ToolPanelUI : PanelUI
 
     private void OnDestroy()
     {
+        Strings.Changed -= OnLanguageChanged;
         if (toolManager != null)
             toolManager.OnToolChanged -= OnToolChanged;
         if (ManageDatasets.Instance != null)
@@ -232,12 +199,11 @@ public class ToolPanelUI : PanelUI
                 continue;
             }
 
-            // Tools is the order, so the tile is moved to where the list puts it
-            // rather than left wherever the scene happened to hold it.
             btnT.SetSiblingIndex(i);
 
             UIButton.Handle h = UIButton.Adopt(btnT.gameObject);
             StyleTileLabel(h);
+            Strings.Bind(h.Text, NameKey(tool));
             ToolButtonVisual visual = new ToolButtonVisual { Tool = tool, Handle = h };
             _toolButtons.Add(visual);
 
@@ -252,17 +218,11 @@ public class ToolPanelUI : PanelUI
         SquareTiles(toolGrid.GetComponent<GridLayoutGroup>());
     }
 
-    // A tile carries its label at the panel's title weight: at the size a tile is
-    // drawn, body text reads as a caption someone forgot to finish.
     private static void StyleTileLabel(UIButton.Handle h)
     {
         if (h != null) Style.ApplyTitle(h.Text);
     }
 
-    // A tool that has been removed can leave its tile behind in the scene, where
-    // nothing binds it: it keeps whatever styling it was saved with, answers to
-    // no press, and still takes a cell from the ones that work. The grid holds
-    // the tiles this panel built and nothing else.
     private void DropUnboundTiles(Transform toolGrid)
     {
         for (int i = toolGrid.childCount - 1; i >= 0; i--)
@@ -273,8 +233,6 @@ public class ToolPanelUI : PanelUI
             Debug.LogWarning($"[ToolPanelUI] '{child.name}' under ToolGrid matches no tool in Tools; " +
                              "dropping it from the grid.");
 
-            // Destroy lands at the end of the frame, so the tile is taken out of
-            // the layout and renamed now rather than counted for another pass.
             child.SetActive(false);
             child.name += "_Unbound";
             Destroy(child);
@@ -350,9 +308,6 @@ public class ToolPanelUI : PanelUI
         PlaceAssistantTile(cell, columns, span);
     }
 
-    // The corner a tile is cut with follows the size it ended up at, so a panel
-    // that fits its tiles to the room it has does not end up with the corners of
-    // a larger one. SetRadius sits out a tile that is already cut to size.
     private void RoundTiles(float cell)
     {
         float radius = Style.TileRadius(cell);
@@ -363,20 +318,14 @@ public class ToolPanelUI : PanelUI
         UIButton.SetRadius(_assistantButton, radius);
     }
 
-    // How many cells the assistant tile covers. The tools fill the grid a cell at
-    // a time; this one takes the rest of the row they end on, so the block stays
-    // rectangular instead of trailing an empty cell.
     private const int AssistantSpan = 3;
 
     private void BindAssistantButton(Transform toolGrid)
     {
-        _assistantButton = UIButton.Create(toolGrid, "Tool_Assistant", "Assistant");
+        _assistantButton = UIButton.Create(toolGrid, "Tool_Assistant", Strings.Get("assistant"));
         _assistantButton.Button.onClick.AddListener(OnAssistantClicked);
         StyleTileLabel(_assistantButton);
 
-        // A grid lays out every child at one cell, and a cell is what this tile is
-        // not. Opting out of the layout leaves it to FitTiles to place, from the
-        // same cell size and spacing the grid gave the tools.
         RectTransform rect = _assistantButton.Root.GetComponent<RectTransform>();
         LayoutElement le = UILayout.Ensure<LayoutElement>(_assistantButton.Root);
         le.ignoreLayout = true;
@@ -393,12 +342,8 @@ public class ToolPanelUI : PanelUI
         RectTransform rect = _assistantButton.Root.GetComponent<RectTransform>();
         if (rect == null) return;
 
-        // The tiles the grid arranges are exactly the bound ones: DropUnboundTiles
-        // clears out everything else, and the assistant opts out with ignoreLayout.
         int at = _toolButtons.Count;
 
-        // The tile has to sit whole: when the row the tools end on cannot hold it,
-        // it starts the next one.
         int row = at / columns;
         int column = at % columns;
         if (column + span > columns) { row++; column = 0; }
@@ -412,10 +357,6 @@ public class ToolPanelUI : PanelUI
             -(_toolGrid.padding.top + row * pitchY));
     }
 
-    // Square cells rarely fill the width they are given, and the grid centres the
-    // columns in what is left over. This tile is placed by hand, so it has to be
-    // told about that gutter or it starts a tile's width left of the column it
-    // belongs under.
     private float ColumnInset(float cell, int columns)
     {
         RectTransform gridRect = _toolGrid.transform as RectTransform;
@@ -460,7 +401,7 @@ public class ToolPanelUI : PanelUI
             StopCoroutine(_connectingPulse);
             _connectingPulse = null;
         }
-        SetAssistantLabel("Assistant");
+        SetAssistantLabel(Strings.Get("assistant"));
     }
 
     private Coroutine _connectingPulse;
@@ -468,14 +409,25 @@ public class ToolPanelUI : PanelUI
 
     private IEnumerator ConnectingPulse()
     {
+        if (!Style.Animate)
+        {
+            SetAssistantLabel(Strings.Get("assistant.connecting") + "...");
+            yield break;
+        }
+
         int dots = 0;
         var wait = new WaitForSeconds(ConnectingPulseSeconds);
         while (true)
         {
-            SetAssistantLabel("Connecting" + new string('.', dots));
+            SetAssistantLabel(Strings.Get("assistant.connecting") + new string('.', dots));
             dots = (dots + 1) % 4;
             yield return wait;
         }
+    }
+
+    private void OnLanguageChanged()
+    {
+        if (_connectingPulse == null) SetAssistantLabel(Strings.Get("assistant"));
     }
 
     private void SetAssistantLabel(string text)
@@ -503,7 +455,9 @@ public class ToolPanelUI : PanelUI
 
             _toolContents[tool] = content.gameObject;
             SizeHeader(content.gameObject);
-            AddDescription(content.gameObject, Description(tool));
+            Transform header = content.Find("Header");
+            if (header != null) Strings.Bind(header.GetComponent<TMP_Text>(), NameKey(tool));
+            AddDescription(content.gameObject, DescriptionKey(tool));
 
             VerticalLayoutGroup contentLayout = content.GetComponent<VerticalLayoutGroup>();
             if (contentLayout != null) ApplyPaneLayout(contentLayout);
@@ -531,8 +485,8 @@ public class ToolPanelUI : PanelUI
         layout.childForceExpandWidth = true;
         layout.childForceExpandHeight = false;
 
-        AddHeader(content, "Assistant");
-        AddDescription(content, "Carries out your spoken requests using the same tools.");
+        AddHeader(content, "assistant");
+        AddDescription(content, "assistant.desc");
 
         var buttons = new (string, string, UnityEngine.Events.UnityAction)[AssistantSpeedLabels.Length];
         for (int i = 0; i < AssistantSpeedLabels.Length; i++)
@@ -541,6 +495,7 @@ public class ToolPanelUI : PanelUI
             buttons[i] = ("AssistantSpeed_" + i, AssistantSpeedLabels[i], () => OnAssistantSpeedClicked(captured));
         }
         _assistantSpeedRow = AddToggleRow(content, "AssistantSpeedRow", buttons);
+        Strings.Bind(_assistantSpeedRow.Items[AssistantSpeedLabels.Length - 1].Text, "speed.instant");
         _assistantSpeedRow.SetSelected(0);
 
         UILayout.ShowPart(content, false);
@@ -597,6 +552,9 @@ public class ToolPanelUI : PanelUI
         Transform titleBar = FindTransform.FindDeep(transform, "TitleBar");
         if (titleBar == null) return;
 
+        Transform title = titleBar.Find("Title");
+        if (title != null) Strings.Bind(title.GetComponent<TMP_Text>(), "panel.tools");
+
         Transform undoAllBtn = FindTransform.FindDeep(titleBar, "UndoAll_Btn");
         if (undoAllBtn != null)
         {
@@ -607,7 +565,7 @@ public class ToolPanelUI : PanelUI
             TextMeshProUGUI label = textT != null
                 ? textT.GetComponent<TextMeshProUGUI>()
                 : undoAllBtn.GetComponentInChildren<TextMeshProUGUI>(true);
-            if (label != null) label.text = "Undo All";
+            if (label != null) Strings.Bind(label, "undo.all");
 
             UIButton.Adopt(undoAllBtn.gameObject);
 
@@ -620,8 +578,9 @@ public class ToolPanelUI : PanelUI
             Transform anchor = undoAllBtn.parent != null && undoAllBtn.parent.name.EndsWith("_Border")
                 ? undoAllBtn.parent
                 : undoAllBtn;
-            UIButton.Handle undo = UIButton.Create(anchor.parent, "Undo_Btn", "Undo",
+            UIButton.Handle undo = UIButton.Create(anchor.parent, "Undo_Btn", Strings.Get("undo"),
                 width: Style.TitleBarButtonWidth);
+            Strings.Bind(undo.Text, "undo");
             undo.Root.transform.SetSiblingIndex(anchor.GetSiblingIndex());
             undo.Button.onClick.AddListener(OnUndo);
         }
@@ -815,7 +774,6 @@ public class ToolPanelUI : PanelUI
     {
         if (_canvas == null) return;
         ShowCanvas();
-        if (MapCarousel.Instance != null) MapCarousel.Instance.PlacePanelBeside(this);
         QueueFitTiles();
         PanelGuard.ClearToolPanel();
         StateChannel.RecordState("toolPanel", "the tool panel is open, so the tool buttons are on screen");
@@ -849,7 +807,6 @@ public class ToolPanelUI : PanelUI
     private GameObject GetToolContent(ToolType tool) =>
         _toolContents.TryGetValue(tool, out GameObject go) ? go : null;
 
-    // A row of equal-width buttons, one press each, set just under the header.
     private static ButtonList AddToggleRow(GameObject content, string rowName,
         params (string name, string label, UnityEngine.Events.UnityAction onClick)[] buttons)
     {
@@ -872,25 +829,25 @@ public class ToolPanelUI : PanelUI
         if (header != null) UILayout.FixedHeight(header.gameObject, Style.HeaderHeight);
     }
 
-    private static void AddHeader(GameObject content, string text)
+    private static void AddHeader(GameObject content, string key)
     {
         if (content.transform.Find("Header") != null) return;
 
         TextMeshProUGUI label = UILabel.Make(content.transform, "Header", Style.Black,
             TextAlignmentOptions.Left, TextOverflowModes.Ellipsis, bold: true);
-        label.text = text;
+        Strings.Bind(label, key);
         label.transform.SetAsFirstSibling();
 
         SizeHeader(content);
     }
 
-    private void AddDescription(GameObject content, string text)
+    private void AddDescription(GameObject content, string key)
     {
-        if (string.IsNullOrEmpty(text) || content.transform.Find("Description") != null) return;
+        if (string.IsNullOrEmpty(key) || content.transform.Find("Description") != null) return;
 
         TextMeshProUGUI label = UILabel.Make(content.transform, "Description", Style.Black,
             TextAlignmentOptions.TopLeft, TextOverflowModes.Overflow, wrap: true);
-        label.text = text;
+        Strings.Bind(label, key);
 
         InsertBelowHeader(content, label.transform);
     }

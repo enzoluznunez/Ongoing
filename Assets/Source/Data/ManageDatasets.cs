@@ -13,12 +13,8 @@ public class ManageDatasets : MonoBehaviour
 
     public event Action<int> OnActiveDatasetChanged;
 
-    // A sheet someone asked for could not be read, by its payload: what is
-    // open stays open, and whatever already showed the request takes it back.
     public event Action<string> OnRequestFailed;
 
-    // A sheet was read, asked for or not: whatever shows sheets readies room
-    // for it now rather than when it is opened.
     public event Action<DataSource> OnDatasetRead;
 
     public class Dataset
@@ -26,35 +22,23 @@ public class ManageDatasets : MonoBehaviour
         public string label;
         public string payload;
 
-        // What the dataset is called when it is spoken of, label or not.
         public string Name => string.IsNullOrEmpty(label) ? "dataset" : label;
 
-        // Every dataset is listed from ViewCatalog's catalogue of sheets: it
-        // stands in the rail from startup and is read the first time someone
-        // opens it, so a session begins with every sheet named and none of them
-        // read. The description says what it would show once read.
         public string description;
 
         public DataSource source;
         public bool loaded;
 
-        // A parse is in flight exactly while a reader exists that has not
-        // answered yet; the result handler and Unload both clear the reader.
         public bool loading => source != null && !loaded;
 
         public readonly EditList Edits = new EditList();
     }
 
-    // Which dataset each reader in flight is for.
     private readonly Dictionary<Parser, Dataset> _reads = new Dictionary<Parser, Dataset>();
 
     private readonly List<Dataset> _datasets = new List<Dataset>();
     private int _active = -1;
 
-    // The dataset most recently asked for that was still being read. Reads
-    // finish in any order, so only this one is switched to when its read lands;
-    // an earlier request that finishes later (the startup sheet, say) is kept
-    // but left in the background.
     private Dataset _requested;
     private int _datasetsCreated;
     private static readonly EditList Unowned = new EditList();
@@ -91,7 +75,14 @@ public class ManageDatasets : MonoBehaviour
         if (toolManager == null) toolManager = Scene.Tools;
     }
 
-    // The dataset with this payload, or -1 when none has it.
+    public string PayloadOf(DataSource source)
+    {
+        if (source == null) return null;
+        for (int i = 0; i < _datasets.Count; i++)
+            if (_datasets[i].source == source) return _datasets[i].payload;
+        return null;
+    }
+
     public int IndexOf(string payload)
     {
         for (int i = 0; i < _datasets.Count; i++)
@@ -99,8 +90,6 @@ public class ManageDatasets : MonoBehaviour
         return -1;
     }
 
-    // Datasets the app knows of but has not read. They are listed straight away
-    // and cost nothing until they are opened.
     public void AddCatalogEntries(IEnumerable<(string file, string label, string description)> entries)
     {
         if (entries == null) return;
@@ -121,10 +110,6 @@ public class ManageDatasets : MonoBehaviour
     private readonly Dictionary<Dataset, TaskCompletionSource<bool>> _awaitingLoad =
         new Dictionary<Dataset, TaskCompletionSource<bool>>();
 
-    // Reads a listed dataset if it has not been read, and answers when it is
-    // ready either way. The assistant awaits this so that it never reports
-    // switching to a sheet the app is still reading, then switches itself;
-    // reading alone asks for nothing to be shown.
     public Task<bool> EnsureLoaded(int index)
     {
         if (index < 0 || index >= _datasets.Count) return Task.FromResult(false);
@@ -142,7 +127,6 @@ public class ManageDatasets : MonoBehaviour
         return waiting.Task;
     }
 
-    // Whether anyone was waiting on it.
     private bool SettleLoad(Dataset dataset, bool ok)
     {
         if (!_awaitingLoad.TryGetValue(dataset, out TaskCompletionSource<bool> waiting)) return false;
@@ -151,12 +135,6 @@ public class ManageDatasets : MonoBehaviour
         return true;
     }
 
-    // Reads a listed dataset ahead of anyone asking for it, so switching to it
-    // later shows it at once. Nobody is told it was read, or that it could not
-    // be: a failed read is tried again when it is asked for.
-    // Sheets read ahead of being asked for go a few at a time, in the order
-    // they were queued, so startup does not send every request at once. One
-    // asked for meanwhile is read at once, ahead of the queue.
     private const int PreloadsAtOnce = 3;
     private readonly Queue<Dataset> _preloads = new Queue<Dataset>();
     private readonly HashSet<Dataset> _preloading = new HashSet<Dataset>();
@@ -169,7 +147,6 @@ public class ManageDatasets : MonoBehaviour
         PumpPreloads();
     }
 
-    // How many reads ahead were asked for, and how many have not answered.
     public int PreloadsQueued { get; private set; }
     public int PreloadsLeft => _preloads.Count + _preloading.Count;
 
@@ -221,13 +198,11 @@ public class ManageDatasets : MonoBehaviour
 
         if (!ok)
         {
-            // A listed sheet stays listed when it will not read: it is still
-            // one of the regions, and trying again is a slide away.
             Unload(dataset);
             if (!preloaded)
             {
-                Notices.Show(this, "Sheet Unavailable",
-                    reason ?? $"{dataset.label} could not be read.");
+                Notices.Show(this, Strings.Get("notice.sheetUnavailable"),
+                    reason ?? Strings.Format("notice.sheetUnavailable.body", dataset.label));
                 OnRequestFailed?.Invoke(dataset.payload);
             }
             return;
@@ -244,15 +219,9 @@ public class ManageDatasets : MonoBehaviour
     {
         if (index < 0 || index >= _datasets.Count) return;
 
-        // Any switch supersedes a read still pending from an earlier request,
-        // including asking for the dataset already open.
         _requested = null;
         if (index == _active && _datasets[index].loaded) return;
 
-        // A listed sheet is read here, the first time it is asked for, or again
-        // when its last read failed. The parse finishes on a later frame and
-        // lands back in OnDatasetLoadResult, which switches to it then, unless
-        // something else was asked for since.
         if (!_datasets[index].loaded)
         {
             Request(_datasets[index]);
@@ -262,12 +231,9 @@ public class ManageDatasets : MonoBehaviour
         Activate(index);
     }
 
-    // Drops a read still pending from an earlier request, so it is not shown
-    // when it lands; what is open stays open.
     public void CancelRequest() => _requested = null;
 
 
-    // Shows a read dataset on the table.
     private static readonly Unity.Profiling.ProfilerMarker ActivateMarker =
         new Unity.Profiling.ProfilerMarker("ManageDatasets.Activate");
 
@@ -318,22 +284,18 @@ public class ManageDatasets : MonoBehaviour
         return rest > 0 ? $"{list} and {rest} more" : list;
     }
 
-    // Reads a dataset that is to be shown once it lands.
     private void Request(Dataset dataset)
     {
         _requested = dataset;
         BeginLoad(dataset);
     }
 
-    // Finishes any move in hand and puts the tool down, before what the table
-    // shows changes under them.
     private void SettleHands()
     {
         if (sheetManager != null) sheetManager.CommitPendingGrabs();
         if (toolManager != null) toolManager.DeselectTool();
     }
 
-    // Gives back everything the parse held, and leaves the entry listed.
     private void Unload(Dataset dataset)
     {
         dataset.loaded = false;

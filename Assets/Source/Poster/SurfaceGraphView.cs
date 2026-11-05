@@ -1,16 +1,5 @@
 using UnityEngine;
 
-// Prototype poster figure: a scooped surface over a two-variable floor.
-//
-// The floor's two axes are the first two variables and depth is the third. The
-// fourth is colour, and here it is depth itself: the ten division colours are
-// used as contour steps, so a band edge is a level line and the eye reads how
-// far the scoop falls by counting bands rather than by trusting the shading
-// alone. A bowl seen from above foreshortens badly, and colour is what keeps it
-// from flattening into a disc on a printed page.
-//
-// Each cell is flat-shaded from its own centre, which keeps the band edges
-// crisp instead of smearing one band into the next across a quad.
 [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
 public class SurfaceGraphView : MonoBehaviour
 {
@@ -57,16 +46,6 @@ public class SurfaceGraphView : MonoBehaviour
     private Vector3 Point(float u, float v) =>
         new Vector3((u - 0.5f) * extent.x, Depth(u, v) * height, (v - 0.5f) * extent.y);
 
-    // The scoop: a crater rather than a parabola. A bowl whose walls are a
-    // simple square curve has no floor and no lip, so every contour looks the
-    // same and the eye has nothing to hang depth on. Smoothstep gives the three
-    // parts a scoop actually has -- a flat floor, a steep wall, a flattening
-    // lip -- and equal steps in depth then land as wide rings on the floor,
-    // tight rings up the wall and wide rings again at the lip, which is itself
-    // a reading of how fast the surface is falling.
-    //
-    // The tilt lifts one lip above the other so the figure has a direction to
-    // be read down. Returns 0 at the floor, 1 at the highest lip.
     private static float Depth(float u, float v)
     {
         float dx = (u - 0.5f) * 2f;
@@ -77,8 +56,5 @@ public class SurfaceGraphView : MonoBehaviour
         return Mathf.Clamp01(0.90f * wall + 0.05f * dx + 0.02f * dz);
     }
 
-    // How open to the sky a point on the scoop is. The floor sees least of it,
-    // so it is darkest; the lip sees all of it. Crude next to a real occlusion
-    // term, and enough: it is the cue that says hollow rather than mound.
     private static float Exposure(float depth) => Mathf.Lerp(0.46f, 1f, depth);
 }

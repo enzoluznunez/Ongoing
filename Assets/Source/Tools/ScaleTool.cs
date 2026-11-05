@@ -3,8 +3,8 @@ using Oculus.Interaction;
 
 public class ScaleTool : GrabTool
 {
-    public const float MinScale = 0.01f;
-    public const float MaxScale = 2f;
+    public const float MinScale = CreateSheet.DefaultScale * 0.75f;
+    public const float MaxScale = CreateSheet.DefaultScale * 1.25f;
 
     private static ITransformer ScaleTransformerFor(CreateSheet sheet)
     {

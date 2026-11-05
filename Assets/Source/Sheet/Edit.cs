@@ -14,13 +14,9 @@ public struct MoveRecord
     public Vector3 postScale;
     public float distance;
 
-    // Where the sheets' frame stood in the world when this edit was made: the
-    // poses above are stated against it. A sheet the Move tool has moved stays
-    // against this frame rather than following the panel.
     public Vector3 anchorPos;
     public Quaternion anchorRot;
 
-    // A move that ends where it began: no edit at all.
     public bool IsNoChange => SamePose(prePos, preRot, preScale, postPos, postRot, postScale);
 
     public static bool SamePose(Vector3 aPos, Quaternion aRot, Vector3 aScale,
@@ -29,8 +25,6 @@ public struct MoveRecord
         (aScale - bScale).sqrMagnitude < 1e-8f;
 }
 
-// Always a strip: one whole row or column raised above the sheet, or, with
-// 'lower', a raised one taken down again.
 public struct ProjectionRecord
 {
     public bool isColumn;
@@ -50,9 +44,6 @@ public class Edit
 
     public bool reorderIsColumn;
     public List<int> reorderPreOrder;
-    // The whole arrangement before, hidden lines included, when the reorder
-    // moved those too (a sort that ranks every line); null when it only
-    // rearranged the lines on the sheet.
     public List<int> reorderPreFull;
     public int reorderFrom;
     public int reorderTarget;
@@ -60,13 +51,9 @@ public class Edit
 
     public int group;
 
-    // Which column groups were hidden before this filter, and after it. Undo puts
-    // the first back; a replay onto a freshly loaded dataset applies the second.
     public List<int> filterPreHidden;
     public List<int> filterPostHidden;
 
-    // Which axis the hidden set belongs to. One edit only ever covers one axis,
-    // so a press on the company list and a press on the metric list undo apart.
     public bool filterIsRow;
 
     public static string KindName(EditKind kind) => kind.ToString().ToLowerInvariant();

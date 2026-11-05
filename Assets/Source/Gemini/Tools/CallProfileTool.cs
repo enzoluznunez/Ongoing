@@ -20,7 +20,6 @@ public sealed class CallProfileTool : AgenticTool<CallProfileTool.Args> {
              "{revenue_min: 10000000}. Rows only; give no other way of picking lines with it."), Optional]
         public BreachFilters where;
 
-        // The breaches 'where' named, looked up before the call runs.
         internal BreachMatch matched;
     }
 
@@ -53,8 +52,6 @@ public sealed class CallProfileTool : AgenticTool<CallProfileTool.Args> {
         Parameters = WithNames(ParametersFor(typeof(Args)))
     };
 
-    // The most rows one 'where' raises: each is a strip of its own, and more
-    // than this buries the sheet under them.
     private const int MostStrips = 50;
 
     protected override Task<string> Prepare(Args args) => LookUp(args.where, m => args.matched = m);
@@ -91,8 +88,6 @@ public sealed class CallProfileTool : AgenticTool<CallProfileTool.Args> {
             wanted.Add(single);
         }
 
-        // 'wanted' holds blocks; one strip raises a whole paired metric, so any
-        // line inside the block stands for it.
         var data = Scene.Data;
         int blockMin = data != null ? data.GroupOf(columns, lineMin) : lineMin;
         var lines = new List<int>(wanted.Count);
@@ -104,7 +99,6 @@ public sealed class CallProfileTool : AgenticTool<CallProfileTool.Args> {
         Raise(profile, columns, lines, rowMin, rowMax, colMin, colMax, blockMin, result);
     }
 
-    // Raises each of 'lines', visible positions on the axis, as one undo entry.
     private static void Raise(ProfileTool profile, bool columns, List<int> lines,
         int rowMin, int rowMax, int colMin, int colMax, int blockMin, Dictionary<string, object> result) {
         var data = Scene.Data;
@@ -170,10 +164,6 @@ public sealed class CallProfileTool : AgenticTool<CallProfileTool.Args> {
         var data = Scene.Data;
         if (data == null) { result["error"] = "No data source found in scene."; return false; }
 
-        // Ranking needs one measure in one unit. On a paired sheet the columns hold
-        // different metrics, so neither axis can be ranked this way: judging metrics
-        // against each other is meaningless, and judging a row means adding dollars
-        // to share counts.
         bool byLine = !string.IsNullOrWhiteSpace(of.line);
         if (byLine == !string.IsNullOrWhiteSpace(of.measure)) {
             result["error"] = "'of' needs exactly one of 'line' or 'measure'.";
@@ -191,8 +181,6 @@ public sealed class CallProfileTool : AgenticTool<CallProfileTool.Args> {
             return false;
         }
 
-        // By one line of the other axis, its cells alone are read: a single
-        // cell's sum is its value, and a paired metric's is its years together.
         string measure = "sum";
         if (byLine) {
             if (!TryResolveLine(of.line, !columns, crossMin, crossMax, result, out int crossBlock)) return false;
@@ -219,7 +207,6 @@ public sealed class CallProfileTool : AgenticTool<CallProfileTool.Args> {
         var picked = new List<object>(take);
         var scores = new List<object>(take);
         for (int i = 0; i < take; i++) {
-            // 'into' holds blocks, as TryResolveLine's do.
             into.Add(data.GroupOf(columns, scored[i].Value));
             picked.Add(data.TitleAt(columns, scored[i].Value));
             scores.Add(System.Math.Round(scored[i].Key, 2));

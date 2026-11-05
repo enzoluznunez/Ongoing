@@ -42,8 +42,6 @@ public static class PanelPlacement
 
     public const float FlipSeconds = 0.35f;
 
-    // A two-hand turn on 'go' as far as the hands take it. Reuses the turn
-    // 'go' already has.
     public static TwoGrabRotateTransformer FreeSpin(GameObject go)
     {
         TwoGrabRotateTransformer spin = go.GetComponent<TwoGrabRotateTransformer>();
@@ -58,8 +56,6 @@ public static class PanelPlacement
         return spin;
     }
 
-    // How a panel turns in two hands: about the upright through 'pivot', as
-    // far as the hands take it.
     public static TwoGrabRotateTransformer UprightSpin(GameObject go, Transform pivot)
     {
         TwoGrabRotateTransformer spin = FreeSpin(go);
@@ -68,10 +64,6 @@ public static class PanelPlacement
         return spin;
     }
 
-    // Turns 't' half round about the upright through 'pivot', to face a
-    // viewer who has walked round behind it. It gives way, where it stands,
-    // the moment 'stop' says so (a hand has taken hold) or anything else
-    // places 't' meanwhile: a panel stood somewhere new is not turned back.
     public static IEnumerator Flip(Transform t, Vector3 pivot, Func<bool> stop)
     {
         Quaternion from = t.rotation;
@@ -80,6 +72,12 @@ public static class PanelPlacement
         Vector3 offset = t.position - pivot;
         Vector3 wrotePos = t.localPosition;
         Quaternion wroteRot = t.localRotation;
+
+        if (!Style.Animate)
+        {
+            t.SetPositionAndRotation(pivot + half * offset, to);
+            yield break;
+        }
 
         float elapsed = 0f;
         while (elapsed < FlipSeconds)
@@ -94,13 +92,10 @@ public static class PanelPlacement
         }
     }
 
-    // Against its parent, so a parent carrying it along does not count.
     private static bool Moved(Transform t, Vector3 localPos, Quaternion localRot) =>
         (t.localPosition - localPos).sqrMagnitude > 1e-8f || Quaternion.Angle(t.localRotation, localRot) > 0.01f;
 }
 
-// The swell a grabbed thing takes while a hand holds it, and the scale it
-// goes back to when let go.
 public struct GrabSwell
 {
     private bool _on;
@@ -108,7 +103,6 @@ public struct GrabSwell
 
     public bool On => _on;
 
-    // The scale at rest, without the swell.
     public Vector3 Rest(Transform t) => _on ? _rest : t.localScale;
 
     public void Set(Transform t, bool held)
@@ -123,7 +117,6 @@ public struct GrabSwell
         _on = held;
     }
 
-    // Takes the present scale as the resting one, swell or not.
     public void Forget(Transform t)
     {
         _on = false;

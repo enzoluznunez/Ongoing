@@ -20,19 +20,19 @@ public class Prewarm : MonoBehaviour
         GameObject rig = BuildWarmRig();
 
         ToolPanelUI tool = Scene.ToolPanel;
+        SettingsPanelUI settings = Scene.SettingsPanel;
         Tooltip tooltip = FindAnyObjectByType<Tooltip>(FindObjectsInactive.Include);
 
         if (tool != null) tool.PrewarmCanvas(true);
+        if (settings != null) settings.PrewarmCanvas(true);
         if (tooltip != null) tooltip.PrewarmCanvas(true);
-        // The click a poke plays, its clip made now rather than on the first poke.
         UIPressFeedback.Prepare();
 
-        // Two frames: one to lay the nested layout groups out, one to draw
-        // what that settled on.
         yield return null;
         yield return null;
 
         if (tool != null) tool.PrewarmCanvas(false);
+        if (settings != null) settings.PrewarmCanvas(false);
         if (tooltip != null) tooltip.PrewarmCanvas(false);
         if (rig != null) Destroy(rig);
 
@@ -65,10 +65,6 @@ public class Prewarm : MonoBehaviour
         AddLabel(canvasGo.transform, Style.BodyFont);
         AddLabel(canvasGo.transform, Style.TitleFont);
 
-        // The bars, the maps and the sheet's titles are warmed by drawing
-        // the real ones once the loading phase has built them (GraphicsWarm):
-        // a quad in their materials warmed nothing they use, its mesh layout
-        // not being theirs. These world titles stay for the glyphs below.
         foreach (TMP_FontAsset font in new[] { Style.BodyFont, Style.TitleFont })
         {
             if (font != null) font.TryAddCharacters(CommonGlyphs, out _);
@@ -82,9 +78,6 @@ public class Prewarm : MonoBehaviour
         return root;
     }
 
-    // Every glyph a title is likely to use, added to the fonts at startup so
-    // no sheet or panel adds them mid-session: printable ASCII, Latin-1's
-    // letters and signs, and typographic punctuation.
     private static readonly string CommonGlyphs = BuildCommonGlyphs();
 
     private static string BuildCommonGlyphs()

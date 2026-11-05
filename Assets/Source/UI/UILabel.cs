@@ -17,7 +17,7 @@ public static class UILabel
         label.color = color;
         label.alignment = alignment;
         label.overflowMode = overflow;
-        label.enableWordWrapping = wrap;
+        label.textWrappingMode = wrap ? TextWrappingModes.Normal : TextWrappingModes.NoWrap;
         label.raycastTarget = false;
         return label;
     }

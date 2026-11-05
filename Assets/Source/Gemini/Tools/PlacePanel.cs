@@ -29,7 +29,7 @@ public sealed class PlacePanel : AgenticTool<PlacePanel.Args> {
     public override FunctionDeclaration Declaration => new FunctionDeclaration {
         Name = "PlacePanel",
         Description = "Place the tool panel in the room for the user, as if they grabbed its edge and moved it; " +
-                      "the sheet and map stay where they are. 'move' slides it, 'rotate' turns it about the upright " +
+                      "the sheet stays where it is. 'move' slides it, 'rotate' turns it about the upright " +
                       "axis, and 'face' squares it to the user without moving it. Only do this when the user asks. " +
                       "It stays upright and within arm's reach, and must be open: if the latest message says the " +
                       "user closed it, reopen it with SetPanel first, or ask. Undo does not reverse placement.",
@@ -53,8 +53,6 @@ public sealed class PlacePanel : AgenticTool<PlacePanel.Args> {
             return;
         }
 
-        // The panel goes straight to its new place, at every assistant
-        // speed: panels never slide into place.
         switch (args.action) {
             case "move": Move(panel, args, result); break;
             case "rotate": Rotate(panel, args, result); break;

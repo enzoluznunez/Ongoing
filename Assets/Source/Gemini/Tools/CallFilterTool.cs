@@ -26,7 +26,6 @@ public sealed class CallFilterTool : AgenticTool<CallFilterTool.Args> {
              "off, 'show' brings them back."), Values("only", "hide", "show"), Optional]
         public string whereDoes;
 
-        // The breaches 'where' named, looked up before the call runs.
         internal BreachMatch matched;
     }
 
@@ -104,8 +103,6 @@ public sealed class CallFilterTool : AgenticTool<CallFilterTool.Args> {
             for (int i = 0; i < toShow.Count; i++) hidden.Remove(toShow[i]);
         }
 
-        // A false return with nothing to say is a filter that was already in
-        // force; the timeline shows that as 'changed' false and reads back below.
         bool applied = filter.Apply(rows, new List<int>(hidden), out string refusal);
 
         if (!applied && refusal != null) {
@@ -116,9 +113,6 @@ public sealed class CallFilterTool : AgenticTool<CallFilterTool.Args> {
         Report(data, rows, result);
     }
 
-    // The columns unless the caller says otherwise, which is what a filter meant
-    // before the tool could reach the other axis. 'metric' and 'company' are
-    // still understood, from when every sheet was companies by metrics.
     private static bool ReadAxis(string axis, out bool rows, Dictionary<string, object> result) {
         rows = false;
         if (string.IsNullOrWhiteSpace(axis)) return true;
@@ -190,8 +184,6 @@ public sealed class CallFilterTool : AgenticTool<CallFilterTool.Args> {
         result["axis"] = noun;
         result["showingCount"] = showing.Count;
         result["hiddenCount"] = off.Count;
-        // A long list costs the conversation more than it tells: the counts
-        // stand in for it, and DescribeSheet reads the rows when they matter.
         bool listed = showing.Count + off.Count <= MostListed;
         if (listed) {
             result["showing"] = showing;
@@ -204,7 +196,6 @@ public sealed class CallFilterTool : AgenticTool<CallFilterTool.Args> {
                       : $"call DescribeSheet for the {noun}s now on the sheet before naming one by position.");
     }
 
-    // The most lines a result lists by name.
     private const int MostListed = 60;
 
 }

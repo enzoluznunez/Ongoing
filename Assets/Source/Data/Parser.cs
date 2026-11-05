@@ -63,15 +63,10 @@ public class Parser : DataSource
         }
     }
 
-    // Which read is current: a read still under way when another starts, or
-    // when the sheet is let go, is dropped when it lands.
     private int _readTicket;
 
     private static readonly ProfilerMarker ApplyMarker = new ProfilerMarker("Parser.Apply");
 
-    // The text is split and its figures read on a worker, so a large sheet
-    // never holds up a frame; what is read is taken in here on the main
-    // thread, on a later frame.
     public void LoadFromCsvText(string csvText)
     {
         ClearGrid();
@@ -135,8 +130,6 @@ public class Parser : DataSource
         }
     }
 
-    // What a sheet's text says, read without touching Unity, so it can be read
-    // on any thread. A sheet that will not do says why in 'failure'.
     private sealed class Table
     {
         public string failure;
@@ -174,8 +167,6 @@ public class Parser : DataSource
             List<string> header = grid[0];
             table.header = header;
 
-            // '#heights N': the header's last N columns are the heights of the N
-            // before them, so only those first N are columns of the sheet.
             int heights = directives.heights;
             if (heights > 0 && header.Count - 1 != heights * 2)
             {
@@ -195,10 +186,6 @@ public class Parser : DataSource
             }
             table.groupSize = groupSize;
 
-            // The '#metro', '#color' and '#city' directives carry one value per data row as
-            // the file holds them, so dropping a short row here has to drop its
-            // place in them too. Keeping each survivor's original position is what
-            // lets the rest of the sheet keep its colour.
             int sourceRows = grid.Count - 1;
             var rows = new List<List<string>>(sourceRows);
             var sourceRow = new List<int>(sourceRows);
@@ -277,11 +264,6 @@ public class Parser : DataSource
         public readonly List<string> cities = new List<string>();
     }
 
-    // Directive lines sit above the header and configure the grid. '#group N'
-    // says how many columns belong to one metric; '#heights N' that the last N
-    // columns are the heights of the N before them; '#metro', '#color' and
-    // '#city' carry one value per data row, in row order. Anything else is
-    // ignored, so a file may carry comments without becoming a row.
     private static void ReadDirective(string line, Directives into, string label)
     {
         string body = line.TrimStart().TrimStart('#').Trim();
@@ -317,19 +299,12 @@ public class Parser : DataSource
     {
         rest = null;
         if (!body.StartsWith(name, StringComparison.OrdinalIgnoreCase)) return false;
-        // The whole word, so a comment such as '# colors follow...' stays a comment.
         if (body.Length > name.Length && !char.IsWhiteSpace(body[name.Length])) return false;
 
         rest = body.Substring(name.Length).Trim();
         return true;
     }
 
-    // A row's metro, its colour and its city only mean anything together and
-    // only if there is exactly one of each per row (the city is only checked,
-    // not kept): a sheet whose directives
-    // disagree with its rows is drawn uncoloured rather than coloured by a
-    // guess. 'sourceRows' is how many data rows the directives were written
-    // for, and 'sourceRow' says where each row that survived stood among them.
     private void SetRowCategories(Directives directives, int sourceRows, List<int> sourceRow)
     {
         _rowCategories.Clear();

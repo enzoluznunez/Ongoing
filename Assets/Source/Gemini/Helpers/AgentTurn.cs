@@ -29,7 +29,6 @@ public static class AgentTurn
     {
         ManageSheets sheets = Scene.Sheets;
         if (sheets != null) sheets.Interrupt();
-        if (MapCarousel.Instance != null) MapCarousel.Instance.CompleteAgentMotion();
 
         SortTool sort = Scene.Sort;
         if (sort != null && sort.HaltOrderSequence() && sheets != null) sheets.AmendReorderRecord();
@@ -45,9 +44,9 @@ public static class AgentTurn
         StateChannel.Record($"the user stopped you after {stamped} of your changes had been applied");
 
         if (sheets != null)
-            Notices.Show(sheets, "Assistant Stopped", stamped == 1
-                ? "One change was already made. Undo takes it back."
-                : $"{stamped} changes were already made. Undo takes them back in one step.");
+            Notices.Show(sheets, Strings.Get("notice.stopped"), stamped == 1
+                ? Strings.Get("notice.stopped.one")
+                : Strings.Format("notice.stopped.many", stamped));
     }
 
     public static void Clear()

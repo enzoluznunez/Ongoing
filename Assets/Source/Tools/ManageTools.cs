@@ -68,7 +68,6 @@ public class ManageTools : MonoBehaviour
         if (sheetManager != null) sheetManager.SyncProjectionToStack();
     }
 
-    // Every tool but None records edits of the kind with its own name.
     private static bool TryEditKindOf(ToolType tool, out EditKind kind) =>
         Enum.TryParse(tool.ToString(), out kind);
 
@@ -84,7 +83,6 @@ public class ManageTools : MonoBehaviour
         if (outcome != ManageSheets.UndoResult.Unreachable)
         {
             ManageDatasets.ActiveEdits.Pop();
-            // A strip the assistant's undo puts back up rises at its speed.
             sheetManager.SyncProjectionToStack(StateChannel.InAgentCall);
         }
         return outcome;
@@ -146,8 +144,6 @@ public class ManageTools : MonoBehaviour
         for (int i = 0; i < had && ManageDatasets.ActiveEdits.Peek() != null; i++)
             if (UndoTop(out _) == ManageSheets.UndoResult.Unreachable) break;
 
-        // Every tool resets; the edits all go at once below rather than a
-        // kind at a time.
         foreach (ToolType tool in System.Enum.GetValues(typeof(ToolType)))
             if (tool != ToolType.None) OnToolReset?.Invoke(tool);
 

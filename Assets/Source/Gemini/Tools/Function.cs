@@ -99,8 +99,6 @@ public abstract class Function {
         return sink.Head;
     }
 
-    // Keeps only the first maxBytes of what is written but counts everything, so a
-    // large result is never materialised as a full string just to be truncated.
     private sealed class TruncatingStream : System.IO.Stream {
         private readonly byte[] head;
         private int headLen;

@@ -1,18 +1,8 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-// Geometry for the poster figures, accumulated into one mesh per view.
-//
-// The sheet shader the rest of the app draws with is unlit and reads vertex
-// colour, so shading here is baked per vertex on the CPU rather than lit at
-// draw time: one fixed key direction, a little ambient. That keeps the figures
-// on the same material as the headset's cubes, and makes a capture reproducible
-// -- no scene light, no exposure, no pipeline settings to match.
 public class PosterMesh
 {
-    // Deliberately oblique rather than overhead: a surface whose normals all
-    // point roughly up takes almost no shading from a light above it, and the
-    // slope then reads only from the silhouette.
     public static readonly Vector3 KeyDirection = new Vector3(-0.58f, 0.40f, -0.71f).normalized;
 
     private const float Ambient = 0.30f;
@@ -22,16 +12,6 @@ public class PosterMesh
     private readonly List<Color> _colors = new List<Color>();
     private readonly List<int> _tris = new List<int>();
 
-    // Lambert wrapped into the ambient floor, so a face turned away from the key
-    // is dimmer but never black and the hue stays readable all round.
-    // The palette is hex, which is sRGB, but a vertex colour is handed to the
-    // shader unconverted and the project renders linear. Converting here is what
-    // keeps a captured band the same colour as the hex in the data.
-    //
-    // The exposure argument is the second depth cue: geometry alone cannot tell
-    // a bowl from a dome once the silhouette is ambiguous, but a hollow that
-    // darkens as it deepens is read as a hollow immediately. The caller passes
-    // how open to the sky a point is, and it multiplies the lighting.
     public static Color Shade(Color color, Vector3 normal, float exposure)
     {
         Color linear = QualitySettings.activeColorSpace == ColorSpace.Linear ? color.linear : color;
@@ -51,7 +31,6 @@ public class PosterMesh
         return mesh;
     }
 
-    // Corners wound a, b, c, d around the face.
     public void AddQuad(Vector3 a, Vector3 b, Vector3 c, Vector3 d,
                         Color ca, Color cb, Color cc, Color cd)
     {
@@ -65,8 +44,6 @@ public class PosterMesh
     public void AddQuad(Vector3 a, Vector3 b, Vector3 c, Vector3 d, Color color) =>
         AddQuad(a, b, c, d, color, color, color, color);
 
-    // A UV sphere. The node marker: round from every angle, and shaded so a
-    // ring of ten of them still reads as ten solids rather than ten flat discs.
     public void AddSphere(Vector3 center, float radius, Color color, float exposure = 1f,
                           int rings = 18, int segments = 28)
     {
@@ -102,7 +79,6 @@ public class PosterMesh
         }
     }
 
-    // A flat ribbon from a to b in the XY plane: the edges of the network.
     public void AddRibbon(Vector3 a, Vector3 b, float width, Color colorA, Color colorB)
     {
         Vector3 along = b - a;
@@ -112,8 +88,6 @@ public class PosterMesh
         AddQuad(a - side, b - side, b + side, a + side, colorA, colorB, colorB, colorA);
     }
 
-    // Shortens a segment at both ends so an edge meets the rim of a node rather
-    // than running under it, which would darken the sphere it passes beneath.
     public static void Trim(ref Vector3 a, ref Vector3 b, float startGap, float endGap)
     {
         Vector3 along = b - a;

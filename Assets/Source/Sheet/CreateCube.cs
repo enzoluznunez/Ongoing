@@ -1,9 +1,5 @@
 using UnityEngine;
 
-// A bar on a sheet. It has no collider: a fingertip finds the bar it is at
-// by where it stands among the sheet's lines (SheetRaycast), so a sheet of
-// thousands of bars puts nothing in the physics scene, and the sheet's grab
-// has one box to test rather than a collider per bar.
 [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
 public class CreateCube : MonoBehaviour
 {
@@ -26,10 +22,6 @@ public class CreateCube : MonoBehaviour
     private float _swell;
     private bool _painted;
 
-    // Drawn only while its line is on the sheet (visible) and its sheet is up
-    // (shown); touchable only while drawn, while its sheet takes pokes, and
-    // while it is not rising or falling with its whole sheet (moving), as a
-    // sheet mid-switch is not touched.
     private bool _visible = true;
     private bool _shown = true;
     private bool _pickable = true;
@@ -37,8 +29,6 @@ public class CreateCube : MonoBehaviour
 
     public bool Touchable => _visible && _shown && _pickable && !_moving;
 
-    // The point of the bar nearest a world point, the point itself when it
-    // is inside: the bar is the unit cube its transform stretches.
     public Vector3 ClosestPoint(Vector3 world)
     {
         Vector3 p = transform.InverseTransformPoint(world);
@@ -54,7 +44,6 @@ public class CreateCube : MonoBehaviour
         return Mathf.Abs(p.x) <= 0.5f && Mathf.Abs(p.y) <= 0.5f && Mathf.Abs(p.z) <= 0.5f;
     }
 
-    // The colour it is drawn in, before any lighting.
     public Color BaseColor => _baseColor;
 
     public bool IsVisible => _visible;
@@ -165,7 +154,6 @@ public class CreateCube : MonoBehaviour
         Apply();
     }
 
-    // The sheet's own showing, apart from whether this bar's line is on it.
     public void SetShown(bool shown)
     {
         if (_shown == shown) return;

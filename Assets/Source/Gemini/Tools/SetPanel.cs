@@ -7,28 +7,29 @@ public sealed class SetPanel : AgenticTool<SetPanel.Args> {
         [Doc("What to do with it. Prefer 'open' or 'close' over 'toggle' when you know the state you want.")]
         [Values("open", "close", "toggle")]
         public string state;
-        [Doc("Which panel: 'tool', the tool panel, or 'map', the map panel. Defaults to 'tool'.")]
-        [Values("tool", "map"), Optional]
+        [Doc("Which panel: 'tool', the tool panel, or 'settings', the settings panel. Defaults to 'tool'.")]
+        [Values("tool", "settings"), Optional]
         public string panel;
     }
 
     public override FunctionDeclaration Declaration => new FunctionDeclaration {
         Name = "SetPanel",
         Description = "Open, close, or toggle the tool panel (the tool buttons and your speed setting) or the " +
-                      "map panel, as the user's wrist buttons do. A panel opens ahead of the user, beside the " +
-                      "other when that one is open; neither moves or hides the sheet.",
+                      "settings panel (the user's own settings, which only they change), as the user's wrist " +
+                      "buttons do. A panel opens ahead of the user, beside the other when that one is open; " +
+                      "neither moves nor hides the sheet.",
         Parameters = ParametersFor(typeof(Args))
     };
 
     protected override void Run(Args args, Dictionary<string, object> result) {
         string state = args.state;
 
-        if (args.panel == "map") {
-            var maps = MapCarousel.Instance;
-            if (maps == null) { result["error"] = "There is no map in this scene."; return; }
-            Apply(state, maps.IsOpen, () => maps.SetOpen(true), () => maps.SetOpen(false), maps.Toggle);
-            result["visible"] = maps.IsOpen;
-            result["did"] = maps.IsOpen ? "the map panel is open" : "the map panel is closed";
+        if (args.panel == "settings") {
+            var settings = Scene.SettingsPanel;
+            if (settings == null) { result["error"] = "Settings panel not found in scene."; return; }
+            Apply(state, settings.IsVisible, settings.ShowPanel, settings.HidePanel, settings.TogglePanel);
+            result["visible"] = settings.IsVisible;
+            result["did"] = settings.IsVisible ? "the settings panel is open" : "the settings panel is closed";
             return;
         }
 

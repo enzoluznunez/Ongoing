@@ -14,13 +14,9 @@ public abstract class DataSource : MonoBehaviour
     public string RowCategoryAt(int dataRow) =>
         dataRow >= 0 && dataRow < _rowCategories.Count ? _rowCategories[dataRow] : null;
 
-    // White when a sheet carries no categories, which is what an ordinary CSV
-    // loaded by hand is: uncoloured rather than wrongly coloured.
     public Color RowColorAt(int dataRow) =>
         dataRow >= 0 && dataRow < _rowColors.Count ? _rowColors[dataRow] : Color.white;
 
-    // The categories present, in the order the rows are in. One entry per block,
-    // so a sheet that arrived blocked by metro reads back one name per metro.
     public List<string> CategoriesInOrder(IReadOnlyList<int> rows)
     {
         var found = new List<string>();
@@ -38,11 +34,6 @@ public abstract class DataSource : MonoBehaviour
     public string ColumnAxisTitle => _columnAxisTitle;
     public string RowAxisTitle => _rowAxisTitle;
 
-    // The columns actually on the sheet, in order. Everything downstream — the
-    // sheet build, the labels, the statistics, the agent's reads — works from
-    // this, so hiding a metric removes it from all of them at once. The full
-    // arrangement lives on in _columnOrder, which is what a hidden metric comes
-    // back into when it is shown again.
     public IReadOnlyList<int> ColumnOrder => _visibleColumns;
     public IReadOnlyList<int> RowOrder => _visibleRows;
 
@@ -61,8 +52,6 @@ public abstract class DataSource : MonoBehaviour
         return string.IsNullOrEmpty(title) ? $"{(columns ? "column" : "row")} {visIndex + 1}" : title;
     }
 
-    // -1 when the line is not on the sheet, which now covers a hidden metric as
-    // well as an index the data never had.
     public int VisIndexOf(bool columns, int dataIndex)
     {
         IReadOnlyList<int> order = columns ? ColumnOrder : RowOrder;
@@ -71,10 +60,6 @@ public abstract class DataSource : MonoBehaviour
             if (order[v] == dataIndex) return v;
         return -1;
     }
-
-    // Consecutive columns may belong to one group: a metric holding one cell per
-    // year, drawn as a tight pair. Rows are never grouped, so both axes share one
-    // code path and a group size of 1 is exactly the ungrouped behaviour.
 
     public int ColumnGroupSize => _columnGroupSize;
     public IReadOnlyList<string> SeriesTitles => _seriesTitles;
@@ -88,11 +73,6 @@ public abstract class DataSource : MonoBehaviour
         return (columns ? ColumnOrder : RowOrder).Count / GroupSize(columns);
     }
 
-    // Filtering hides whole column groups: on a grouped axis that is one metric
-    // with both its years, and on an ungrouped one it is a single column. Groups
-    // are named by their place in the data, not on the sheet, so a hidden metric
-    // survives every reorder and comes back where the arrangement says it goes.
-
     private readonly HashSet<int> _hiddenGroups = new HashSet<int>();
     private readonly List<int> _visibleColumns = new List<int>();
 
@@ -102,8 +82,6 @@ public abstract class DataSource : MonoBehaviour
 
     public string DataGroupTitleAt(int dataGroup) => GroupTitleOfData(true, dataGroup * _columnGroupSize);
 
-    // Data-space group ids in the order they stand on the sheet, hidden ones
-    // included, so a list of metrics reads the same whether or not it is filtered.
     private List<int> DataGroupsInOrder()
     {
         var groups = new List<int>(DataGroupCount);
@@ -112,8 +90,6 @@ public abstract class DataSource : MonoBehaviour
         return groups;
     }
 
-    // Both axes filter by this: every id has to exist, one line has to stay,
-    // and nothing is announced when the set is unchanged.
     private bool SetHidden(HashSet<int> target, IEnumerable<int> hidden, int count, string noun,
                            out string refusal)
     {
@@ -145,19 +121,9 @@ public abstract class DataSource : MonoBehaviour
         return true;
     }
 
-    // The row axis filters the same way the column axis does, one company at a
-    // time rather than by group: rows carry no series, so a hidden row is a
-    // single line off the sheet. Rows are named by their place in the data here
-    // too, so a hidden company survives a sort and comes back where the
-    // arrangement left it.
-
     private readonly HashSet<int> _hiddenRows = new HashSet<int>();
     private readonly List<int> _visibleRows = new List<int>();
 
-    // A company is one row and a metric one column group; past that the two
-    // axes filter the same way, so these take the axis as 'rows'. Lines are
-    // listed in data-space ids in the order they stand on the sheet, hidden
-    // ones included, so a list reads the same whether or not it is filtered.
     public List<int> FilterLinesInOrder(bool rows) => rows ? new List<int>(_rowOrder) : DataGroupsInOrder();
 
     public List<int> HiddenInOrder(bool rows)
@@ -170,13 +136,10 @@ public abstract class DataSource : MonoBehaviour
 
     public bool IsHidden(bool rows, int id) => HiddenSet(rows).Contains(id);
 
-    // Refused rather than clamped when it would empty the sheet: a sheet with
-    // no rows or columns is not a filter the user can see their way out of.
     public bool SetHiddenOn(bool rows, IEnumerable<int> hidden, out string refusal) =>
         SetHidden(HiddenSet(rows), hidden, rows ? RowCount : DataGroupCount,
             FilterNoun(this, rows), out refusal);
 
-    // What one filtered line on that axis is called: a row, or a column group.
     public static string FilterNoun(DataSource data, bool rows) => rows ? RowNoun(data) : GroupNoun(data, true);
 
     private HashSet<int> HiddenSet(bool rows) => rows ? _hiddenRows : _hiddenGroups;
@@ -196,11 +159,6 @@ public abstract class DataSource : MonoBehaviour
         }
     }
 
-    // Where each line on the sheet stands among every line, hidden ones
-    // included: the place in the whole arrangement of the line at each
-    // visible position. The sheet is laid out by these, so a hidden line
-    // leaves its place empty and nothing else moves; everything that counts
-    // lines (the tools, the assistant) still counts the visible ones.
     private readonly List<int> _rowSlots = new List<int>();
     private readonly List<int> _columnSlots = new List<int>();
 
@@ -208,13 +166,8 @@ public abstract class DataSource : MonoBehaviour
 
     public int SlotCount(bool columns) => columns ? _columnOrder.Count : _rowOrder.Count;
 
-    // The whole arrangement on an axis, hidden lines included, in data-space
-    // line ids.
     public List<int> FullOrder(bool columns) => new List<int>(columns ? _columnOrder : _rowOrder);
 
-    // Sets the whole arrangement, hidden lines included: a sort that ranks the
-    // hidden lines too, so each comes back where it belongs, and the undo of
-    // one. False when it is not an arrangement of every line.
     public bool SetFullOrder(bool columns, IReadOnlyList<int> order)
     {
         List<int> target = columns ? _columnOrder : _rowOrder;
@@ -230,16 +183,11 @@ public abstract class DataSource : MonoBehaviour
         return true;
     }
 
-    // What one row is called: the sheet's own name for its rows when its corner
-    // cell gives one ('attack type', 'industry', 'company'), and otherwise just
-    // a row, which is all an ordinary CSV loaded by hand says.
     public static string RowNoun(DataSource data) =>
         data != null && !string.IsNullOrWhiteSpace(data.RowAxisTitle)
             ? data.RowAxisTitle.Trim().ToLowerInvariant()
             : "row";
 
-    // 'industry' -> 'industries', 'attack type' -> 'attack types'. The nouns
-    // come from the data, so a plain trailing 's' is not always right.
     public static string Plural(string noun)
     {
         if (string.IsNullOrEmpty(noun)) return noun;
@@ -307,8 +255,6 @@ public abstract class DataSource : MonoBehaviour
         return g >= 0 && g < _groupTitles.Count ? _groupTitles[g] : null;
     }
 
-    // One name per addressable block in an order: per metric on a grouped axis,
-    // per line otherwise.
     public static List<string> BlockTitlesFor(DataSource data, bool columns, IReadOnlyList<int> order)
     {
         var list = new List<string>();
@@ -328,8 +274,6 @@ public abstract class DataSource : MonoBehaviour
         return s >= 0 && s < _seriesTitles.Count ? _seriesTitles[s] : null;
     }
 
-    // What one addressable line is called: a metric on a grouped axis, otherwise
-    // the column or row itself.
     public static string GroupLabelAt(DataSource data, bool columns, int group)
     {
         string title = data != null ? data.GroupTitleAt(columns, group) : null;
@@ -337,8 +281,6 @@ public abstract class DataSource : MonoBehaviour
         return $"{GroupNoun(data, columns)} {group + 1}";
     }
 
-    // The data-space twin of GroupLabelAt: names a metric by its place in the
-    // data rather than on the sheet, so a filtered-out one still has a name.
     public static string GroupLabelOfData(DataSource data, int dataGroup)
     {
         string title = data != null ? data.DataGroupTitleAt(dataGroup) : null;
@@ -383,8 +325,6 @@ public abstract class DataSource : MonoBehaviour
         }
     }
 
-    // The shared opening of two titles, cut back to a word boundary so
-    // "Revenue 2019" and "Revenue 2020" share "Revenue", not "Revenue 20".
     private static string SharedPrefix(string a, string b)
     {
         if (string.IsNullOrEmpty(a) || string.IsNullOrEmpty(b)) return "";
@@ -409,18 +349,9 @@ public abstract class DataSource : MonoBehaviour
     protected List<string> _columnTitles = new List<string>();
     protected List<string> _rowTitles = new List<string>();
 
-    // The fourth channel. Rows are breaches, columns are figures, height is the
-    // figure's place among every US breach, and colour says which metro a row's
-    // company is in: the colour its pin on the map is drawn in. The lists are
-    // per data row and arrive with the sheet rather than being assigned here,
-    // so a metro keeps its colour on every sheet and map it appears on and
-    // filtering rows away never repaints the ones that remain.
     protected List<string> _rowCategories = new List<string>();
     protected List<Color> _rowColors = new List<Color>();
 
-    // Each cell's bar height in [0, 1], when the sheet sends them: a bar's
-    // height is then not its value but its value's place among a larger whole
-    // than the sheet. Null when heights are worked out from the values.
     protected float[,] _heights;
     protected string _columnAxisTitle;
     protected string _rowAxisTitle;
@@ -434,9 +365,6 @@ public abstract class DataSource : MonoBehaviour
     private readonly List<string> _groupTitles = new List<string>();
     private readonly List<string> _seriesTitles = new List<string>();
 
-    // One scale per column group, so metrics of wildly different size stay
-    // readable. Ungrouped data keeps a single bucket, which cancels out and
-    // leaves the fractions below arithmetically unchanged.
     private float[] _scales = new float[0];
 
     protected List<int> _columnOrder = new List<int>();
@@ -485,10 +413,6 @@ public abstract class DataSource : MonoBehaviour
 
     private int BucketOf(int colIndex) => _columnGroupSize > 1 ? colIndex / _columnGroupSize : 0;
 
-    // Each group is divided by its own largest magnitude before any fraction is
-    // taken, so a metric in trillions and a metric in single dollars both fill the
-    // bar height, and zero stays on one shared plane. With a single bucket the
-    // divisor cancels from every fraction below, so ungrouped data is unaffected.
     private void BuildScales(int rowCount, int colCount, int filled)
     {
         int buckets = _columnGroupSize > 1 ? BucketOf(colCount - 1) + 1 : 1;
@@ -553,9 +477,6 @@ public abstract class DataSource : MonoBehaviour
         OnLayoutInvalidated?.Invoke();
     }
 
-    // The Sort tool's own reset: it puts the arrangement back, and leaves the
-    // filter alone, because hiding a metric is the Filter tool's edit to undo.
-    // Whether every row and column stands where the data has it.
     public bool InDataOrder => IsIdentity(_columnOrder, ColumnCount) && IsIdentity(_rowOrder, RowCount);
 
     public void ResetOrder()
@@ -565,10 +486,6 @@ public abstract class DataSource : MonoBehaviour
         RaiseOrderChanged();
     }
 
-    // 'order' is an arrangement of the columns on the sheet, so under a filter it
-    // is shorter than the dataset. It is spliced back over the slots the visible
-    // columns hold, which leaves every hidden metric exactly where it was: undo a
-    // filter after a sort and the metric returns to its place, not to the end.
     public bool SetColumnOrder(IReadOnlyList<int> order)
     {
         if (!SpliceVisibleColumns(order)) return false;
@@ -607,8 +524,6 @@ public abstract class DataSource : MonoBehaviour
         return true;
     }
 
-    // Positions are line indexes on both axes; on a grouped axis the whole group
-    // holding 'fromPos' travels to the group slot holding 'toPos'.
     public void MoveColumn(int fromPos, int toPos)
     {
         List<int> arrangement = new List<int>(_visibleColumns);
@@ -662,9 +577,6 @@ public abstract class DataSource : MonoBehaviour
         return true;
     }
 
-    // A grouped axis may only be reordered by whole groups, each keeping its
-    // members in sequence. Rejecting anything else here makes it impossible for
-    // any caller, by hand or by tool, to split a pair.
     private static bool IsGroupAligned(IReadOnlyList<int> order, int groupSize)
     {
         if (groupSize <= 1) return true;
@@ -707,7 +619,6 @@ public abstract class DataSource : MonoBehaviour
         return _values[rowIndex, colIndex];
     }
 
-    // The value in the cell at a visible position, if there is one.
     public bool TryValueAt(int visRow, int visCol, out double value)
     {
         value = 0d;
@@ -741,8 +652,6 @@ public abstract class DataSource : MonoBehaviour
         return (Normalized(rowIndex, colIndex) - lo) / range;
     }
 
-    // Sent heights stand on the base plane, as a place is never below the
-    // lowest: a loss is low, not negative.
     public float ZeroFraction =>
         _heights == null && TryBaselineRange(_globalMin, _globalMax, out float lo, out float range) ? -lo / range : 0f;
 

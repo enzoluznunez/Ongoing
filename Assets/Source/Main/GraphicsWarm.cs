@@ -2,21 +2,6 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Rendering;
 
-// Draws, during the loading phase's last step, a tiny copy of everything the
-// scene will draw, so the graphics driver does its first-draw work behind
-// the loading text rather than the first time the sheet and the maps show.
-// That work is of two kinds. A pipeline per shader, mesh layout and render
-// state: one copy of each kind builds those. And a GPU buffer per mesh: every
-// bar is its own mesh, so the first sheet up is thousands of them, and
-// setting up their buffers on the frames it showed stalled the app for over
-// a second after every launch. So every distinct mesh is drawn once too,
-// a share a frame, as many as the frames keep up with.
-//
-// The meshes are taken from the scene as it stands once everything is
-// built: every mesh renderer, hidden ones included (the sheet waiting to
-// rise, every map, the strips and copies put away). They are looked through
-// a share a frame, and without making garbage, as one pass over all of them
-// in a frame grew the heap for a third of a second.
 public static class GraphicsWarm
 {
     private struct Draw
@@ -29,9 +14,9 @@ public static class GraphicsWarm
 
     private static readonly List<Draw> Kinds = new List<Draw>();
     private static readonly List<Draw> Meshes = new List<Draw>();
-    private static readonly HashSet<(int, MeshTopology, int, ShadowCastingMode, bool, int)> SeenKinds =
-        new HashSet<(int, MeshTopology, int, ShadowCastingMode, bool, int)>();
-    private static readonly HashSet<int> SeenMeshes = new HashSet<int>();
+    private static readonly HashSet<(EntityId, MeshTopology, int, ShadowCastingMode, bool, int)> SeenKinds =
+        new HashSet<(EntityId, MeshTopology, int, ShadowCastingMode, bool, int)>();
+    private static readonly HashSet<EntityId> SeenMeshes = new HashSet<EntityId>();
     private static readonly List<Material> Materials = new List<Material>();
     private static readonly List<VertexAttributeDescriptor> Attributes = new List<VertexAttributeDescriptor>();
 
@@ -45,24 +30,15 @@ public static class GraphicsWarm
     private static float _started;
     private static bool _done;
 
-    // How far ahead of the eyes the copies stand: just behind the loading
-    // text (LoadingPhase), and each this wide across, a speck at most.
     private const float Ahead = 1.25f;
     private const float Width = 0.001f;
 
-    // Renderers looked through a frame.
     private const int ScanPerFrame = 2000;
-    // Frames each kind is drawn for: the first builds what each needs, the
-    // rest let that work finish.
     private const int KindFrames = 4;
-    // Meshes drawn a frame: starting here, halved after a frame longer than
-    // SlowMs, half again as many after one that kept up, within these.
     private const int FirstBatch = 64;
     private const int LeastBatch = 16;
     private const int MostBatch = 1024;
     private const float SlowMs = 25f;
-    // Frames waited once everything is drawn, for the last of it to finish
-    // before the reveal.
     private const int SettleFrames = 4;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
@@ -82,7 +58,6 @@ public static class GraphicsWarm
         _done = false;
     }
 
-    // One frame's share of the warming. True once all of it is done.
     public static bool Step()
     {
         if (_done) return true;
@@ -93,7 +68,7 @@ public static class GraphicsWarm
         {
             _started = Time.unscaledTime;
             _batch = FirstBatch;
-            _renderers = Object.FindObjectsByType<MeshRenderer>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+            _renderers = Object.FindObjectsByType<MeshRenderer>(FindObjectsInactive.Include);
         }
         _frames++;
 
@@ -119,7 +94,6 @@ public static class GraphicsWarm
 
         if (_drawn < Meshes.Count)
         {
-            // The length of the frame before says whether the last share kept up.
             if (_drawn > 0)
             {
                 bool slow = Time.unscaledDeltaTime * 1000f > SlowMs;
@@ -169,13 +143,13 @@ public static class GraphicsWarm
         }
 
         float size = Width / Mathf.Max(mesh.bounds.size.magnitude, 1e-4f);
-        bool newMesh = SeenMeshes.Add(mesh.GetInstanceID());
+        bool newMesh = SeenMeshes.Add(mesh.GetEntityId());
         for (int s = 0; s < submeshes; s++)
         {
             Material material = Materials[s];
             if (material == null) continue;
 
-            bool newKind = SeenKinds.Add((material.GetInstanceID(), mesh.GetTopology(s), r.gameObject.layer,
+            bool newKind = SeenKinds.Add((material.GetEntityId(), mesh.GetTopology(s), r.gameObject.layer,
                                           r.shadowCastingMode, r.receiveShadows, layout));
             if (!newKind && !newMesh) continue;
 
@@ -193,7 +167,6 @@ public static class GraphicsWarm
                 }
             };
             if (newKind) Kinds.Add(draw);
-            // One draw of a mesh sets up its buffers, whatever it is drawn with.
             if (newMesh)
             {
                 Meshes.Add(draw);

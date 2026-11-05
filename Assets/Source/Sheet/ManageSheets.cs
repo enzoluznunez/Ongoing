@@ -21,7 +21,7 @@ public class ManageSheets : MonoBehaviour
     [Tooltip("Height of the full value range, in metres.")]
     [Range(0.02f, 1f)] public float maximumHeight = 0.25f;
 
-    [Tooltip("Without a map, how far ahead of the user a sheet's near edge opens, in metres.")]
+    [Tooltip("How far ahead of the user a sheet's near edge opens, in metres.")]
     public float minimumZOffsetFromCamera = 0f;
 
     [Header("Row and column titles")]
@@ -47,23 +47,14 @@ public class ManageSheets : MonoBehaviour
         public CreateSheet source;
         public int visRow;
         public int visCol;
-        // How far below its place the strip still is while it rises into it.
         public float rise;
         public Coroutine riseRoutine;
-        // Up as far as the edits go, but not built yet: strips raised
-        // together are built one a frame (BuildPendingStrip). The speed it
-        // rises into place at once built, taken when it was raised, since the
-        // assistant's call that raised it is over by then; zero to stand at
-        // once (the assistant at Instant).
         public bool pending;
         public float riseSpeed;
     }
 
-    // The sheet. There is one: nothing cuts it apart.
     private CreateSheet _sheet;
 
-    // Every strip the Profile tool has raised, oldest first. There is no cap:
-    // any number of rows and columns can stand raised at once.
     private readonly List<Projection> _projections = new List<Projection>();
 
     private DataSource _bound;
@@ -76,17 +67,10 @@ public class ManageSheets : MonoBehaviour
     private float _groupGap;
     private float _baseY;
 
-    // A sheet just made waits, hidden, until it can be put where it opens:
-    // beside the panel, unless its dataset's edits already say where it stands.
     private bool _spawnPending;
-    // Whether its strips rise with it: not when the assistant switched at
-    // Instant.
     private bool _spawnAnimates = true;
 
     private bool _sheetsGrabbable;
-    // Whether a hand is at one of the map's sliders, so no sheet takes it for
-    // a grab (FlatSlideBar.AnyBusy); a sheet already held stays held.
-    private bool _grabBlocked;
 
     public CreateSheet Sheet => _sheet;
     public int RowCount => _rowCount;
@@ -94,10 +78,24 @@ public class ManageSheets : MonoBehaviour
     public float Height => maximumHeight;
     public bool IsBuilt => _sheet != null;
 
-    private void OnEnable() => Bind(dataSource != null ? dataSource : ManageDatasets.ActiveSource);
+    private void OnEnable()
+    {
+        Bind(dataSource != null ? dataSource : ManageDatasets.ActiveSource);
+        Settings.Changed += OnSettingChanged;
+    }
+
+    private void OnSettingChanged(Setting which)
+    {
+        if (which != Setting.ColorMode) return;
+        DataSource data = _bound;
+        if (_sheet != null) _sheet.Repaint(data);
+        for (int i = 0; i < _projections.Count; i++)
+            if (_projections[i].view != null) _projections[i].view.Repaint(data);
+    }
 
     private void OnDisable()
     {
+        Settings.Changed -= OnSettingChanged;
         Unbind();
         if (_readHook != null) _readHook.OnDatasetRead -= OnDatasetRead;
         _readHook = null;
@@ -124,8 +122,7 @@ public class ManageSheets : MonoBehaviour
 
     private void LateUpdate()
     {
-        BlockGrabsAtSliders();
-        FollowPanel();
+        KeepShown();
         BuildPendingStrip();
         PlaceCurrentProjection();
     }
@@ -135,8 +132,6 @@ public class ManageSheets : MonoBehaviour
         Unbind();
         dataSource = source;
         ClearProjections();
-        // Switching to another dataset, the sheet up sinks away first and the
-        // next rises once it is down; closing takes it away at once.
         if (source != null) RetireSheets();
         else ClearSheets();
         Bind(source);
@@ -185,7 +180,6 @@ public class ManageSheets : MonoBehaviour
 
         bool skipReflow = _skipReflowOnce;
         _skipReflowOnce = false;
-        // Where each line stood before this build, for the lines to move from.
         bool reflow = !skipReflow && _sheet != null;
         if (reflow) SnapshotLineCoords();
         bool animate = ChangeAnimates;
@@ -196,8 +190,6 @@ public class ManageSheets : MonoBehaviour
             _sheet = NewSheet();
             BuildWhole(_sheet, data);
             _spawnPending = true;
-            // Taken now: the sheet rises a few frames on, past the call that
-            // switched to it, and its strips with it.
             float rise = SwitchDuration(_sheet);
             _spawnAnimates = rise > 0f;
             _sheet.PlayGrow(rise);
@@ -208,11 +200,6 @@ public class ManageSheets : MonoBehaviour
             BuildWhole(_sheet, data);
         }
 
-        // A filter the assistant makes plays out at its speed: the lines
-        // leaving shrink into the base, and any coming back grow in where they
-        // stood. The user's own filter, like their other changes but a Sort
-        // drag, lands at once (ChangeAnimates). Nothing else moves: a line
-        // keeps its place on the sheet whether or not it is filtered.
         if (reflow)
         {
             if (!animate) StopReflow();
@@ -226,27 +213,18 @@ public class ManageSheets : MonoBehaviour
         }
 
         RebuildProjections();
-        // A strip a filter took down, its line hidden, stands again once a
-        // later filter shows that line, as the edits still say it is up.
         if (!_spawnPending) SyncProjectionToStack();
         OnSheetsChanged?.Invoke();
         HitchLog.Note($"sheet rebuilt, {_rowCount}x{_colCount} bars, {clock.Elapsed.TotalMilliseconds:F1} ms");
     }
 
-    // Room left between one row's title and the next, in metres.
     private const float RowTitleGap = 0.01f;
 
-    // How far apart the rows stand: a bar and its gap, or, when the titles
-    // are on, the longest row title and a little room, since the titles run
-    // along the rows and would otherwise reach into their neighbours'.
     private float RowPitch(DataSource data)
     {
         float pitch = _cellSize;
         if (!showLabels || data == null) return pitch;
 
-        // The titles are the dataset's, the same whatever is filtered or
-        // sorted, so they are measured once per dataset rather than on every
-        // rebuild.
         if (data == _pitchData && Mathf.Approximately(_cellSize, _pitchCell)) return _pitch;
 
         IReadOnlyList<string> titles = data.RowTitles;
@@ -280,8 +258,6 @@ public class ManageSheets : MonoBehaviour
         gap = labelGap
     };
 
-    // The metros the rows between two positions belong to, in row order: what
-    // the assistant needs to answer "what is on this sheet".
     public List<string> CategoriesIn(int rowMin, int rowMax)
     {
         var found = new List<string>();
@@ -295,7 +271,6 @@ public class ManageSheets : MonoBehaviour
         return _bound.CategoriesInOrder(rows);
     }
 
-    // The sheet holds every line there is, from the first to the last.
     private void BuildWhole(CreateSheet sheet, DataSource data) => BuildSpan(sheet, data, 0, _rowCount - 1, 0, _colCount - 1);
 
     private void BuildSpan(CreateSheet sheet, DataSource data, int rMin, int rMax, int cMin, int cMax) =>
@@ -322,8 +297,6 @@ public class ManageSheets : MonoBehaviour
             case EditKind.Move:
             case EditKind.Rotate:
             case EditKind.Scale:
-                // The assistant's undo glides back at its speed, as its edits
-                // glide there; a press of Undo puts the sheet back at once.
                 return RestoreSheetPose(e.move.sheetId, e.move.prePos, e.move.preRot, e.move.preScale,
                         animate: AsAgent)
                     ? UndoResult.Applied : UndoResult.Stale;
@@ -333,23 +306,17 @@ public class ManageSheets : MonoBehaviour
 
             case EditKind.Filter:
                 if (_bound == null) return UndoResult.Unreachable;
-                // Refused, or already as it was: the sheet does not match the
-                // edit any more, so the record goes without claiming an undo.
                 return _bound.SetHiddenOn(e.filterIsRow, e.filterPreHidden, out _)
                     ? UndoResult.Applied : UndoResult.Stale;
 
             case EditKind.Sort:
                 if (_bound == null) return UndoResult.Unreachable;
-                // The lines slide back at the assistant's speed when it is the
-                // assistant undoing; a press of Undo puts them back at once.
                 if (!AsAgent) SuppressNextReflow();
                 bool reordered = e.reorderPreFull != null
                     ? _bound.SetFullOrder(e.reorderIsColumn, e.reorderPreFull)
                     : e.reorderIsColumn
                         ? _bound.SetColumnOrder(e.reorderPreOrder)
                         : _bound.SetRowOrder(e.reorderPreOrder);
-                // Nothing rebuilt to take the skip, so the next change, a
-                // filter or a sort, would jump instead of moving.
                 if (!reordered) _skipReflowOnce = false;
                 return reordered ? UndoResult.Applied : UndoResult.Stale;
         }
@@ -378,13 +345,9 @@ public class ManageSheets : MonoBehaviour
             }
         }
 
-        // Binding cleared the strips; the ones this dataset's edits leave
-        // raised stand again, with the sheet when it rises (TrySpawn).
         if (!_spawnPending) SyncProjectionToStack();
     }
 
-    // Raises a row or column, or lowers it when it is already raised: either
-    // is an edit on the undo timeline. 'lowered' says which it was.
     public bool PushProjection(ProjectionRecord rec, EditKind kind, out bool lowered)
     {
         lowered = false;
@@ -406,12 +369,6 @@ public class ManageSheets : MonoBehaviour
         return -1;
     }
 
-    // The strips standing are those the Profile edits raise and do not lower
-    // again, played in order. Strips already up stay as they are; only the
-    // ones newly raised are built, and only those left out are taken down.
-    // 'animateNew' raises new strips and sinks lowered ones at the speed in
-    // effect; 'spread' builds new ones a frame apart even when they stand at
-    // once (several coming up together, as after a dataset switch).
     public void SyncProjectionToStack(bool animateNew = false, bool spread = false)
     {
         var wanted = new List<ProjectionRecord>();
@@ -426,8 +383,6 @@ public class ManageSheets : MonoBehaviour
             else if (at < 0) wanted.Add(e.projection);
         }
 
-        // A strip taken down sinks back into the sheet at the speed one
-        // raised alongside it would rise at.
         float lowerSpeed = StripSpeed(animateNew);
         for (int i = _projections.Count - 1; i >= 0; i--)
             if (IndexOfRecord(wanted, _projections[i].rec) < 0) LowerProjectionAt(i, lowerSpeed);
@@ -449,10 +404,6 @@ public class ManageSheets : MonoBehaviour
         foreach (Projection p in _projections) into.Add(p.rec);
     }
 
-    // A row strip stands while its row shows, whichever of its cells was
-    // poked to raise it, and a column strip while its column does: the
-    // cell named on the other axis is only where it was raised from, and
-    // a filter taking that line off leaves the strip up.
     public bool TryResolveProjection(ProjectionRecord rec, out int visRow, out int visCol)
     {
         visRow = visCol = -1;
@@ -466,8 +417,6 @@ public class ManageSheets : MonoBehaviour
         return true;
     }
 
-    // A column strip on a grouped axis raises its whole metric, so any year of
-    // that metric names the same strip.
     private bool SameRecord(ProjectionRecord a, ProjectionRecord b)
     {
         if (a.isColumn != b.isColumn) return false;
@@ -477,12 +426,6 @@ public class ManageSheets : MonoBehaviour
             : a.dataCol == b.dataCol;
     }
 
-    // A strip raised with others, as the assistant raises a whole set at
-    // once or a dataset's edits stand again, is put up now and built in a
-    // later frame, one a frame: building each is a strip's worth of bars and
-    // titles, and six in one frame showed as a quarter-second stall. It
-    // counts as up at once (FindProjection), so nothing raises it twice.
-    // One raised by hand is built at once.
     private void ShowProjection(ProjectionRecord rec, bool animate, bool defer)
     {
         if (_bound == null || !TryResolveProjection(rec, out _, out _)) return;
@@ -491,7 +434,6 @@ public class ManageSheets : MonoBehaviour
         else BuildStrip(rec, speed);
     }
 
-    // How fast a strip rises or sinks: zero to stand or go at once.
     private float StripSpeed(bool animate) =>
         animate && isActiveAndEnabled && !AgentInstant ? ActiveMotionSpeed : 0f;
 
@@ -509,8 +451,6 @@ public class ManageSheets : MonoBehaviour
 
     private bool BuildStrip(ProjectionRecord rec, float riseSpeed, int at = -1)
     {
-        // A strip whose line is filtered off cannot stand; finding that out
-        // before taking a spare spares showing and hiding one on every rebuild.
         if (!TryResolveProjection(rec, out _, out _)) return false;
 
         CreateSheet view = TakeStrip();
@@ -539,8 +479,6 @@ public class ManageSheets : MonoBehaviour
         p.riseRoutine = StartCoroutine(RiseRoutine(p, p.rise, 0f, speed, _projections));
     }
 
-    // Moves a strip from one depth below its place to another, while it is
-    // still among 'members'; a lowered one is put away once down.
     private IEnumerator RiseRoutine(Projection p, float from, float to, float speed, List<Projection> members)
     {
         float sourceScale = p.source != null ? Mathf.Abs(p.source.transform.lossyScale.y) : 1f;
@@ -571,17 +509,12 @@ public class ManageSheets : MonoBehaviour
         _projections.RemoveAt(index);
     }
 
-    // Strips lowered and still sinking back into the sheet, the way a raised
-    // one rises out of it, put away once they are down. They are no longer
-    // up as far as anything is concerned (FindProjection): a strip raised
-    // again meanwhile is a new one.
     private readonly List<Projection> _lowering = new List<Projection>();
 
     private void LowerProjectionAt(int index, float speed)
     {
         Projection p = _projections[index];
         _projections.RemoveAt(index);
-        // From wherever it stands, part way up if it was still rising.
         float from = p.rise;
         StopRise(p);
         if (p.pending || p.view == null || speed <= 0f || !isActiveAndEnabled)
@@ -602,22 +535,17 @@ public class ManageSheets : MonoBehaviour
         PutStripAway(p.view);
     }
 
-    // Every strip still sinking, put away at once.
     private void CompleteLowering()
     {
         for (int i = _lowering.Count - 1; i >= 0; i--) FinishLowering(_lowering[i]);
     }
 
-    // Keeps each sinking strip over its line, as the line moves.
     private void PlaceLowering()
     {
         for (int i = _lowering.Count - 1; i >= 0; i--)
             if (!PlaceProjection(_lowering[i])) FinishLowering(_lowering[i]);
     }
 
-    // Strips put away, made while the app loads (PrepareRoom), so raising a
-    // row or column stands one up rather than making it. More are made only
-    // when more are up at once than were readied.
     private const int StripsReady = 4;
     private readonly List<CreateSheet> _stripSpares = new List<CreateSheet>();
 
@@ -652,19 +580,10 @@ public class ManageSheets : MonoBehaviour
         }
     }
 
-    // Whether the Sort tool has a line in hand, moving lines along the sheet
-    // as the hand does.
     public bool LinesDragged { get; set; }
 
-    // Whether the strips were following moving lines last frame: they follow
-    // one frame past the motion, so they land where the lines came to rest.
     private bool _stripsFollowing;
 
-    // Moves each raised strip's bars along with the sheet's lines while
-    // those are moving: a row strip's across its columns, a column strip's
-    // along its rows. The strip itself already stands over its line
-    // (PlaceProjection); this keeps the bars it carries lined up with the
-    // sheet's under a drag or a reflow, rather than where it was built.
     private void FollowLines()
     {
         bool moving = _reflow != null || LinesDragged;
@@ -683,8 +602,6 @@ public class ManageSheets : MonoBehaviour
         }
     }
 
-    // The lines' own motion, a reflow under way, put where it ends, as when
-    // a hand takes a line while the others are still sliding.
     public void CompleteLineMotion() => CompleteReflow();
 
     private void PlaceCurrentProjection()
@@ -711,8 +628,6 @@ public class ManageSheets : MonoBehaviour
         return true;
     }
 
-    // The columns a column strip raises: the whole metric on a grouped axis,
-    // or just the one column otherwise.
     public void ColumnStripSpan(int visCol, out int lo, out int hi)
     {
         lo = hi = visCol;
@@ -720,7 +635,6 @@ public class ManageSheets : MonoBehaviour
         _bound.GroupSpan(true, _bound.GroupOf(true, visCol), out lo, out hi);
     }
 
-    // Where a column strip's centre sits across the source piece.
     private float ColumnStripOffset(CreateSheet source, int visCol)
     {
         ColumnStripSpan(visCol, out int lo, out int hi);
@@ -740,8 +654,6 @@ public class ManageSheets : MonoBehaviour
         Transform src = p.source.transform;
 
         p.view.SetShown(p.source.Shown);
-        // Placed every frame, so written only when it moved: each write dirties
-        // the whole strip's bars and titles.
         Transform t = p.view.transform;
         Vector3 local = transform.InverseTransformPoint(world);
         if (t.localPosition != local || t.localRotation != src.localRotation)
@@ -794,16 +706,7 @@ public class ManageSheets : MonoBehaviour
         if (_sheet != null) _sheet.SetGrabbable(GrabbableNow(_sheet));
     }
 
-    private bool GrabbableNow(CreateSheet sheet) =>
-        _sheetsGrabbable && (!_grabBlocked || sheet.IsGrabbed);
-
-    private void BlockGrabsAtSliders()
-    {
-        bool blocked = FlatSlideBar.AnyBusy;
-        if (blocked == _grabBlocked) return;
-        _grabBlocked = blocked;
-        if (_sheetsGrabbable) SetGrabbable(true);
-    }
+    private bool GrabbableNow(CreateSheet sheet) => _sheetsGrabbable;
 
     private Func<CreateSheet, ITransformer> _twoGrabFor;
 
@@ -842,8 +745,6 @@ public class ManageSheets : MonoBehaviour
         }
     }
 
-    // 'reattach' when the reset drops the moves, which puts the sheet back in
-    // its place against this object.
     public void ResetGrabs(bool reattach)
     {
         _twoGrabFor = null;
@@ -881,10 +782,6 @@ public class ManageSheets : MonoBehaviour
         public Quaternion toRot;
         public Vector3 toScale;
         public Coroutine routine;
-        // Whether stopping it part way makes the pose where it stopped the
-        // edit's (a move under way); false for an undo putting the sheet
-        // back, which finishes instead: the record it would change is not
-        // the one being undone.
         public bool amend = true;
     }
 
@@ -916,17 +813,10 @@ public class ManageSheets : MonoBehaviour
 
     public bool AgentMotionAnimates => AsAgent && !_agentMotionInstant;
 
-    // Whether a change to what the sheet shows plays out or lands at once.
-    // The user's own changes land at once (a filter poke, Undo), all but a
-    // Sort drag, which says so while it commits (UserChangeAnimates); the
-    // assistant's play out at its speed, and land at once at Instant.
-    private bool ChangeAnimates => AsAgent ? !_agentMotionInstant : UserChangeAnimates;
+    private bool ChangeAnimates => Style.Animate && (AsAgent ? !_agentMotionInstant : UserChangeAnimates);
 
     public bool UserChangeAnimates { get; set; }
 
-    // How long the assistant's motion over 'meters' takes at its speed: zero
-    // at Instant, and -1 when it is not the assistant moving anything, for
-    // whatever moves by its own timing then.
     public float AgentMotionSeconds(float meters) =>
         !AsAgent ? -1f : _agentMotionInstant ? 0f : MotionDuration(meters);
 
@@ -935,33 +825,22 @@ public class ManageSheets : MonoBehaviour
 
     private bool AgentInstant => AsAgent && _agentMotionInstant;
 
-    // How long bars take to grow from the base or sink into it, the furthest
-    // of them travelling 'localTravel' in 'piece's own units: measured at the
-    // size the sheet is drawn, so a sheet made smaller or larger moves its
-    // bars at the same speed as any other.
     private float GrowDuration(CreateSheet piece, float localTravel)
     {
         if (!isActiveAndEnabled || ActiveMotionSpeed <= 0f || AgentInstant || piece == null) return 0f;
         return MotionDuration(localTravel * Mathf.Abs(piece.transform.lossyScale.y));
     }
 
-    // The same at the user's motion speed, whoever is acting: what the
-    // user's own slides use.
     public float UserMotionSeconds(float meters) =>
         systemMotionSpeed <= 0f ? 0f : MotionSeconds(meters, systemMotionSpeed);
 
-    // How long a sheet takes to sink or rise on a switch: at the user's
-    // motion speed for a switch they made, however they made it; at the
-    // assistant's for one it made, and at once when that is Instant.
-    // Measured, as a filter's bars are, by the tallest of 'piece's bars at
-    // the size the sheet is drawn.
     private float SwitchDuration(CreateSheet piece) =>
         piece == null ? 0f : GrowDuration(piece, piece.GrowTravel());
 
     private float MotionDuration(float meters) => MotionSeconds(meters, ActiveMotionSpeed);
 
     private float MotionSeconds(float meters, float speed) =>
-        Mathf.Clamp(meters / Mathf.Max(speed, 1e-3f), minMotionSeconds, maxMotionSeconds);
+        !Style.Animate ? 0f : Mathf.Clamp(meters / Mathf.Max(speed, 1e-3f), minMotionSeconds, maxMotionSeconds);
 
     private float PieceRadius(CreateSheet piece)
     {
@@ -970,7 +849,6 @@ public class ManageSheets : MonoBehaviour
         return Mathf.Sqrt(halfCols * halfCols + halfRows * halfRows);
     }
 
-    // Where each column and row stood, by data index, before a rebuild.
     private readonly Dictionary<int, float> _oldColumns = new Dictionary<int, float>();
     private readonly Dictionary<int, float> _oldRows = new Dictionary<int, float>();
 
@@ -981,7 +859,6 @@ public class ManageSheets : MonoBehaviour
         _sheet.CollectLineCoords(_oldColumns, _oldRows);
     }
 
-    // A bar of a line about to leave the sheet, as it stood.
     private struct LeavingBar
     {
         public CreateSheet piece;
@@ -990,14 +867,9 @@ public class ManageSheets : MonoBehaviour
         public Color color;
     }
 
-    // Copies of the bars of the lines just taken off the sheet, shrinking into
-    // the base: the lines themselves are already gone from the data, so a read
-    // or an undo never waits on them.
     private readonly List<CreateCube> _leaving = new List<CreateCube>();
     private Coroutine _leavingRoutine;
 
-    // The bars standing on the sheet now whose row or column the data no
-    // longer shows.
     private readonly HashSet<int> _shownRows = new HashSet<int>();
     private readonly HashSet<int> _shownColumns = new HashSet<int>();
 
@@ -1023,8 +895,6 @@ public class ManageSheets : MonoBehaviour
         return found;
     }
 
-    // The furthest any leaving bar's top or bottom travels sinking into the
-    // base, in the sheet's own units.
     private float LeavingTravel(List<LeavingBar> bars)
     {
         float most = 0f;
@@ -1049,8 +919,6 @@ public class ManageSheets : MonoBehaviour
         _leavingRoutine = StartCoroutine(ShrinkRoutine(bars, duration));
     }
 
-    // Each copy sinks into the base, top and bottom alike, as a bar grows out
-    // of it in reverse.
     private IEnumerator ShrinkRoutine(List<LeavingBar> bars, float duration)
     {
         yield return Style.Tween(duration, eased =>
@@ -1074,13 +942,10 @@ public class ManageSheets : MonoBehaviour
         _leaving.Clear();
     }
 
-    // Copies put away, made while the app loads (PrepareRoom): as many as the
-    // largest sheet has bars, so even filtering all but one line off makes none.
     private readonly List<CreateCube> _leavingSpares = new List<CreateCube>();
 
     private CreateCube TakeLeavingBar() => PopLive(_leavingSpares) ?? MakeLeavingBar();
 
-    // The last spare in 'list' that still exists, taken off it; null when none is left.
     public static T PopLive<T>(List<T> list) where T : UnityEngine.Object
     {
         while (list.Count > 0)
@@ -1104,8 +969,6 @@ public class ManageSheets : MonoBehaviour
         return cube;
     }
 
-    // The bars of lines that were not on the sheet before this build, grown
-    // up from the base once the lines leaving have gone.
     private void GrowReturning(float delay)
     {
         CreateSheet s = _sheet;
@@ -1128,8 +991,6 @@ public class ManageSheets : MonoBehaviour
         while (_reflow != null) yield return null;
     }
 
-    // The lines left on the sheet slide from where they stood to their new
-    // places, starting 'delay' seconds from now.
     private void StartReflow(float delay)
     {
         StopReflow();
@@ -1188,7 +1049,7 @@ public class ManageSheets : MonoBehaviour
             {
                 LineMove m = moves[i];
                 if (m.piece == null) continue;
-                float k = Style.EaseOut(t / m.duration);
+                float k = m.duration > 0f ? Style.EaseOut(t / m.duration) : 1f;
                 m.piece.LayoutLine(m.columns, m.line, Mathf.Lerp(m.from, m.to, k));
                 if (k < 1f) moving = true;
             }
@@ -1211,7 +1072,6 @@ public class ManageSheets : MonoBehaviour
         _reflowMoves = null;
     }
 
-    // Stops a piece's glide where it stands, handing back where it was headed.
     private bool TryStopGlide(CreateSheet piece, out GlideState g)
     {
         if (piece == null || !_pieceGlides.TryGetValue(piece, out g)) { g = null; return false; }
@@ -1248,8 +1108,6 @@ public class ManageSheets : MonoBehaviour
         {
             risen |= p.rise > 0f;
             StopRise(p);
-            // One still waiting to be built stands when it is, rather than
-            // rising after the user has taken over.
             p.riseSpeed = 0f;
         }
         CompleteLowering();
@@ -1356,6 +1214,9 @@ public class ManageSheets : MonoBehaviour
             tr.localRotation = Quaternion.Slerp(fromRot, g.toRot, k);
             tr.localScale = Vector3.Lerp(fromScale, g.toScale, k);
         }
+        if (piece != null && duration <= 0f)
+            piece.transform.SetLocalPositionAndRotation(g.toPos, g.toRot);
+        if (piece != null && duration <= 0f) piece.transform.localScale = g.toScale;
         _pieceGlides.Remove(piece);
     }
 
@@ -1366,9 +1227,6 @@ public class ManageSheets : MonoBehaviour
             NotifyMoveCommitted(s, pos, rot, scale);
     }
 
-    // 'animate' glides the sheet there from where it stands, at the
-    // assistant's speed (an undo the assistant makes); otherwise, and always
-    // at Instant, it is put there at once.
     public bool RestoreSheetPose(int sheetId, Vector3 pos, Quaternion rot, Vector3 scale, bool animate = false)
     {
         CreateSheet sheet = Sheet;
@@ -1407,22 +1265,15 @@ public class ManageSheets : MonoBehaviour
         _root.SetParent(transform, false);
     }
 
-    // Sheets put away rather than destroyed: a dataset switch builds the next
-    // sheet on one, reusing its cubes and labels instead of making hundreds of
-    // objects anew in one frame. Two are kept, since the sheet sinking away
-    // and the one about to rise are both needed at once; the second is built
-    // at startup (PrewarmSecondSheet).
     private const int SpareCount = 2;
     private readonly List<CreateSheet> _spares = new List<CreateSheet>();
 
-    // The sheet sinking away for another dataset's, until it is down.
     private CreateSheet _sinking;
     private bool _secondMade;
 
-    // The height every sheet's frame stands at once it is first stood, so
-    // each dataset's sheet rises at the level the last one sank at.
-    private float _level;
-    private bool _hasLevel;
+    private Vector3 _homePos;
+    private Quaternion _homeRot;
+    private bool _hasHome;
 
     private CreateSheet MakeSheet()
     {
@@ -1437,7 +1288,6 @@ public class ManageSheets : MonoBehaviour
     {
         CreateSheet s = TakeSpare() ?? MakeSheet();
         GameObject go = s.gameObject;
-        // It waits hidden until it rises (TrySpawn).
         s.SetShown(false);
         s.SetGrabbable(GrabbableNow(s));
         s.sheetId = FirstSheetId;
@@ -1445,11 +1295,8 @@ public class ManageSheets : MonoBehaviour
         return s;
     }
 
-    // The spare, woken and standing where a newly made sheet would.
     private CreateSheet TakeSpare()
     {
-        // A spare's fall finishes while it is still a spare, so the Park its
-        // fall was waiting to run leaves it where it is.
         for (int i = 0; i < _spares.Count; i++)
             if (_spares[i] != null) _spares[i].CompleteFall();
         CreateSheet s = PopLive(_spares);
@@ -1470,9 +1317,6 @@ public class ManageSheets : MonoBehaviour
         _sheet = null;
     }
 
-    // Takes the sheet off the table with a fall: it sinks into its base, out of
-    // reach of hands and tools, and is put away once down. A sheet still
-    // sinking from the switch before goes at once.
     private void RetireSheets()
     {
         FinishLeaving();
@@ -1497,7 +1341,6 @@ public class ManageSheets : MonoBehaviour
         _sinking = null;
     }
 
-    // What the sheet up was carrying that the next one builds anew.
     private void ForgetSheets()
     {
         ClearLeaving();
@@ -1513,8 +1356,6 @@ public class ManageSheets : MonoBehaviour
         s.SetShown(false);
     }
 
-    // Each dataset's title glyphs go into the font when it is read, not when
-    // its sheet is first built.
     private ManageDatasets _readHook;
 
     private void HookReads()
@@ -1530,8 +1371,6 @@ public class ManageSheets : MonoBehaviour
 
     private static void OnDatasetRead(DataSource data) => SheetLabels.WarmGlyphs(data);
 
-    // What has to be made ahead for the largest dataset, measured while the
-    // app loads.
     public struct Room
     {
         public int cubes;
@@ -1540,10 +1379,6 @@ public class ManageSheets : MonoBehaviour
         public int stripLabels;
     }
 
-    // Readies, a few milliseconds a frame while the app loads, until it says
-    // it is done: both sheets that take turns (the one up and the next,
-    // rising as it falls) with room for the largest dataset, the strips the
-    // Profile tool raises, and the copies a filter shrinks away.
     public bool PrepareRoom(Room room, double budgetMs)
     {
         var clock = System.Diagnostics.Stopwatch.StartNew();
@@ -1579,18 +1414,13 @@ public class ManageSheets : MonoBehaviour
             _leavingSpares.Add(MakeLeavingBar());
         }
 
-        // The tools that swap a sheet's grab add their pieces to it once.
         if (_sheet != null) PrepareGrabs?.Invoke(_sheet);
         for (int i = 0; i < _spares.Count; i++) PrepareGrabs?.Invoke(_spares[i]);
         return true;
     }
 
-    // Each tool that hands a sheet its own grab (Scale, Rotate) adds what that
-    // takes to a sheet here, while the app loads, rather than on first use.
     public static event Action<CreateSheet> PrepareGrabs;
 
-    // The second sheet, built once with the first dataset and put away, so
-    // the first switch has a sheet ready to rise while the first sinks.
     private void PrewarmSecondSheet(DataSource data)
     {
         if (_secondMade) return;
@@ -1603,64 +1433,23 @@ public class ManageSheets : MonoBehaviour
         Park(s);
     }
 
-    // This object, which every sheet pose is stated against, stands where
-    // the sheet's right edge goes, upright. It is stood right of the map
-    // whenever a sheet opens, and then left where it is while that sheet is
-    // up: the sheet is neither panel's, and stays up whichever is open. Only
-    // the Move and Rotate tools move it. A sheet the Move tool has moved is cut loose:
-    // this object stays where it stood at that move, and undoing every move
-    // puts it back in its place here.
-    private void FollowPanel()
+    private void KeepShown()
     {
         CreateSheet sheet = Sheet;
         if (sheet == null || _spawnPending || sheet.IsGrabbed) return;
-
-        if (IsDetached(sheet.sheetId)) { sheet.SetShown(true); return; }
-
-        // With no map to stand beside (it could not be fetched), the sheet
-        // stays where it opened, and shown.
-        MapCarousel map = MapCarousel.Instance;
-        if (map == null || !map.Ready) { sheet.SetShown(true); return; }
-
-        if (!_framed) FrameBeside(map, sheet);
-        sheet.SetShown(_framed);
+        sheet.SetShown(true);
     }
 
-    // Whether this object has been stood beside the map yet.
-    private bool _framed;
-
-    // Stands this object right of the map, the sheet and the map centred on
-    // the user as a pair the first time.
-    private bool FrameBeside(MapCarousel map, CreateSheet sheet)
-    {
-        float width = sheet != null ? -SpawnOffset(sheet).x * 2f : 0f;
-        map.CentrePair(width);
-        if (!map.TrySheetFrame(width, out Vector3 pos, out Quaternion rot)) return false;
-        transform.SetPositionAndRotation(pos, rot);
-        _framed = true;
-        // Standing it beside the map sets the level every sheet stands at.
-        _level = pos.y;
-        _hasLevel = true;
-        return true;
-    }
-
-    // Puts a sheet just made where it opens and shows it. A dataset whose
-    // edits move, turn or resize its sheet was put back by the replay, against
-    // this object, or against where it stood when the sheet was cut loose;
-    // any other opens right of the map, wherever it stands now.
     private bool TrySpawn()
     {
         CreateSheet sheet = Sheet;
         if (sheet == null) return true;
 
-        // The sheet before it sinks away first; this one rises once it is down.
         if (_sinking != null) return false;
 
-        // A sheet the user moved goes back where they put it. Any other opens
-        // right of the map, level with its Region slider.
         if (TryLooseAnchor(sheet.sheetId, out Vector3 loosePos, out Quaternion looseRot))
             transform.SetPositionAndRotation(loosePos, looseRot);
-        else if (!AnchorToPanel(sheet)) return false;
+        else if (!AnchorAhead(sheet)) return false;
 
         if (!HasPoseEdit(sheet.sheetId))
             sheet.transform.SetLocalPositionAndRotation(SpawnOffset(sheet), Quaternion.identity);
@@ -1674,36 +1463,30 @@ public class ManageSheets : MonoBehaviour
         return true;
     }
 
-    // Right of the map, which waits for the map to be stood; with no map to
-    // stand beside (it could not be fetched), straight ahead of the user, at
-    // the level every sheet stands at, or about chest height the first time.
-    private bool AnchorToPanel(CreateSheet sheet)
+    private bool AnchorAhead(CreateSheet sheet)
     {
-        MapCarousel map = MapCarousel.Instance;
-        if (map != null && map.Ready) return FrameBeside(map, sheet);
+        if (_hasHome)
+        {
+            transform.SetPositionAndRotation(_homePos, _homeRot);
+            return true;
+        }
+
+        if (!LoadingPhase.Done) return false;
         if (!CameraRig.TryGetBasis(out Vector3 camPos, out Quaternion yaw)) return false;
 
-        bool first = !_hasLevel;
         float halfDepth = Mathf.Max(_rowCount - 1, 0) * _rowPitch * 0.5f;
         Vector3 centre = camPos + yaw * new Vector3(
             0f, 0f, Mathf.Max(minimumZOffsetFromCamera, 0f) + halfDepth);
-        centre.y = first ? camPos.y * 0.75f : _level;
+        centre.y = camPos.y * 0.75f;
 
-        // The frame is set so the sheet's usual place beside the panel lands there.
         transform.SetPositionAndRotation(centre - yaw * SpawnOffset(sheet), yaw);
-        if (first)
-        {
-            Recenter.NoteHome();
-            _level = transform.position.y;
-            _hasLevel = true;
-        }
+        Recenter.NoteHome();
+        _homePos = transform.position;
+        _homeRot = transform.rotation;
+        _hasHome = true;
         return true;
     }
 
-    // Where a sheet stands against its frame, which stands where its right
-    // edge goes, level with the map's Region slider when it was stood
-    // (MapCarousel.TrySheetFrame): left of the frame, the base of its bars level
-    // with the slider's bar and its own centre in the frame's plane.
     private Vector3 SpawnOffset(CreateSheet sheet)
     {
         float scale = Mathf.Abs(sheet.transform.localScale.x);
@@ -1722,11 +1505,8 @@ public class ManageSheets : MonoBehaviour
     private static bool IsPoseEdit(Edit e, int sheetId) =>
         e != null && e.IsPose && e.move.sheetId == sheetId;
 
-    // Whether the Move tool has cut the sheet loose from the panel.
     public bool IsDetached(int sheetId) => TryLooseAnchor(sheetId, out _, out _);
 
-    // Where this object stood when the sheet was cut loose. Every pose edit
-    // from then on was made with it standing there, so the first move says.
     private static bool TryLooseAnchor(int sheetId, out Vector3 pos, out Quaternion rot)
     {
         EditList edits = ManageDatasets.ActiveEdits;

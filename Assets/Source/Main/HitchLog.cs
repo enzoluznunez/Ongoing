@@ -2,17 +2,6 @@ using System.Collections.Generic;
 using System.Text;
 using UnityEngine;
 
-// Logs every frame that runs long, with what was going on around it, so a
-// session's stutter can be read back from the headset's log over USB
-// ('adb logcat -s Unity' and look for [Hitch]). A frame counts as long past
-// one and a half of the display's frame time. Each line says how long the
-// frame took; how much of the recent frames the main thread, the render
-// thread and the GPU took, which tells work in scripts from work drawing;
-// whether the garbage collector ran; and what changed in the half second
-// before it. Every few seconds a summary line gives the steady frame rate.
-//
-// Other code marks what it does with Note, and a note made within the half
-// second before a hitch is printed with it.
 public class HitchLog : MonoBehaviour
 {
     private const float HitchShare = 1.5f;
@@ -29,10 +18,9 @@ public class HitchLog : MonoBehaviour
     private int _gcCount;
     private float _frameMs = 1000f / 72f;
 
-    // What was last seen, so a change can be noted.
     private ToolType _tool = ToolType.None;
     private int _dataset = int.MinValue;
-    private bool _panel, _map, _agent;
+    private bool _panel, _agent;
 
     private float _summaryStart;
     private int _frames, _hitches;
@@ -50,17 +38,10 @@ public class HitchLog : MonoBehaviour
     {
         if (_instance != null) return;
 
-        // Plain log lines without a stack trace: a development build would
-        // otherwise capture one as a string for every line, the assistant's
-        // log of each message it receives among them, and that is both time
-        // and garbage the collector later stops the app to sweep up.
-        // Warnings and errors keep theirs.
         Application.SetStackTraceLogType(LogType.Log, StackTraceLogType.None);
         Spawn.Once(ref _instance);
     }
 
-    // Marks something the app just did, to be printed with any hitch that
-    // follows within half a second.
     public static void Note(string what)
     {
         if (_instance == null) return;
@@ -83,14 +64,11 @@ public class HitchLog : MonoBehaviour
         float refresh = DisplayHz();
         if (refresh > 1f) _frameMs = 1000f / refresh;
 
-        // This frame's delta is how long the frame before it took.
         float ms = Time.unscaledDeltaTime * 1000f;
         int gc = System.GC.CollectionCount(0);
         bool collected = gc != _gcCount;
         _gcCount = gc;
 
-        // The first frames after launch and a frame after the app was paused
-        // (headset off) are not stutter.
         if (Time.frameCount > 2 && ms < 2000f)
         {
             _frames++;
@@ -112,9 +90,6 @@ public class HitchLog : MonoBehaviour
         catch { return 0f; }
     }
 
-    // Notes the changes a hitch could follow from that nothing else marks:
-    // the tool picked, the dataset shown, either panel opening or closing,
-    // and the assistant starting or finishing a call.
     private void WatchState()
     {
         ManageTools tools = Scene.Tools;
@@ -134,9 +109,6 @@ public class HitchLog : MonoBehaviour
         bool panelOpen = panel != null && panel.IsVisible;
         if (panelOpen != _panel) { _panel = panelOpen; Note(panelOpen ? "tool panel opened" : "tool panel closed"); }
 
-        MapCarousel map = MapCarousel.Instance;
-        bool mapOpen = map != null && map.IsOpen;
-        if (mapOpen != _map) { _map = mapOpen; Note(mapOpen ? "map panel opened" : "map panel closed"); }
 
         bool agent = StateChannel.InAgentCall;
         if (agent != _agent) { _agent = agent; Note(agent ? "assistant call started" : "assistant call ended"); }
@@ -159,7 +131,6 @@ public class HitchLog : MonoBehaviour
             if (sheet != null && sheet.IsGrabbed) _line.Append(", sheet held");
             if (sheets.LinesDragged) _line.Append(", sort drag");
         }
-        if (FlatSlideBar.AnyBusy) _line.Append(", map slider in hand");
         if (_agent) _line.Append(", assistant working");
 
         float now = Time.unscaledTime;
@@ -174,9 +145,6 @@ public class HitchLog : MonoBehaviour
         Debug.Log(_line.ToString());
     }
 
-    // The most each part of the frame took over the last few frames the
-    // timings have reached (they trail by a frame or two). Zero where the
-    // platform does not report a part.
     private void AppendTimings()
     {
         uint got = FrameTimingManager.GetLatestTimings(TimingDepth, _timings);

@@ -17,10 +17,6 @@ public abstract class PanelUI : MonoBehaviour
 
     protected RectTransform CanvasRect => _canvas != null ? _canvas.transform as RectTransform : null;
 
-    // Whether the panel is open. A shut panel is hidden, not switched off: its
-    // canvas stays active with everything on it built, laid out and drawn
-    // once at startup (Prewarm), and only stops drawing and taking pokes, so
-    // opening and closing it never rebuilds it.
     public bool IsVisible => _canvas != null && _shown && gameObject.activeInHierarchy;
     private bool _shown;
     private PokeInteractable[] _pokes = new PokeInteractable[0];
@@ -41,7 +37,7 @@ public abstract class PanelUI : MonoBehaviour
 
     protected void ShowCanvas()
     {
-        PlaceAhead();
+        if (!PlaceBesideOpenPanel()) PlaceAhead();
         SetShown(true);
         ResolveLayoutNow();
         SetGrabbable(true);
@@ -59,8 +55,6 @@ public abstract class PanelUI : MonoBehaviour
         UILayout.ShowCanvas(_canvas, _pokes, on, _warming);
     }
 
-    // Draws the shut panel, unseen, for the frames Prewarm gives it, so its
-    // layout, text and meshes are built at startup rather than on first open.
     private bool _warming;
     private CanvasGroup _warmGroup;
     private float _warmAlpha;
@@ -79,7 +73,6 @@ public abstract class PanelUI : MonoBehaviour
         _canvas.enabled = _shown || _warming;
     }
 
-    // Builds the layout a first open would, now.
     protected void ResolveLayoutNow()
     {
         if (!_layoutDirty) return;
@@ -87,7 +80,6 @@ public abstract class PanelUI : MonoBehaviour
         ResolveDeferredLayout();
     }
 
-    // Starts the panel shut: built and active, but not drawn or poked.
     protected void StartHidden()
     {
         if (_canvas == null) return;
@@ -95,8 +87,35 @@ public abstract class PanelUI : MonoBehaviour
         HideCanvas();
     }
 
+    private static readonly List<PanelUI> _panels = new List<PanelUI>();
+
+    private const float PanelGap = 0.03f;
+
+    private bool PlaceBesideOpenPanel()
+    {
+        PanelUI other = null;
+        for (int i = _panels.Count - 1; i >= 0; i--)
+        {
+            if (_panels[i] == null) { _panels.RemoveAt(i); continue; }
+            if (_panels[i] != this && _panels[i].IsVisible) { other = _panels[i]; break; }
+        }
+        if (other == null || other.CanvasRect == null || CanvasRect == null) return false;
+
+        var theirs = new Vector3[4];
+        var mine = new Vector3[4];
+        transform.rotation = other.transform.rotation;
+        other.CanvasRect.GetWorldCorners(theirs);
+        CanvasRect.GetWorldCorners(mine);
+
+        Vector3 right = (theirs[2] - theirs[1]).normalized;
+        Vector3 target = theirs[2] + right * PanelGap;
+        transform.position += target - mine[1];
+        return true;
+    }
+
     protected void InitPanel(Vector2 size)
     {
+        if (!_panels.Contains(this)) _panels.Add(this);
         _canvas = GetComponentInChildren<Canvas>(true);
         if (_canvas != null) _canvas.sortingOrder = Style.SortPanels;
         ApplyPanelSize(size);
@@ -158,9 +177,6 @@ public abstract class PanelUI : MonoBehaviour
         rt.offsetMax = new Vector2(padRight, Style.SmallBorder);
     }
 
-    // Whether the panel may be grabbed: while it is shown, and not while a
-    // hand is at one of the map's sliders, which would take the panel with
-    // the slide (FlatSlideBar.AnyBusy). A grab already under way is kept.
     private bool _grabWanted;
 
     private void SetGrabbable(bool on)
@@ -172,7 +188,7 @@ public abstract class PanelUI : MonoBehaviour
     private void ApplyGrabCollider()
     {
         if (grabCollider == null) return;
-        bool on = _grabWanted && (Held || !FlatSlideBar.AnyBusy);
+        bool on = _grabWanted;
         if (grabCollider.enabled != on) grabCollider.enabled = on;
     }
 
@@ -187,7 +203,6 @@ public abstract class PanelUI : MonoBehaviour
     private bool _grabbableSearched;
     private GrabSwell _swell;
 
-    // The panel's scale at rest, without the swell it takes while held.
     public Vector3 RestScale => _swell.Rest(transform);
 
     private void ApplyGrabLook()
@@ -224,8 +239,19 @@ public abstract class PanelUI : MonoBehaviour
         InvalidateGrabBounds();
     }
 
+    private Vector2 _pokeFitted;
+
+    private void FitPokes()
+    {
+        RectTransform canvas = CanvasRect;
+        if (canvas == null || canvas.rect.size == _pokeFitted) return;
+        _pokeFitted = canvas.rect.size;
+        UILayout.FitPokeBounds(canvas);
+    }
+
     private void LateUpdate()
     {
+        FitPokes();
         ApplyGrabCollider();
         ApplyGrabLook();
         ApplyFacing();
@@ -332,6 +358,7 @@ public abstract class PanelUI : MonoBehaviour
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetStatics()
     {
+        _panels.Clear();
         _frontMaterial = null;
         _backMaterial = null;
     }
@@ -420,7 +447,6 @@ public abstract class PanelUI : MonoBehaviour
             StyleHeaderLabel(headers[i].GetComponent<TextMeshProUGUI>());
     }
 
-    // A pane's inset: the panel inset at the sides, small padding above and below.
     protected static RectOffset PanePadding() => new RectOffset(
         (int)Style.PanelInset, (int)Style.PanelInset,
         (int)Style.SmallPadding, (int)Style.SmallPadding);
@@ -451,7 +477,6 @@ public abstract class PanelUI : MonoBehaviour
         return true;
     }
 
-    // Stands the panel ahead of the user without showing it.
     public void PlaceAhead()
     {
         Transform cam = CameraRig.MainTransform;
@@ -465,8 +490,6 @@ public abstract class PanelUI : MonoBehaviour
         transform.SetPositionAndRotation(cam.position + forward * zOffsetFromCamera, Quaternion.LookRotation(forward));
     }
 
-    // Turns the panel square to a viewer at 'eye' without moving it. False
-    // when the viewer is too close to tell which way that is.
     public bool SquareTo(Vector3 eye)
     {
         Vector3 face = transform.position - eye;

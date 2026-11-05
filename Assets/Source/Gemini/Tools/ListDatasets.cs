@@ -25,8 +25,6 @@ public sealed class ListDatasets : AgenticTool {
                 var dataset = datasets.Datasets[i];
                 bool active = i == datasets.ActiveIndex;
 
-                // A sheet that has not been read yet has nothing drawn and no
-                // edits; what it would show is the whole of what there is to report.
                 if (!dataset.loaded) {
                     list.Add(new Dictionary<string, object> {
                         { "name", dataset.Name },
@@ -139,7 +137,6 @@ public sealed class ListDatasets : AgenticTool {
         }
     }
 
-    // A company filter hides rows by data index; a metric filter hides column groups.
     private static List<object> FilterTitles(DataSource data, bool rows, List<int> hidden)
     {
         var names = new List<object>();

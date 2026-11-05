@@ -3,23 +3,11 @@ using UnityEditor;
 using UnityEngine;
 using UnityEngine.Rendering.Universal;
 
-// Renders the prototype poster views to PNG files.
-//
-// Both views are ordinary scene objects, so a capture is just a camera pointed
-// at one: no play mode, no build. The objects are made and destroyed inside the
-// call, which leaves whatever scene is open untouched.
-//
-// Anti-aliasing is supersampling rather than MSAA: the image is drawn at a
-// multiple of the requested size and box-filtered down. It costs a little
-// memory and is the same on every machine, which matters more here than speed
-// because the output is a file that goes on a printed poster.
 public static class PosterCapture
 {
     private const string OutputDirectory = "poster";
     private const int Supersample = 3;
 
-    // Transparent, so the figure drops onto whatever the poster's background
-    // is; the white copies are there for previewing and for slides.
     private static readonly Color Transparent = new Color(1f, 1f, 1f, 0f);
     private static readonly Color White = Color.white;
 
@@ -35,8 +23,6 @@ public static class PosterCapture
         Debug.Log($"[PosterCapture] Wrote the prototype views to {directory}.");
     }
 
-    // Called by the batch-mode invocation in the header comment of this file's
-    // companion README line; kept separate so a failure exits non-zero.
     public static void CaptureAllBatch()
     {
         try
@@ -51,8 +37,6 @@ public static class PosterCapture
         }
     }
 
-    // Square, as asked: the ring of ten nodes has no long axis, so any other
-    // ratio would only pad it.
     private static void CaptureNetwork(string directory)
     {
         var host = new GameObject("PosterNetworkGraph");
@@ -62,10 +46,6 @@ public static class PosterCapture
             var view = host.AddComponent<NetworkGraphView>();
             view.Build(material);
 
-            // Perspective, unlike the surface: an orthographic camera draws a
-            // near node and a far node the same size, which throws away the
-            // depth the layout is carrying. A long lens keeps the convergence
-            // mild enough that the ring still reads as a ring.
             Render(directory, "network-graph", 2048, 2048,
                    pivot: Vector3.zero,
                    euler: Vector3.zero,
@@ -79,10 +59,6 @@ public static class PosterCapture
         }
     }
 
-    // Square, to match the network graph: the two hang together on the poster,
-    // and a pair of figures in different ratios reads as two separate exhibits.
-    // Viewed from three-quarters above, since a scoop read head-on loses the
-    // very depth the figure is about.
     private static void CaptureSurface(string directory)
     {
         var host = new GameObject("PosterSurfaceGraph");
@@ -104,10 +80,6 @@ public static class PosterCapture
         }
     }
 
-    // The app's own sheet material, on a throwaway copy with culling off: the
-    // headset only ever sees a cube from outside, but a poster camera can catch
-    // the underside of a surface, and a figure with holes in it is worse than
-    // one that draws a few faces twice.
     private static Material Material()
     {
         var material = Resources.Load<Material>("Materials/SheetMaterial");
@@ -129,12 +101,6 @@ public static class PosterCapture
               Draw(width, height, pivot, euler, orthographicSize, fieldOfView, White));
     }
 
-    // The camera is placed by backing away from the pivot along its own view
-    // direction, so changing the angle reframes nothing: an orthographic camera
-    // keeps the pivot dead centre whatever distance it sits at.
-    // A field of view of zero means an orthographic camera; anything else is a
-    // perspective one, framed so that the pivot plane spans what the same
-    // orthographic size would have.
     private static Texture2D Draw(int width, int height,
                                   Vector3 pivot, Vector3 euler,
                                   float orthographicSize, float fieldOfView,
@@ -204,9 +170,6 @@ public static class PosterCapture
         return texture;
     }
 
-    // A box filter over each supersample block. Colour is averaged weighted by
-    // alpha, so the transparent copy's edge pixels do not pick up the colour of
-    // the cleared background and fringe on a dark poster.
     private static Texture2D Downsample(Texture2D source, int width, int height)
     {
         Color[] pixels = source.GetPixels();

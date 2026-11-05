@@ -12,6 +12,7 @@ public static class Scene {
     private static ManageSheets sheetManager;
     private static ManageDatasets manageDatasets;
     private static Tooltip tooltip;
+    private static SettingsPanelUI settingsPanel;
 
     public static ManageTools Tools => Resolve(ref toolManager);
     public static ToolPanelUI ToolPanel => Resolve(ref toolPanelUI);
@@ -22,6 +23,7 @@ public static class Scene {
     public static ManageSheets Sheets => Resolve(ref sheetManager);
     public static ManageDatasets Datasets => ManageDatasets.Instance != null ? ManageDatasets.Instance : Resolve(ref manageDatasets);
     public static Tooltip Tooltip => Resolve(ref tooltip);
+    public static SettingsPanelUI SettingsPanel => Resolve(ref settingsPanel);
 
     public static string DatasetLabel {
         get {
@@ -31,9 +33,6 @@ public static class Scene {
         }
     }
 
-    // The sheet on the table's data. With datasets managed, that is the open
-    // one or nothing: before the first sheet opens there is none, and the tools must not
-    // read or act on whichever dataset happened to be open last.
     public static DataSource Data {
         get {
             if (ManageDatasets.Instance != null) return ManageDatasets.ActiveSource;

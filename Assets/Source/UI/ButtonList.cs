@@ -3,11 +3,12 @@ using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.UI;
 
-// A row of buttons that share the width equally, at most one of them selected.
 public class ButtonList
 {
     private readonly RectTransform _root;
     private readonly List<UIButton.Handle> _items = new List<UIButton.Handle>();
+
+    public IReadOnlyList<UIButton.Handle> Items => _items;
 
     public ButtonList(RectTransform root)
     {

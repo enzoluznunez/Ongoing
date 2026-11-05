@@ -2,11 +2,6 @@ using System;
 using System.Collections.Generic;
 using Google.GenAI.Types;
 
-// The filters a sheet tool's 'where' names breaches by. Every name is checked
-// against CyberContract, so a misheard name is caught before any lookup. With
-// no breach database behind this build, AgenticTool.WithNames keeps 'where'
-// out of the tools' schemas and BreachMatch refuses one; this stays so a
-// local lookup over the StreamingAssets sheets can take its place.
 public class BreachFilters {
 
     [Optional, Limits(CyberContract.FirstYear, CyberContract.LastYear)]
@@ -54,7 +49,7 @@ public class BreachFilters {
     public bool? sec;
 
     [Optional]
-    [Doc("Metros, by the names the sheets and map give them, such as 'New York, NY'.")]
+    [Doc("Metros, by the names the sheets give them, such as 'New York, NY'.")]
     public string[] metro;
 
     [Optional]
@@ -70,8 +65,6 @@ public class BreachFilters {
     [Doc("A stock ticker, such as WMT.")]
     public string ticker;
 
-    // Bounds on an amount, inclusive. Dollars are whole dollars: 10 million is
-    // 10000000. A breach that does not report an amount fails a bound on it.
     [Optional, Doc("Smallest revenue, in dollars (10 million is 10000000).")] public double? revenue_min;
     [Optional, Doc("Largest revenue, in dollars.")] public double? revenue_max;
     [Optional, Doc("Smallest net income, in dollars; negative is a loss.")] public double? net_income_min;
@@ -89,9 +82,6 @@ public class BreachFilters {
     [Optional, Doc("Smallest cost of the breach, in dollars. Most breaches do not report it, and those fail this bound.")] public double? cost_min;
     [Optional, Doc("Largest cost of the breach, in dollars.")] public double? cost_max;
 
-    // The filters that take names, with the names each takes and the field
-    // holding them. The schema lists the names so the model picks from them
-    // rather than guessing a spelling.
     private static readonly (string field, string[] names, Func<BreachFilters, string[]> given)[] Vocabulary = {
         ("industry", CyberContract.Industries, f => f.industry),
         ("attack", CyberContract.AttackTypes, f => f.attack),
@@ -109,7 +99,6 @@ public class BreachFilters {
         return schema;
     }
 
-    // 'value' in the contract's own spelling, or why it is not one of 'names'.
     public static string Canonical(ref string value, string field, string[] names) {
         if (value == null) return null;
         string given = value.Trim();
@@ -119,8 +108,6 @@ public class BreachFilters {
         return null;
     }
 
-    // Puts every name into the contract's own spelling, or says why one cannot
-    // be: the reason lists what would have worked.
     public string Check() {
         if (since.HasValue && until.HasValue && since > until)
             return $"'since' ({since}) is after 'until' ({until}).";

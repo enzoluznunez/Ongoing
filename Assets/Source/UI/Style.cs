@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 
@@ -20,6 +21,7 @@ public static class Style
         if (label == null) return;
         if (BodyFont != null) label.font = BodyFont;
         label.fontSize = Body;
+        Track(_bodies, label);
     }
 
     public static void ApplyTitle(TMP_Text label)
@@ -27,6 +29,52 @@ public static class Style
         if (label == null) return;
         if (TitleFont != null) label.font = TitleFont;
         label.fontSize = Title;
+        Track(_titles, label);
+    }
+
+    public static void ApplyWorldBody(TMP_Text label)
+    {
+        if (label == null) return;
+        if (BodyFont != null) label.font = BodyFont;
+        label.fontSize = WorldBody;
+    }
+
+    public static void ApplyWorldTitle(TMP_Text label)
+    {
+        if (label == null) return;
+        if (TitleFont != null) label.font = TitleFont;
+        label.fontSize = WorldTitle;
+    }
+
+    private static readonly List<TMP_Text> _bodies = new List<TMP_Text>();
+    private static readonly List<TMP_Text> _titles = new List<TMP_Text>();
+    private static bool _listening;
+
+    private static void Track(List<TMP_Text> list, TMP_Text label)
+    {
+        if (!_listening)
+        {
+            _listening = true;
+            Settings.Changed += OnSettingChanged;
+        }
+        (list == _bodies ? _titles : _bodies).Remove(label);
+        if (!list.Contains(label)) list.Add(label);
+    }
+
+    private static void OnSettingChanged(Setting which)
+    {
+        if (which != Setting.TextSize) return;
+        Resize(_bodies, Body);
+        Resize(_titles, Title);
+    }
+
+    private static void Resize(List<TMP_Text> list, float size)
+    {
+        for (int i = list.Count - 1; i >= 0; i--)
+        {
+            if (list[i] == null) { list.RemoveAt(i); continue; }
+            list[i].fontSize = size;
+        }
     }
 
     private static TMP_FontAsset Load(ref TMP_FontAsset cached, string path)
@@ -44,6 +92,9 @@ public static class Style
     {
         _bodyFont = null;
         _titleFont = null;
+        _bodies.Clear();
+        _titles.Clear();
+        _listening = false;
     }
 
     public static readonly Color White = Hex(255, 255, 255);
@@ -57,26 +108,39 @@ public static class Style
 
     public const float SmallBorder = 2f;
 
-    public const float Body = 10f;
-    public const float Title = 12f;
+    public static float Body => BodySize(Settings.TextSize);
+    public static float Title => Body + 2f;
+
+    public static float BodySize(TextSize size) =>
+        size == TextSize.Small ? 8f : size == TextSize.Medium ? 12f : 16f;
+
+    public const float LayoutBody = 16f;
+    public const float LayoutTitle = 18f;
+
+    public const float WorldBody = 10f;
+    public const float WorldTitle = 12f;
 
     public const float WorldScale = 0.001f;
     public const float WorldTextScale = WorldScale * 10f;
 
-    // How far along a timed motion is, for its share of time 't': fast at
-    // first and slowing into place. Every timed motion uses it, the sheet's,
-    // its lines' and strips' and the map's alike, so all of them move the
-    // same way.
     public static float EaseOut(float t)
     {
         t = Mathf.Clamp01(t);
         return 1f - (1f - t) * (1f - t) * (1f - t);
     }
 
-    // A timed motion over 'seconds': from the next frame on, hands 'apply'
-    // how far along it is (EaseOut), ending at 1.
+    public static bool Animate => Settings.Animations;
+
+    public static float Seconds(float seconds) => Animate ? seconds : 0f;
+
     public static IEnumerator Tween(float seconds, Action<float> apply)
     {
+        if (!Animate || seconds <= 0f)
+        {
+            apply(1f);
+            yield break;
+        }
+
         float t = 0f;
         while (t < seconds)
         {
@@ -86,47 +150,40 @@ public static class Style
         }
     }
 
-    // How much of the way to close toward a target this frame, closing at
-    // 'rate' per second however long the frame was.
     public static float Damp(float rate, float dt) => 1f - Mathf.Exp(-rate * dt);
 
-    public const float SmallPadding = 6f;
-    public const float MediumPadding = 12f;
-    public const float ButtonTextPad = 10f;
+    public const float SmallPadding = 10f;
+    public const float MediumPadding = 19f;
+    public const float ButtonTextPad = 16f;
     public const float PanelInset = MediumPadding;
 
-    public const float HeaderHeight = 30f;
+    public const float HeaderHeight = 48f;
 
-    public const float OutRadius = 8f;
-    public const float ChipRadius = 4f;
-    public const float PanelRadius = 12f;
+    public const float OutRadius = 13f;
+    public const float ChipRadius = 6f;
+    public const float PanelRadius = 19f;
     public const float PanelInnerRadius = PanelRadius - SmallBorder;
 
     public static float RadiusFor(float height) => height <= Subbutton.y ? ChipRadius : OutRadius;
 
     public static float InnerRadius(float radius) => radius - SmallBorder;
 
-    // A tile is a button the size of a card, and a fixed corner would read as a
-    // square beside the buttons it shares a panel with. Its radius is a share of
-    // its side instead, held between a button's corner and the panel's own so
-    // the whole surface stays one family. Whole units keep the rounded sprites
-    // to a handful as a tile is resized.
     public const float TileRadiusRatio = 0.12f;
 
     public static float TileRadius(float side) =>
         Mathf.Round(Mathf.Clamp(side * TileRadiusRatio, OutRadius, PanelRadius + SmallPadding));
 
-    public static readonly Vector2 Subbutton = new Vector2(40f, 20f);
-    public static readonly Vector2 Button = new Vector2(50f, 25f);
-    public const float TitleBarButtonWidth = 80f;
+    public static readonly Vector2 Subbutton = new Vector2(64f, 32f);
+    public static readonly Vector2 Button = new Vector2(80f, 40f);
+    public const float TitleBarButtonWidth = 128f;
 
     public const int SortPanels = 0;
     public const int SortHandUI = 0;
     public const int SortNotices = 10;
 
-    public static readonly Vector2 Subpanel = new Vector2(400f, 280f);
-    public static readonly Vector2 Panel = new Vector2(400f, 400f);
-    public const float TooltipWidth = 360f;
+    public static readonly Vector2 Subpanel = new Vector2(640f, 448f);
+    public static readonly Vector2 Panel = new Vector2(640f, 640f);
+    public const float TooltipWidth = 576f;
 
     public static Color Alpha(Color c, float a)
     {

@@ -79,7 +79,7 @@ public class PointerHighlight : MonoBehaviour,
 
     private void DriveLift()
     {
-        if (!isActiveAndEnabled)
+        if (!isActiveAndEnabled || !Style.Animate)
         {
             SnapLift();
             return;

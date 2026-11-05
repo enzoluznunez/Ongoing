@@ -4,7 +4,6 @@
     "references": [
         "Oculus.VR",
         "Oculus.Interaction",
-        "meta.xr.mrutilitykit",
         "Unity.TextMeshPro",
         "UnityEngine.UI"
     ],

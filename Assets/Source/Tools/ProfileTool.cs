@@ -103,8 +103,6 @@ public class ProfileTool : Tool
         UIPressFeedback.Play();
     }
 
-    // Raises a line for the assistant. One already raised is left up, rather
-    // than lowered as a press on it would.
     public bool ShowProfile(bool columns, int visRow, int visCol)
     {
         if (!Active || sheetManager == null) return false;
@@ -124,7 +122,6 @@ public class ProfileTool : Tool
         lift = liftAboveMaximumHeight
     };
 
-    // Raises the line, or lowers it when it is already raised.
     private bool Project(bool columns, int dataRow, int dataCol, int visRow, int visCol)
     {
         if (!sheetManager.PushProjection(Record(columns, dataRow, dataCol), EditKind.Profile, out bool lowered))

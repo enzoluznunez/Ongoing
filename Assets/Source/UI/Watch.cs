@@ -10,6 +10,8 @@ public class Watch : MonoBehaviour
 {
     [SerializeField, Interface(typeof(IHand))]
     private UnityEngine.Object _hand;
+    [SerializeField, Interface(typeof(IHand))]
+    private UnityEngine.Object _rightHand;
 
     public ToolPanelUI toolPanelUI;
     public GeminiClient geminiClient;
@@ -40,12 +42,12 @@ public class Watch : MonoBehaviour
 
     private IHand _ihand;
     private UIButton.Handle _toolBtn;
-    private UIButton.Handle _mapBtn;
+    private UIButton.Handle _settingsBtn;
+    private bool _settingsPanelOpen;
 
     private Canvas _canvas;
     private Transform _canvasTransform;
     private bool _toolPanelOpen;
-    private bool _mapPanelOpen;
 
     private bool _raisedActive;
     private GeminiStatus _raisedStatus;
@@ -64,7 +66,8 @@ public class Watch : MonoBehaviour
 
     private void Awake()
     {
-        _ihand = _hand as IHand;
+        _ihand = HandFor(Settings.Handedness);
+        Settings.Changed += OnSettingChanged;
 
         _canvas = GetComponentInChildren<Canvas>(true);
         if (_canvas != null)
@@ -82,41 +85,53 @@ public class Watch : MonoBehaviour
         }
     }
 
-    // Two buttons, one above the other, each opening and closing its own
-    // panel: Map Panel, made from the scene's Tool Panel button, then Tool
-    // Panel. Both are in the Undo All button's style, as wide and twice as
-    // tall so a fingertip finds them easily, floating apart with nothing
-    // behind them.
     private void BindButtons()
     {
         Transform tool = FindTransform.FindDeep(transform, "Tool Panel_Btn");
-        if (tool != null && FindTransform.FindDeep(transform, "Map Panel_Btn") == null)
+        if (tool != null && FindTransform.FindDeep(transform, "Settings_Btn") == null)
         {
-            GameObject map = Instantiate(tool.gameObject, tool.parent, false);
-            map.name = "Map Panel_Btn";
-            map.transform.SetSiblingIndex(tool.GetSiblingIndex());
+            GameObject settings = Instantiate(tool.gameObject, tool.parent, false);
+            settings.name = "Settings_Btn";
+            settings.transform.SetSiblingIndex(tool.GetSiblingIndex());
         }
 
-        _mapBtn = BindPanelButton("Map Panel_Btn", "Map Panel", OnMapClicked);
-        _toolBtn = BindPanelButton("Tool Panel_Btn", "Tool Panel", OnToolClicked);
+        _settingsBtn = BindPanelButton("Settings_Btn", "wrist.settings", OnSettingsClicked);
+        _toolBtn = BindPanelButton("Tool Panel_Btn", "wrist.tools", OnToolClicked);
         HideUnboundButtons();
         SizeToButtons();
     }
 
-    // The watch shows exactly the buttons it binds. Anything else left in the
-    // group — a button for a panel that no longer exists — is taken off the
-    // layout rather than left sitting there doing nothing.
+    private IHand HandFor(WristHand side)
+    {
+        IHand right = _rightHand as IHand;
+        return side == WristHand.Right && right != null ? right : _hand as IHand;
+    }
+
+    private bool OnRight => Settings.Handedness == WristHand.Right && _rightHand as IHand != null;
+
+    private void OnSettingChanged(Setting which)
+    {
+        if (which != Setting.Handedness) return;
+        _ihand = HandFor(Settings.Handedness);
+        _calibrated = false;
+        _hasPose = false;
+        _lostAt = -1f;
+        _poseFilter.Reset();
+    }
+
+    private void OnDestroy() => Settings.Changed -= OnSettingChanged;
+
     private void HideUnboundButtons()
     {
         RectTransform group = FindTransform.FindDeep(transform, "Buttons") as RectTransform;
         if (group == null) return;
 
         GameObject tool = _toolBtn != null ? _toolBtn.Root : null;
-        GameObject map = _mapBtn != null ? _mapBtn.Root : null;
+        GameObject settings = _settingsBtn != null ? _settingsBtn.Root : null;
         for (int i = 0; i < group.childCount; i++)
         {
             GameObject child = group.GetChild(i).gameObject;
-            if (child != tool && child != map && child.activeSelf) child.SetActive(false);
+            if (child != tool && child != settings && child.activeSelf) child.SetActive(false);
         }
     }
 
@@ -152,15 +167,14 @@ public class Watch : MonoBehaviour
 
         group.pivot = new Vector2(0.5f, 0.5f);
         UILayout.Stretch(group);
+        if (canvasRect != null) UILayout.FitPokeBounds(canvasRect);
     }
 
-    // The Undo All button's width and twice its height, and the space between
-    // the two, in the canvas's units.
     private static readonly Vector2 ButtonSize = new Vector2(Style.TitleBarButtonWidth, Style.Button.y * 2f);
-    private const float ButtonGap = 10f;
+    private const float ButtonGap = 16f;
 
 
-    private UIButton.Handle BindPanelButton(string name, string label, UnityEngine.Events.UnityAction onClick)
+    private UIButton.Handle BindPanelButton(string name, string labelKey, UnityEngine.Events.UnityAction onClick)
     {
         Transform t = FindTransform.FindDeep(transform, name);
         if (t == null)
@@ -173,7 +187,8 @@ public class Watch : MonoBehaviour
         if (h.Text != null)
         {
             h.Text.gameObject.SetActive(true);
-            h.Text.text = label;
+            h.Text.textWrappingMode = TMPro.TextWrappingModes.Normal;
+            Strings.Bind(h.Text, labelKey);
         }
         h.Button.onClick.AddListener(onClick);
         UIButton.SetSelected(h, false);
@@ -185,9 +200,10 @@ public class Watch : MonoBehaviour
         if (toolPanelUI != null) toolPanelUI.TogglePanel();
     }
 
-    private void OnMapClicked()
+    private void OnSettingsClicked()
     {
-        if (MapCarousel.Instance != null) MapCarousel.Instance.Toggle();
+        SettingsPanelUI settings = Scene.SettingsPanel;
+        if (settings != null) settings.TogglePanel();
     }
 
 
@@ -230,11 +246,10 @@ public class Watch : MonoBehaviour
     private void SyncPanelButtonStates()
     {
         if (toolPanelUI != null) SyncPanelButton(toolPanelUI.IsVisible, _toolBtn, ref _toolPanelOpen);
-        MapCarousel map = MapCarousel.Instance;
-        if (map != null) SyncPanelButton(map.IsOpen, _mapBtn, ref _mapPanelOpen);
+        SettingsPanelUI settings = Scene.SettingsPanel;
+        if (settings != null) SyncPanelButton(settings.IsVisible, _settingsBtn, ref _settingsPanelOpen);
     }
 
-    // A button shows as selected while its panel is open.
     private static void SyncPanelButton(bool open, UIButton.Handle button, ref bool wasOpen)
     {
         if (open == wasOpen) return;
@@ -275,10 +290,8 @@ public class Watch : MonoBehaviour
             SetGeminiActive(false, AssistantCause.Failure);
 
             if (wasActive)
-                Notices.Show(this, "Assistant Off",
-                    status == GeminiStatus.MicDenied
-                        ? "Microphone access is denied, so the assistant cannot listen."
-                        : "The assistant could not stay connected and turned itself off.");
+                Notices.Show(this, Strings.Get("notice.assistantOff"),
+                    Strings.Get(status == GeminiStatus.MicDenied ? "notice.micDenied" : "notice.disconnected"));
         }
 
         RaiseAssistantChanged();
@@ -286,9 +299,7 @@ public class Watch : MonoBehaviour
 
     private void OnContextWarning()
     {
-        Notices.Show(this, "Assistant Nearly Full",
-            "The assistant is close to the limit of what it can hold in mind. " +
-            "It will reset itself shortly and start over from a blank slate.");
+        Notices.Show(this, Strings.Get("notice.nearlyFull"), Strings.Get("notice.nearlyFull.body"));
     }
 
     private void OnContextExhausted()
@@ -296,13 +307,11 @@ public class Watch : MonoBehaviour
         SetGeminiActive(false, AssistantCause.Failure);
         var toolPanel = Scene.ToolPanel;
         bool panelOpen = toolPanel != null && toolPanel.IsVisible;
-        Notices.Show(this, "Assistant Full",
-            panelOpen
-                ? "The assistant ran out of room to hold the conversation and stopped. Select the assistant again to start over."
-                : "The assistant ran out of room to hold the conversation and stopped. To start over, open the Tool Panel and select the assistant.");
+        Notices.Show(this, Strings.Get("notice.full"),
+            Strings.Get(panelOpen ? "notice.full.open" : "notice.full.closed"));
     }
 
-    private bool Engaged => IsEngaged(_toolBtn) || IsEngaged(_mapBtn);
+    private bool Engaged => IsEngaged(_toolBtn) || IsEngaged(_settingsBtn);
 
     private static bool IsEngaged(UIButton.Handle h) => h != null && h.Highlight != null && h.Highlight.IsEngaged;
 
@@ -427,6 +436,7 @@ public class Watch : MonoBehaviour
         across.Normalize();
 
         Vector3 outward = Vector3.Cross(along, across).normalized;
+        if (OnRight) outward = -outward;
 
         Vector3 stackUp = -across;
         stackUp = Vector3.ProjectOnPlane(stackUp, outward).normalized;
@@ -438,9 +448,6 @@ public class Watch : MonoBehaviour
         return true;
     }
 
-    // Hidden while the hand is away, not switched off, so the buttons are
-    // never rebuilt as the hand comes and goes: they stop drawing and taking
-    // fingertips.
     private void SetVisible(bool visible)
     {
         if (_canvas == null || _canvas.enabled == visible) return;

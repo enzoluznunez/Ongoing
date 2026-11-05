@@ -1,6 +1,3 @@
-// The names and bounds the breach data uses: what BreachFilters checks a
-// 'where' against and the regions ShowMap offers. Kept by hand, to match the
-// StreamingAssets data.
 public static class CyberContract {
     public const int FirstYear = 2005;
     public const int LastYear = 2023;

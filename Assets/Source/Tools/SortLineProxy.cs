@@ -16,8 +16,6 @@ public class SortLineProxy : MonoBehaviour
 
     public float Coord => columns ? transform.localPosition.x : transform.localPosition.z;
 
-    // Where a row's and a column's handle stand, as shares of the bars' full
-    // height, and how tall each is: rows below, columns above, a gap between.
     public const float RowBand = 0.25f;
     public const float ColumnBand = 0.75f;
     public const float BandHeight = 0.45f;
@@ -27,10 +25,6 @@ public class SortLineProxy : MonoBehaviour
     private HandGrabInteractable _handGrab;
     private OneGrabTranslateTransformer _slide;
 
-    // One handle per block, so a grouped axis is grabbed a whole metric at a time
-    // and its years can never be pulled apart. Made with nothing to hold yet,
-    // put away, while the app loads, and stood on a sheet's line by Place
-    // whenever the Sort tool is out.
     public static SortLineProxy Make(Transform parent)
     {
         GameObject go = new GameObject("SortLine");
@@ -50,9 +44,6 @@ public class SortLineProxy : MonoBehaviour
         _slide = GetComponent<OneGrabTranslateTransformer>();
     }
 
-    // Stands the handle on a block of a sheet's lines, sliding along that
-    // axis from the first block's place to the last. False, leaving it put
-    // away, when there is no such block.
     public bool Place(CreateSheet owner, bool columns, int block, float height)
     {
         if (owner == null) return false;
@@ -64,12 +55,6 @@ public class SortLineProxy : MonoBehaviour
         int max = owner.BlockMax(columns);
         if (block < min || block > max) return false;
 
-        // Across every place on the other axis, empty ones included, as the
-        // sheet itself spans them: a line filtered off at either end leaves
-        // the sheet its size and its middle where it was, so the handle,
-        // centred on that middle, would otherwise slide toward the empty end
-        // and its grip stand over the first lines at the other. The Filter
-        // tool measures the ends the same way (FilterTool.Outside).
         bool across = !columns;
         float span = owner.SlotCoord(across, owner.LastSlot(across))
                      - owner.SlotCoord(across, owner.FirstSlot(across)) + owner.PitchOn(across);
@@ -97,7 +82,6 @@ public class SortLineProxy : MonoBehaviour
         return true;
     }
 
-    // Put away, it takes no hand and no poke; nothing of it is drawn either way.
     public void SetLive(bool on)
     {
         _box.enabled = on;
@@ -123,8 +107,6 @@ public class SortLineProxy : MonoBehaviour
         }
     }
 
-    // Stated in the sheet's own space rather than from where the handle stood
-    // when it was readied, so a handle can be stood on any line again.
     private OneGrabTranslateTransformer.OneGrabTranslateConstraints Limits(float coord, float back, float forward)
     {
         var limits = new OneGrabTranslateTransformer.OneGrabTranslateConstraints

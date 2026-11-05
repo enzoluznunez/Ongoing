@@ -241,7 +241,7 @@ public static class Gemini {
             },
             ResponseModalities = new List<Modality> { Modality.Audio },
             SpeechConfig = new SpeechConfig {
-                LanguageCode = "en-US",
+                LanguageCode = SpeechLanguage,
                 VoiceConfig = new VoiceConfig {
                     PrebuiltVoiceConfig = new PrebuiltVoiceConfig { VoiceName = "Charon" }
                 }
@@ -256,10 +256,21 @@ public static class Gemini {
                 }
             },
             InputAudioTranscription = new AudioTranscriptionConfig {
-                LanguageCodes = new List<string> { "en-US" }
+                LanguageCodes = new List<string> { SpeechLanguage }
             },
             OutputAudioTranscription = new AudioTranscriptionConfig()
         };
+    }
+
+    private static string SpeechLanguage => Settings.Language == AppLanguage.Spanish ? "es-US" : "en-US";
+
+    public static void Reconfigure(bool fresh) {
+        if (client == null) return;
+        if (fresh) {
+            resumeHandle = null;
+            ResetWindow();
+        }
+        RebuildConfig();
     }
 
     public static void Destroy() {
@@ -455,11 +466,6 @@ public static class Gemini {
         int gen = Interlocked.Increment(ref sessionGeneration);
         var cts = new CancellationTokenSource();
         sessionCts = cts;
-        // Started off the main thread: until its first wait, the loop would
-        // otherwise run inline on the frame that asked for it, opening the
-        // socket (address lookup, connect) there, a third of a second the
-        // headset showed as one frame when the tool panel opened. Past that
-        // first wait it was on the thread pool already, as every reconnect is.
         sessionTask = Task.Run(() => RunAfterAsync(previous, gen, cts.Token));
     }
 
@@ -506,7 +512,6 @@ public static class Gemini {
     private static int rawMin = int.MaxValue;
     private static int rawMax;
 
-    // The mic audio gathered or queued so far, dropped.
     private static void DropPendingAudio() {
         ResetMicAccumulator();
         while (sendQueue.TryDequeue(out _)) { }
@@ -816,9 +821,6 @@ public static class Gemini {
             pendingUserFlush = false;
             lastUserText = null;
             Interlocked.Exchange(ref toolRoundsThisTurn, 0);
-            // The turn's bookkeeping is the main thread's: tool calls and the
-            // user taking over read it there, so it is cleared there too, in
-            // order behind whatever this turn already queued.
             _ = MainThread.Run(AgentTurn.Clear);
             if (ConsumeShutdownRequest())
                 _ = MainThread.Run(() => {

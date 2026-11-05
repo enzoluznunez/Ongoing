@@ -8,8 +8,6 @@ public class SortTool : Tool
 
     private readonly List<SortLineProxy> _proxies = new List<SortLineProxy>();
 
-    // Handles put away, made while the app loads (Prepare): taking the tool
-    // out or finishing a move stands them on the lines again, making none.
     private readonly List<SortLineProxy> _spare = new List<SortLineProxy>();
     private Transform _spareRoot;
 
@@ -39,8 +37,6 @@ public class SortTool : Tool
         _spare.Clear();
     }
 
-    // Makes handles, put away, until there are 'count', within 'budgetMs'
-    // this frame. True once there are that many.
     public bool Prepare(int count, double budgetMs)
     {
         var clock = System.Diagnostics.Stopwatch.StartNew();
@@ -66,8 +62,6 @@ public class SortTool : Tool
     {
         CompleteOrderSequence();
         CancelDrag();
-        // Already in the data's order, as after undoing every sort, there is
-        // nothing to rebuild.
         DataSource data = Scene.Data;
         if (data != null && !data.InDataOrder)
         {
@@ -92,9 +86,6 @@ public class SortTool : Tool
 
     private void RebuildProxies()
     {
-        // While a set order walks, the handles stay as they stand, unless the
-        // tool is put away: then they go, or they would stay live under the
-        // next tool, sliding when pinched with nothing to commit them.
         if (_sequence != null && Active) return;
         if (_held != null) CancelDrag();
         ClearProxies();
@@ -167,9 +158,6 @@ public class SortTool : Tool
         _dragColumns = proxy.columns;
         bool columns = _dragColumns;
 
-        // Lines still sliding from the last change, or bars still growing
-        // back after a filter, are put where they end first: both move the
-        // same bars this drag moves, and would pull them back each frame.
         sheetManager.CompleteLineMotion();
         sheet.CompleteGrow();
         sheetManager.LinesDragged = true;
@@ -184,7 +172,7 @@ public class SortTool : Tool
 
     private void Reflow(float dragged)
     {
-        float t = Style.Damp(reflowSmoothing, Time.deltaTime);
+        float t = Style.Animate ? Style.Damp(reflowSmoothing, Time.deltaTime) : 1f;
         bool columns = _dragColumns;
 
         for (int block = _blockMin; block <= _blockMax; block++)
@@ -209,12 +197,9 @@ public class SortTool : Tool
 
         ClearDrag();
 
-        // A drag lets go with the lines sliding into their places: Sort is
-        // one of the user's changes that plays out rather than landing.
         if (sheetManager != null) sheetManager.UserChangeAnimates = true;
         bool moved = MoveLine(_dragColumns, from, target);
         if (sheetManager != null) sheetManager.UserChangeAnimates = false;
-        // A move rebuilds the sheet, and the handles with it (OnSheetsChanged).
         if (!moved)
         {
             RestLayout(sheet);
@@ -252,10 +237,6 @@ public class SortTool : Tool
         return true;
     }
 
-    // 'fullOrder', when given, is the whole arrangement the sort ends on,
-    // hidden lines included: a sort that ranks every line, so a filtered line
-    // comes back where it belongs. The lines on the sheet walk to their places
-    // as ever; the hidden ones, which nobody sees, are put in place at the end.
     public bool SetOrder(bool columns, IReadOnlyList<int> targetOrder, IReadOnlyList<int> fullOrder = null)
     {
         if (!Active) return false;
@@ -268,8 +249,6 @@ public class SortTool : Tool
         IReadOnlyList<int> live = columns ? src.ColumnOrder : src.RowOrder;
         var preOrder = new List<int>(live);
 
-        // Plan and walk in block space so a grouped axis steps a whole metric at a
-        // time; the recorded order stays line-level, so undo is unchanged.
         int size = src.GroupSize(columns);
         List<int> preBlocks = Blocks(preOrder, size);
         List<int> targetBlocks = Blocks(targetOrder, size);
@@ -387,8 +366,6 @@ public class SortTool : Tool
         Apply(src, columns, final, whole);
     }
 
-    // 'from' and 'to' are block positions: whole metrics on a grouped axis, single
-    // lines otherwise.
     public bool MoveLine(bool columns, int from, int to)
     {
         if (!Active) return false;

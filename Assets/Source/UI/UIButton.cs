@@ -65,9 +65,6 @@ public static class UIButton
         return back;
     }
 
-    // Re-rounds a button that has been resized since it was built: the frame, the
-    // inner fill and the back all carry the same corner, so they are re-cut
-    // together or the borders stop tracking one another.
     public static void SetRadius(Handle h, float radius)
     {
         if (h == null || h.Root == null || Mathf.Approximately(h.Radius, radius)) return;
@@ -117,8 +114,6 @@ public static class UIButton
         Image frame = UILayout.Ensure<Image>(root);
         RoundedSprite.Apply(frame, radius);
         frame.color = Style.Black;
-        // A press lands a little outside the button too (PokeRule), as the
-        // map's pins and sliders take one; negative padding reaches out.
         float slack = PokeRule.EdgeSlack * PokeRule.Millimetres;
         frame.raycastPadding = new Vector4(-slack, -slack, -slack, -slack);
         h.Frame = frame;
@@ -126,10 +121,6 @@ public static class UIButton
         Button button = UILayout.Ensure<Button>(root);
         button.transition = Selectable.Transition.None;
         button.targetGraphic = frame;
-        // A button added under a part that is hidden (UILayout.ShowPart, so
-        // not interactable) tints its frame to its disabled colour the moment
-        // it is added, before the transition above is off; turning it off
-        // leaves that tint, so it is cleared here.
         frame.canvasRenderer.SetColor(Color.white);
         h.Button = button;
 
@@ -151,7 +142,7 @@ public static class UIButton
         text.alignment = TextAlignmentOptions.Center;
         text.color = Style.Black;
         text.raycastTarget = false;
-        text.enableWordWrapping = false;
+        text.textWrappingMode = TextWrappingModes.NoWrap;
         text.overflowMode = TextOverflowModes.Ellipsis;
         h.Text = text;
 

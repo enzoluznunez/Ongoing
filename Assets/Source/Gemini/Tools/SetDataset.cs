@@ -14,17 +14,10 @@ public sealed class SetDataset : AgenticTool<SetDataset.Args> {
         Name = "SetDataset",
         Description = "Open one of the listed datasets; each keeps its own edits and undo history. There is one " +
                       "for the whole country ('United States'), one per region ('West') and one per metro " +
-                      "('New York, NY'), each read the first time it is opened if it has not been. The map " +
-                      "follows: a metro's sheet slides it to the metro's region and selects its pin; the " +
-                      "country's slides it to the United States map with nothing selected; a region's selects " +
-                      "the region if the United States map is up, else slides to the region's map.",
+                      "('New York, NY'), each read the first time it is opened if it has not been.",
         Parameters = ParametersFor(typeof(Args))
     };
 
-    // Most sheets are listed but unread until someone opens one. Reading takes
-    // a frame or two, so the wait happens here, before Run reports on the dataset:
-    // otherwise the reply would describe the dataset being left rather than the one
-    // being opened.
     protected override async Task<string> Prepare(Args args) {
         Task<bool> reading = null;
         await MainThread.Run(() => {
@@ -67,9 +60,6 @@ public sealed class SetDataset : AgenticTool<SetDataset.Args> {
 
         var data = datasets.Active;
         if (data != null && data.IsLoaded) {
-            // The rows on the sheet, not the rows in the dataset: the metric
-            // count beside it is already a visible count, and a filter can hold
-            // companies back too now, so the two have to be read the same way.
             result["rowCount"] = data.RowOrder.Count;
             if (data.IsGrouped(true)) {
                 result["metricCount"] = data.GroupCount(true);

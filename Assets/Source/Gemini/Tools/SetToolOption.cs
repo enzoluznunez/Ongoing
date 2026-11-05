@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using Google.GenAI.Types;
 
-// How fast the assistant's own actions play out on screen.
 public sealed class SetToolOption : AgenticTool {
 
     public override FunctionDeclaration Declaration {

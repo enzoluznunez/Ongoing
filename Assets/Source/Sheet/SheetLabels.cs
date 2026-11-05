@@ -28,22 +28,14 @@ public class SheetLabels
     private readonly Dictionary<int, TextMeshPro> _colLabel = new Dictionary<int, TextMeshPro>();
     private readonly Dictionary<int, TextMeshPro> _rowLabel = new Dictionary<int, TextMeshPro>();
 
-    // On a grouped axis the column labels become small series ticks and the
-    // metric name is drawn once, further out, riding the middle of its block.
     private readonly Dictionary<int, TextMeshPro> _colGroup = new Dictionary<int, TextMeshPro>();
     private int _colGroupSize = 1;
     private float _colGroupOut;
 
     private const float TickScale = 0.72f;
 
-    // The cell pitch the fixed text scale was chosen against. A label is sized
-    // relative to the column it stands under rather than in metres, so the sheet
-    // can be a tabletop model or a wall and the titles stay the same size
-    // against the bars instead of running into one another at the small end.
     private const float ReferenceCellSize = 0.1f;
 
-    // How much larger than that fixed scale the titles are drawn, at the
-    // sheet's default size.
     private const float TitleSize = 1.2f;
 
     private float _textScale = 1f;
@@ -62,10 +54,6 @@ public class SheetLabels
 
     public SheetLabels(Transform owner) => _owner = owner;
 
-    // While the sheet is hidden its titles are placed at once but written a
-    // few a frame (Pump): writing one remakes its text mesh, and a whole
-    // sheet's worth at once is a stall. Flush writes the rest, as the sheet
-    // is shown.
     public bool Defer { get; set; }
 
     private readonly List<(TextMeshPro label, string text)> _unwritten = new List<(TextMeshPro, string)>();
@@ -90,8 +78,6 @@ public class SheetLabels
         }
     }
 
-    // Makes titles, hidden, up to 'count', within 'budgetMs' this frame.
-    // True once there are that many.
     public bool Reserve(int count, double budgetMs)
     {
         var clock = System.Diagnostics.Stopwatch.StartNew();
@@ -116,9 +102,6 @@ public class SheetLabels
         _written = 0;
     }
 
-    // Hidden, the titles stop turning to the viewer; shown again, they snap
-    // to whichever edges face the viewer by then. They stop drawing rather
-    // than switching off, so showing them again costs nothing.
     public void SetShown(bool on)
     {
         if (_shown == on) return;
@@ -166,6 +149,8 @@ public class SheetLabels
     private void Step(Side side, bool desired, float dt,
         Dictionary<int, TextMeshPro> map, float lowEdge, float highEdge, bool columns)
     {
+        if (!Style.Animate) dt = FadeSeconds * 2f;
+
         if (!side.flipping && desired != side.high)
         {
             side.flipping = true;
@@ -249,7 +234,6 @@ public class SheetLabels
         if (columns && _colGroupSize > 1) CentreGroup(line / _colGroupSize);
     }
 
-    // The metric name sits at the mean of its ticks, so it follows however they move.
     private void CentreGroup(int group)
     {
         if (!_colGroup.TryGetValue(group, out TextMeshPro label) || label == null) return;
@@ -269,7 +253,6 @@ public class SheetLabels
         label.transform.localPosition = p;
     }
 
-    // "2019" reads better as "'19" once the metric name carries the meaning.
     private static string Tick(string title)
     {
         if (string.IsNullOrWhiteSpace(title)) return null;
@@ -280,14 +263,10 @@ public class SheetLabels
         return "'" + t.Substring(2);
     }
 
-    // Adds every glyph a dataset's titles use to the body font now, when it
-    // is read, rather than mid-switch when its sheet is first built. A metric's
-    // name is a run of its columns' titles, so those are covered too.
     public static void WarmGlyphs(DataSource data)
     {
         TMP_FontAsset font = Style.BodyFont;
         if (font == null || data == null) return;
-        // A static font holds what it was baked with and takes nothing more.
         if (font.atlasPopulationMode != AtlasPopulationMode.Dynamic) return;
 
         var seen = new HashSet<char>();
@@ -307,18 +286,12 @@ public class SheetLabels
         if (missing.Length > 0) font.TryAddCharacters(missing.ToString(), out _);
     }
 
-    // How long a title runs, in the sheet's metres, at the size titles are
-    // drawn on a sheet of this cell size: its glyphs' advances in the body
-    // font, as TextMeshPro sets them. The sheet spaces its rows by the longest.
     public static float TitleLength(string text, float cellSize)
     {
         if (string.IsNullOrEmpty(text)) return 0f;
 
         TMP_FontAsset font = Style.BodyFont;
         float units;
-        // Read only: the glyphs were added when the dataset was read
-        // (WarmGlyphs), and asking a static font to add any logs a warning,
-        // with its stack trace in a development build, for every title.
         if (font != null && font.faceInfo.pointSize > 0f)
         {
             float advance = 0f;
@@ -326,15 +299,13 @@ public class SheetLabels
                 advance += font.characterLookupTable.TryGetValue(c, out TMP_Character glyph)
                     ? glyph.glyph.metrics.horizontalAdvance * glyph.glyph.scale
                     : font.faceInfo.pointSize * 0.6f;
-            // A TextMeshPro in the world draws a point a tenth of a unit.
-            units = advance * Style.Body / font.faceInfo.pointSize * font.faceInfo.scale * 0.1f;
+            units = advance * Style.WorldBody / font.faceInfo.pointSize * font.faceInfo.scale * 0.1f;
         }
-        else units = text.Length * Style.Body * 0.06f;
+        else units = text.Length * Style.WorldBody * 0.06f;
 
         return units * Style.WorldTextScale * TextScaleFor(cellSize);
     }
 
-    // How large titles are drawn on cells 'cellSize' across.
     private static float TextScaleFor(float cellSize) =>
         TitleSize * (cellSize > 0f ? cellSize / ReferenceCellSize : 1f);
 
@@ -362,10 +333,6 @@ public class SheetLabels
             float half = cubeSide * 0.5f;
             float y = baseY;
 
-            // Each title stands at its line's place on the sheet, which a
-            // hidden line keeps empty; the edges the titles run along are
-            // the sheet's own, every slot included, so hiding an end line
-            // moves none of them.
             float ColX(int vc) => owner.LineCoord(true, vc);
             float RowZ(int vr) => owner.LineCoord(false, vr);
 
@@ -459,9 +426,9 @@ public class SheetLabels
             go.transform.SetParent(_root, false);
 
             TextMeshPro label = go.AddComponent<TextMeshPro>();
-            Style.ApplyBody(label);
+            Style.ApplyWorldBody(label);
             label.alignment = TextAlignmentOptions.Center;
-            label.enableWordWrapping = false;
+            label.textWrappingMode = TextWrappingModes.NoWrap;
             label.overflowMode = TextOverflowModes.Overflow;
             label.rectTransform.sizeDelta = LabelBox;
             _pool.Add(label);

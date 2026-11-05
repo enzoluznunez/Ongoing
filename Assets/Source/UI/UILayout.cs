@@ -3,6 +3,7 @@ using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 using Oculus.Interaction;
+using Oculus.Interaction.Surfaces;
 
 public static class UILayout
 {
@@ -20,9 +21,6 @@ public static class UILayout
         }
     }
 
-    // Hides or shows a canvas without switching anything off: it stops or
-    // starts drawing, and its poke surfaces stop or start taking fingertips.
-    // 'drawn' keeps it drawing while hidden, for a panel being warmed up.
     public static void ShowCanvas(Canvas canvas, PokeInteractable[] pokes, bool on, bool drawn = false)
     {
         if (!canvas.gameObject.activeSelf) canvas.gameObject.SetActive(true);
@@ -31,9 +29,6 @@ public static class UILayout
             if (pokes[i] != null) pokes[i].enabled = on;
     }
 
-    // Hides or shows one part of a panel (a pane, a card) without switching it
-    // off, so showing it again rebuilds no text or layout: it stops drawing,
-    // stops taking pokes and leaves its parent's layout.
     public static void ShowPart(GameObject part, bool on)
     {
         if (part == null) return;
@@ -45,18 +40,30 @@ public static class UILayout
         Ensure<LayoutElement>(part).ignoreLayout = !on;
     }
 
-    // Whether a part is up: active, and not hidden by ShowPart.
     public static bool PartShown(GameObject part) =>
         part != null && part.activeInHierarchy &&
         !(part.TryGetComponent(out CanvasGroup group) && group.alpha <= 0f && !group.blocksRaycasts);
 
-    // Fills the parent, held 'inset' in from each edge.
     public static void Stretch(RectTransform rt, float inset = 0f)
     {
         rt.anchorMin = Vector2.zero;
         rt.anchorMax = Vector2.one;
         rt.offsetMin = new Vector2(inset, inset);
         rt.offsetMax = new Vector2(-inset, -inset);
+    }
+
+    public static void FitPokeBounds(RectTransform canvas)
+    {
+        if (canvas == null) return;
+        Rect r = canvas.rect;
+        foreach (BoundsClipper clip in canvas.GetComponentsInChildren<BoundsClipper>(true))
+        {
+            Transform t = clip.transform;
+            Vector3 centre = t.InverseTransformPoint(canvas.TransformPoint(r.center));
+            Vector3 size = t.InverseTransformVector(canvas.TransformVector(new Vector3(r.width, r.height, 0f)));
+            clip.Position = new Vector3(centre.x, centre.y, clip.Position.z);
+            clip.Size = new Vector3(Mathf.Abs(size.x), Mathf.Abs(size.y), clip.Size.z);
+        }
     }
 
     public static T Ensure<T>(GameObject go) where T : Component

@@ -52,8 +52,6 @@ public static class RoundedSprite
         return sprite;
     }
 
-    // 'back' draws it with the back-face material, for the black backs behind
-    // panels and buttons; everything else takes the front one.
     public static void Apply(Image image, float radiusUnits, bool back = false)
     {
         if (image == null) return;

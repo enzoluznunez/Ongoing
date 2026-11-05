@@ -10,8 +10,6 @@ public sealed class DescribeDataset : AgenticTool<DescribeDataset.Args> {
 
     private static string lastPagedLabel;
 
-    // The source split into lines, kept while the same text is paged through
-    // so each page does not split the whole file again.
     private static string splitText;
     private static string[] splitLines;
 
