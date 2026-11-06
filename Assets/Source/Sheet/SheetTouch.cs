@@ -21,6 +21,8 @@ public class SheetTouch : MonoBehaviour
     private CreateCube _cube;
     private bool _selected;
 
+    public bool Driving => _driver != null;
+
     private void Awake() => _hub = GetComponent<ReadSheets>();
 
     private void OnDisable() => Drop();
@@ -32,7 +34,7 @@ public class SheetTouch : MonoBehaviour
         if (!_hub.Listening) { Drop(); return; }
 
         if (_driver != null && !Track(_driver)) Drop();
-        if (_driver != null) return;
+        if (_driver != null || HandRays.SheetEventsOwner != null) return;
 
         IReadOnlyList<Fingertips.Source> pokes = Fingertips.All;
         for (int i = 0; i < pokes.Count; i++)

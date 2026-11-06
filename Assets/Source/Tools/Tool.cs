@@ -41,6 +41,25 @@ public abstract class Tool : MonoBehaviour
         sheetManager.SetLineTint(sheet, columns, lo, hi, swell);
     }
 
+    private CreateSheet _rayTintSheet;
+    private bool _rayTintColumns;
+    private int _rayTintLine = -1;
+
+    public void TintFromRay(CreateSheet sheet, bool columns, int line)
+    {
+        _rayTintSheet = sheet;
+        _rayTintColumns = columns;
+        _rayTintLine = line;
+    }
+
+    protected bool ApplyRayTint()
+    {
+        if (_rayTintLine < 0 || _rayTintSheet == null) return false;
+        TintLine(_rayTintSheet, _rayTintColumns, _rayTintLine);
+        _rayTintLine = -1;
+        return true;
+    }
+
     private bool _listening;
 
     private void ListenSheets(bool on)

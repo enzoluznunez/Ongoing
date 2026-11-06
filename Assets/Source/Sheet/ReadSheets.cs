@@ -29,11 +29,15 @@ public class ReadSheets : MonoBehaviour
     [Tooltip("Let a fingertip drive the sheet. Turn off only to take the sheet out of play.")]
     public bool touchInput = true;
 
+    [Tooltip("Let a hand ray drive the sheet and the panels. Turn off only to take rays out of play.")]
+    public bool rayInput = true;
+
     private CreateSheet _pressed;
 
     private void Awake()
     {
         if (touchInput && GetComponent<SheetTouch>() == null) gameObject.AddComponent<SheetTouch>();
+        if (rayInput && GetComponent<HandRays>() == null) gameObject.AddComponent<HandRays>();
     }
 
     public void Hover(Reading reading) => OnHover?.Invoke(reading);

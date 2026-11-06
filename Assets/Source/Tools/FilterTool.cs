@@ -86,7 +86,15 @@ public class FilterTool : Tool
             TintLine(sheet, !rows, line);
             lit = true;
         }
-        if (!lit) ClearTint();
+        if (!lit && !ApplyRayTint()) ClearTint();
+    }
+
+    public void PokeFromRay(bool rows, int slot)
+    {
+        DataSource data = Data;
+        CreateSheet sheet = sheetManager != null ? sheetManager.Sheet : null;
+        if (!Active || data == null || !data.IsLoaded || sheet == null) return;
+        Poke(data, sheet, rows, slot);
     }
 
     private bool TryLineAt(CreateSheet sheet, Vector3 world, out bool inVolume, out bool rows, out int slot)

@@ -12,6 +12,8 @@ public class SortLineProxy : MonoBehaviour
 
     private Grabbable _grabbable;
 
+    public Grabbable Grip => _grabbable;
+
     public bool IsGrabbed => _grabbable != null && _grabbable.SelectingPointsCount > 0;
 
     public float Coord => columns ? transform.localPosition.x : transform.localPosition.z;

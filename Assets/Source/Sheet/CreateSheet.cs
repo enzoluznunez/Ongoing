@@ -688,6 +688,15 @@ public class CreateSheet : MonoBehaviour
         if (_slide == null) _slide = GetComponent<OneGrabTranslateTransformer>();
     }
 
+    public Grabbable Grip
+    {
+        get
+        {
+            EnsureComponents();
+            return _grabbable;
+        }
+    }
+
     public bool IsGrabbed
     {
         get

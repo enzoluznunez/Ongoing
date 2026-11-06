@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using Oculus.Interaction;
 using UnityEngine;
 
 public class SortTool : Tool
@@ -125,6 +126,32 @@ public class SortTool : Tool
         for (int i = 0; i < _proxies.Count; i++)
             if (_proxies[i] != null && _proxies[i].IsGrabbed) return _proxies[i];
         return null;
+    }
+
+    public Grabbable GripOfLine(bool columns, int block)
+    {
+        if (!Active) return null;
+        for (int i = 0; i < _proxies.Count; i++)
+        {
+            SortLineProxy proxy = _proxies[i];
+            if (proxy != null && proxy.columns == columns && proxy.block == block) return proxy.Grip;
+        }
+        return null;
+    }
+
+    private bool _rayTinted;
+
+    private void LateUpdate()
+    {
+        if (!Active) return;
+        if (_held == null && ApplyRayTint())
+        {
+            _rayTinted = true;
+            return;
+        }
+        if (!_rayTinted) return;
+        _rayTinted = false;
+        ClearTint();
     }
 
     private void Update()

@@ -32,7 +32,8 @@ drawn in greys. To open another place's sheet, ask the assistant ("show me the W
 
 The app is used with your hands; put the controllers down. Everything responds to a
 fingertip **poke** (push a fingertip into it from the front) or a **pinch** (thumb and
-index finger together, or a full-hand grip) to grab and move.
+index finger together, or a full-hand grip) to grab and move. Everything also works from
+a distance: point at it and pinch. See [Pointing from a distance](#pointing-from-a-distance).
 
 ### Wrist buttons
 
@@ -100,6 +101,23 @@ button is filled black it is listening; speak naturally. It can:
 The assistant's subpanel has a speed setting for its changes: **0.5 m/s**, **1 m/s** or
 **Instant**. Poke **Assistant** again to turn it off.
 
+### Pointing from a distance
+
+Both hands always have a ray, alongside poke; there is nothing to switch on. A white line
+and dot appear while a hand points at something it can use: a panel, a wrist button, or the
+sheet while a tool is selected. Bring your hand within about 12 cm and the ray gives way
+to poke and grab. Pinch to press; the dot turns black while you hold.
+
+| Pointing at | What a pinch does |
+|---|---|
+| A button or tile | Presses it when you let go |
+| A panel, away from its buttons | Carries it at the same distance as your ray moves. Use both hands to turn it |
+| The sheet, with **Move** | Carries it the same way |
+| The sheet, with **Rotate** or **Scale** | Pinch it with both rays, then twist or move them apart |
+| A bar, with **Profile** | Press, sweep along the row or column, and let go |
+| A bar, with **Sort** | The lower half of the bar takes its row, the upper half its column; move the ray to slide it |
+| A bar, with **Filter** | The lower half of the bar hides its row, the upper half its column. Pinch the empty place where one stood to bring it back |
+
 ### Putting things back in front of you
 
 The sheet and the tool panel stay where you leave them. If you take the headset off for five seconds
@@ -123,7 +141,7 @@ shifts so the layout is in front of you again, at the height it first opened at.
    restart the headset.
 4. Plug the headset into your computer, put it on, and accept **Allow USB debugging**.
    Check *Always allow from this computer*.
-5. Run **Space Setup**. The app uses passthrough and reads your room's scene data.
+5. Run **Space Setup**. The app uses passthrough.
 
 ### Install Unity
 
@@ -157,6 +175,15 @@ Assets/StreamingAssets/
 A sheet is a CSV whose first header cell is `Rows / Columns`; an ordinary CSV works, and
 optional leading `#metro`, `#city`, `#color` and `#heights` lines add row colours and
 bar heights.
+
+To generate all of it from the `Cyberattack-Platform` backend's local exports in
+`Backend/data`, using that backend's virtual environment, run this from the project root:
+
+```
+../Cyberattack-Platform/Backend/.venv/bin/python Tools/export_sheets.py
+```
+
+Git ignores the generated files, as it does the exports they come from.
 
 ### Add your Gemini API key
 
@@ -263,7 +290,8 @@ read. The current sheet stays up.
 It gives up waiting after 45 seconds and opens with whatever loaded.
 
 **The wrist button is missing.**
-It shows only while your left hand is tracked. Hold it up in view of the headset.
+It shows only while the hand chosen under Handedness is tracked. Hold it up in view of the
+headset.
 
 **Everything went dim or grey.**
 That is usually the Quest itself: its menu or a notification is open, or you are close to
