@@ -1,13 +1,10 @@
 using System;
 using System.Collections.Generic;
-using System.Text.Json;
 using System.Threading.Tasks;
-using Google.GenAI.Types;
+using GeminiLive;
 using UnityEngine.Profiling;
 
 public abstract class AgenticTool : Function {
-
-    private static int refreshedAxes;
 
     private readonly string sample;
 
@@ -28,8 +25,6 @@ public abstract class AgenticTool : Function {
 
     protected virtual bool EditsAreOutcome => false;
 
-    protected static void NoteRefreshed(bool columns) => refreshedAxes |= columns ? 2 : 1;
-
     protected override Task<Dictionary<string, object>> Execute(Dictionary<string, object> args) =>
         Perform(args, result => Run(args ?? new Dictionary<string, object>(), result));
 
@@ -46,9 +41,7 @@ public abstract class AgenticTool : Function {
             StateChannel.InAgentCall = true;
             try {
                 AgentTurn.NoteToolCall();
-                Scene.Sort?.CompleteOrderSequence();
-                editsBefore = ManageDatasets.ActiveEdits != null ? ManageDatasets.ActiveEdits.Count : 0;
-                refreshedAxes = 0;
+                editsBefore = ManageCharts.ActiveEdits != null ? ManageCharts.ActiveEdits.Count : 0;
                 act(result);
             }
             catch (Exception e) {
@@ -56,11 +49,7 @@ public abstract class AgenticTool : Function {
                 result["error"] = e.Message;
             }
             finally {
-                if (!IsRefusal(result)) {
-                    if ((refreshedAxes & 1) != 0) StalePositions.Clear(false);
-                    if ((refreshedAxes & 2) != 0) StalePositions.Clear(true);
-                }
-                editsAfter = ManageDatasets.ActiveEdits != null ? ManageDatasets.ActiveEdits.Count : 0;
+                editsAfter = ManageCharts.ActiveEdits != null ? ManageCharts.ActiveEdits.Count : 0;
                 StateChannel.InAgentCall = false;
                 string did = StateChannel.TakeAgentBatch();
                 if (!string.IsNullOrEmpty(did)) result["did"] = did;
@@ -77,7 +66,7 @@ public abstract class AgenticTool : Function {
         if (!IsRefusal(result) && !result.ContainsKey("ok")) {
             result["ok"] = !EditsAreOutcome || changed;
             if (EditsAreOutcome && !changed && !result.ContainsKey("note"))
-                result["note"] = "Nothing changed; the sheet is already the way this call would leave it.";
+                result["note"] = "Nothing changed; the chart is already the way this call would leave it.";
         }
 
         UnityEngine.Debug.Log($"[Gemini][tool] {Name} args={Brief(args)} -> {Brief(result)} " +
@@ -96,187 +85,6 @@ public abstract class AgenticTool : Function {
     }
 
     protected static Schema ParametersFor(System.Type args) => ToolArguments.Schema(args);
-
-    protected static Schema WithNames(Schema schema) {
-        schema.Properties.Remove("where");
-        schema.Properties.Remove("whereDoes");
-        return schema;
-    }
-
-    private static CreateSheet ResolvedSheet() {
-        ManageSheets mgr = Scene.Sheets;
-        return mgr != null ? mgr.Sheet : null;
-    }
-
-    protected static bool TryResolveTargetBounds(Dictionary<string, object> result,
-        out int rowMin, out int rowMax, out int colMin, out int colMax) {
-        rowMin = rowMax = colMin = colMax = 0;
-
-        CreateSheet sheet = ResolvedSheet();
-        if (sheet == null) { result["error"] = "No sheet in scene."; return false; }
-
-        rowMin = sheet.rowMin; rowMax = sheet.rowMax; colMin = sheet.colMin; colMax = sheet.colMax;
-        return true;
-    }
-
-    protected static bool TryResolveLine(object arg, bool columns, int min, int max,
-        Dictionary<string, object> result, out int block) {
-        block = -1;
-        string token = AsString(arg)?.Trim();
-        var data = Scene.Data;
-        string what = DataSource.GroupNoun(data, columns);
-        if (string.IsNullOrEmpty(token)) { result["error"] = $"Provide a {what} number or name."; return false; }
-
-        int size = GroupSize(columns);
-        int blockMin = min / size;
-        int blockMax = max / size;
-        int span = blockMax - blockMin + 1;
-
-        if (int.TryParse(token, out int number)) {
-            if (StalePositions.IsDirty(columns)) {
-                StalePositions.Clear(columns);
-                var current = new List<string>();
-                if (data != null) {
-                    int liveBlocks = data.GroupCount(columns);
-                    for (int b = blockMin; b <= blockMax && b < liveBlocks; b++)
-                        current.Add(DataSource.GroupLabelAt(data, columns, b));
-                }
-                result["error"] = $"The {what} positions have shifted: the user reordered the {what}s since you " +
-                    $"last read them. They now run: {string.Join(", ", current)}. Name the {what} you mean, or " +
-                    "give its position in this order.";
-                return false;
-            }
-            if (number < 1 || number > span) {
-                result["error"] = $"There is no {what} {number} there; it has {span}.";
-                return false;
-            }
-            block = blockMin + number - 1;
-            return true;
-        }
-
-        if (data == null) { result["error"] = "No dataset is open."; return false; }
-
-        int found = -1, hits = 0;
-        void Match(Func<string, bool> matches) {
-            for (int b = blockMin; b <= blockMax; b++) {
-                if (!matches(data.GroupTitleAt(columns, b) ?? "")) continue;
-                found = b;
-                hits++;
-            }
-        }
-        Match(title => string.Equals(title, token, StringComparison.OrdinalIgnoreCase));
-        if (hits == 0 && token.Length >= 3)
-            Match(title => title.StartsWith(token, StringComparison.OrdinalIgnoreCase));
-
-        if (hits == 1) { block = found; return true; }
-        if (hits > 1) {
-            result["error"] = $"More than one {what} is called '{token}'; ask the user which, or give its number.";
-            return false;
-        }
-        string other = DataSource.GroupNoun(data, !columns);
-        result["error"] = TitleExistsOnAxis(token, !columns)
-            ? $"No {what} called '{token}', but there is a {other} called '{token}'; pass it as '{other}' instead."
-            : $"No {what} called '{token}'.";
-        var names = new List<object>();
-        for (int b = blockMin; b <= blockMax; b++) names.Add(data.GroupTitleAt(columns, b) ?? "");
-        result[columns ? "columns" : "rows"] = names;
-        return false;
-    }
-
-    private static int GroupSize(bool columns) {
-        var data = Scene.Data;
-        return data != null ? data.GroupSize(columns) : 1;
-    }
-
-    protected static void BlockSpan(bool columns, int block, int min, int max, out int lo, out int hi) {
-        int size = GroupSize(columns);
-        lo = Math.Max(block * size, min);
-        hi = Math.Min(block * size + size - 1, max);
-    }
-
-    protected static int BlockCountIn(bool columns, int min, int max) {
-        int size = GroupSize(columns);
-        return (max / size) - (min / size) + 1;
-    }
-
-    protected static bool TryResolveLines(IReadOnlyList<string> tokens, bool columns, int min, int max,
-        Dictionary<string, object> result, out List<int> visIndexes) {
-        visIndexes = null;
-        string what = DataSource.GroupNoun(Scene.Data, columns);
-
-        if (tokens == null || tokens.Count == 0) {
-            result["error"] = $"Provide at least one {what} name or number.";
-            return false;
-        }
-
-        int span = BlockCountIn(columns, min, max);
-        if (tokens.Count > span) {
-            result["error"] = $"That is {tokens.Count} entries but there are only {span} {what}s.";
-            return false;
-        }
-
-        var resolved = new List<int>(tokens.Count);
-        var seen = new HashSet<int>();
-        for (int i = 0; i < tokens.Count; i++) {
-            if (!TryResolveLine(tokens[i], columns, min, max, result, out int vis)) return false;
-            if (!seen.Add(vis)) {
-                result["error"] = $"'{tokens[i]}' is listed more than once; each {what} may appear only once.";
-                return false;
-            }
-            resolved.Add(vis);
-        }
-
-        visIndexes = resolved;
-        return true;
-    }
-
-    protected static bool TryInferAxis(string token, out bool columns) {
-        columns = false;
-        token = token?.Trim();
-        if (string.IsNullOrEmpty(token) || int.TryParse(token, out _)) return false;
-
-        bool onColumns = TitleExistsOnAxis(token, true);
-        bool onRows = TitleExistsOnAxis(token, false);
-        if (onColumns == onRows) return false;
-
-        columns = onColumns;
-        return true;
-    }
-
-    protected static bool RunGrouped(int count, Func<int, bool> act) {
-        var edits = ManageDatasets.ActiveEdits;
-        if (count > 1) edits.OpenGroup();
-        try {
-            for (int i = 0; i < count; i++)
-                if (!act(i)) return false;
-        }
-        finally { edits.CloseGroup(); }
-        return true;
-    }
-
-    protected static void NeedChoice(Dictionary<string, object> result, string what,
-        IReadOnlyList<string> options, string message) {
-        result["needsChoice"] = what;
-        if (options != null && options.Count > 0) result["options"] = new List<object>(options);
-        result["message"] = message;
-    }
-
-    protected static bool TitleExistsOnAxis(string token, bool columns) {
-        var data = Scene.Data;
-        if (data == null) return false;
-
-        if (data.IsGrouped(columns)) {
-            int blocks = data.GroupCount(columns);
-            for (int b = 0; b < blocks; b++)
-                if (string.Equals(data.GroupTitleAt(columns, b), token, StringComparison.OrdinalIgnoreCase)) return true;
-            return false;
-        }
-
-        IReadOnlyList<string> titles = columns ? data.ColumnTitles : data.RowTitles;
-        for (int i = 0; i < titles.Count; i++)
-            if (string.Equals(titles[i], token, StringComparison.OrdinalIgnoreCase)) return true;
-        return false;
-    }
 
     protected static bool TryWorldDirection(string direction, out UnityEngine.Vector3 world) {
         world = UnityEngine.Vector3.zero;
@@ -313,9 +121,7 @@ public abstract class AgenticTool : Function {
     }
 
     protected static string AsString(object v) {
-        if (v is JsonElement je)
-            return je.ValueKind == JsonValueKind.String ? je.GetString() : je.ToString();
-        return v?.ToString();
+        return LiveWire.Text(v);
     }
 
     protected static object Round(double v) {
@@ -332,50 +138,29 @@ public abstract class AgenticTool : Function {
         public PiecePose(UnityEngine.Transform t) { pos = t.localPosition; rot = t.localRotation; scale = t.localScale; }
     }
 
-    protected static bool TryResolveSheet(Dictionary<string, object> result,
-        string verb, out ManageSheets mgr, out CreateSheet sheet) {
-        mgr = Scene.Sheets;
-        sheet = ResolvedSheet();
-        if (sheet == null) { result["error"] = $"The sheet is not ready to {verb}; is a sheet shown?"; return false; }
+    protected static bool TryResolveChart(Dictionary<string, object> result,
+        string verb, out ManageCharts mgr, out ChartView chart) {
+        mgr = Scene.Charts;
+        chart = mgr != null ? mgr.View : null;
+        if (chart == null || !chart.Shown) { result["error"] = $"The chart is not ready to {verb}; is a chart shown?"; return false; }
         return true;
     }
 
-    protected static PiecePose ApplyPieceTransform(ManageSheets mgr, CreateSheet sheet, Action<UnityEngine.Transform> mutate) {
-        mgr.CompletePieceMotion(sheet);
-        UnityEngine.Transform t = sheet.transform;
+    protected static PiecePose ApplyChartTransform(ManageCharts mgr, ChartView chart, Action<UnityEngine.Transform> mutate) {
+        mgr.CompleteMotion(chart);
+        UnityEngine.Transform t = chart.transform;
         var pre = new PiecePose(t);
         mutate(t);
-        mgr.NotifyMoveCommitted(sheet, pre.pos, pre.rot, pre.scale);
-        mgr.AnimatePieceFrom(sheet, pre.pos, pre.rot, pre.scale);
+        mgr.NotifyMoveCommitted(chart, pre.pos, pre.rot, pre.scale);
+        mgr.AnimateFrom(chart, pre.pos, pre.rot, pre.scale);
         return pre;
     }
 
-    protected static bool ResolveAxis(string toolName, string axisArg, string inferFrom,
-        Dictionary<string, object> result, out bool columns) {
-        columns = false;
-
-        if (axisArg != null) {
-            columns = axisArg == "columns";
-            result["axisFrom"] = "given";
-            return true;
-        }
-
-        if (TryInferAxis(inferFrom, out columns)) {
-            result["axisFrom"] = "inferred";
-            return true;
-        }
-
-        NeedChoice(result, "axis", new List<string> { "columns", "rows" },
-            $"The {toolName} tool works on columns or rows and the name you gave does not say which. Ask the user which, then call this again with 'axis'.");
-        return false;
-    }
-
-    protected static bool TryParseAxis(string axis, out bool columns) {
-        switch (axis?.Trim().ToLowerInvariant()) {
-            case "column": case "columns": columns = true; return true;
-            case "row": case "rows": columns = false; return true;
-            default: columns = false; return false;
-        }
+    protected static void NeedChoice(Dictionary<string, object> result, string what,
+        IReadOnlyList<string> options, string message) {
+        result["needsChoice"] = what;
+        if (options != null && options.Count > 0) result["options"] = new List<object>(options);
+        result["message"] = message;
     }
 
     protected static void Refuse(Dictionary<string, object> result, string unmet, string message) {
@@ -425,52 +210,6 @@ public abstract class AgenticTool : Function {
         if (tool == null) { result["error"] = $"{kind} tool not found in scene."; return false; }
         return true;
     }
-
-    protected static bool TryCellValue(DataSource data, int visRow, int visCol, out double value) {
-        value = 0d;
-        return data != null && data.TryValueAt(visRow, visCol, out value);
-    }
-
-    protected static bool TryParseMeasure(string raw, string owner,
-        Dictionary<string, object> result, out string measure) {
-        measure = raw?.Trim().ToLowerInvariant();
-        if (measure == "sum" || measure == "average" || measure == "max" || measure == "min") return true;
-        result["error"] = $"'{owner}' needs a 'measure': sum, average, max or min.";
-        return false;
-    }
-
-    protected struct MeasureAcc {
-        private double sum, best, worst;
-        private int n;
-
-        public void Add(double v) {
-            if (n == 0) { best = v; worst = v; }
-            else { if (v > best) best = v; if (v < worst) worst = v; }
-            sum += v;
-            n++;
-        }
-
-        public bool TryScore(string measure, out double score) {
-            score = 0d;
-            if (n == 0) return false;
-            switch (measure) {
-                case "sum": score = sum; return true;
-                case "average": score = sum / n; return true;
-                case "max": score = best; return true;
-                case "min": score = worst; return true;
-                default: return false;
-            }
-        }
-    }
-
-    protected static bool TryLineMeasure(DataSource data, bool isColumn, int line,
-        int crossMin, int crossMax, string measure, out double score) {
-
-        var acc = new MeasureAcc();
-        for (int j = crossMin; j <= crossMax; j++)
-            if (TryCellValue(data, isColumn ? j : line, isColumn ? line : j, out double v)) acc.Add(v);
-        return acc.TryScore(measure, out score);
-    }
 }
 
 public abstract class AgenticTool<TArgs> : AgenticTool where TArgs : class, new() {
@@ -490,11 +229,4 @@ public abstract class AgenticTool<TArgs> : AgenticTool where TArgs : class, new(
 
     protected sealed override void Run(Dictionary<string, object> args, Dictionary<string, object> result) =>
         throw new NotSupportedException();
-
-    protected static async Task<string> LookUp(BreachFilters where, Action<BreachMatch> store) {
-        if (where == null) return null;
-        (BreachMatch match, string error) = await BreachMatch.Look(where).ConfigureAwait(false);
-        if (match != null) store(match);
-        return error;
-    }
 }

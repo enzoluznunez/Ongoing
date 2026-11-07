@@ -1,5 +1,5 @@
 using System.Collections.Generic;
-using Google.GenAI.Types;
+using GeminiLive;
 
 public sealed class SetPanel : AgenticTool<SetPanel.Args> {
 
@@ -17,7 +17,7 @@ public sealed class SetPanel : AgenticTool<SetPanel.Args> {
         Description = "Open, close, or toggle the tool panel (the tool buttons and your speed setting) or the " +
                       "settings panel (the user's own settings, which only they change), as the user's wrist " +
                       "buttons do. A panel opens ahead of the user, beside the other when that one is open; " +
-                      "neither moves nor hides the sheet.",
+                      "neither moves nor hides the chart.",
         Parameters = ParametersFor(typeof(Args))
     };
 

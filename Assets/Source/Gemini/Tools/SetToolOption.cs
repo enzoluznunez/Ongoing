@@ -1,5 +1,5 @@
 using System.Collections.Generic;
-using Google.GenAI.Types;
+using GeminiLive;
 
 public sealed class SetToolOption : AgenticTool {
 
@@ -11,9 +11,7 @@ public sealed class SetToolOption : AgenticTool {
                 Name = "SetToolOption",
                 Description = "Set how fast your own actions play out on screen: '" +
                               string.Join("', '", ToolPanelUI.AssistantSpeedLabels) +
-                              "'. No tool takes an option of its own; selecting a tool is enough. " +
-                              "The speed buttons are on screen only while the tool panel is open and no " +
-                              "tool is selected.",
+                              "'. No tool takes an option of its own; selecting a tool is enough.",
                 Parameters = new Schema {
                     Type = Type.Object,
                     Properties = new Dictionary<string, Schema> {
@@ -39,16 +37,6 @@ public sealed class SetToolOption : AgenticTool {
         if (string.IsNullOrWhiteSpace(option)) {
             result["error"] = "Provide 'option' for the assistant: " +
                               string.Join(", ", ToolPanelUI.AssistantSpeedLabels) + ".";
-            return;
-        }
-
-        if (!EnsureToolPanelOpen(result)) return;
-
-        var tools = Scene.Tools;
-        if (tools != null && tools.SelectedTool != ToolType.None) {
-            Refuse(result, "no tool selected",
-                "The assistant's speed buttons only show while no tool is selected. " +
-                "Clear the selection with SetTool(tool: 'none'), then call this again.");
             return;
         }
 

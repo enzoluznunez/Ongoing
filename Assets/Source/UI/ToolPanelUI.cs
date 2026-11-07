@@ -1,124 +1,79 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
-using TMPro;
 
-public class ToolPanelUI : PanelUI
+public class ToolPanelUI : ModularPanel
 {
-
-    public ManageTools toolManager;
-
-    private readonly List<ToolButtonVisual> _toolButtons = new List<ToolButtonVisual>();
-    private readonly Dictionary<ToolType, GameObject> _toolContents = new Dictionary<ToolType, GameObject>();
-    private RectTransform _primaryRect;
-    private RectTransform _panelRootRect;
-
-    private OptionsCard _toolCard;
-    private OptionsCard _assistantCard;
-    private readonly List<OptionsCard> _stack = new List<OptionsCard>();
-    private int _suspendedSlot = -1;
-
-    private Coroutine _resizeRoutine;
-    private GridLayoutGroup _toolGrid;
-    private UIButton.Handle _assistantButton;
-    private Watch _assistant;
+    private const float StepImageHeight = 170f;
+    private const float ConnectingPulseSeconds = 0.4f;
 
     public static readonly string[] AssistantSpeedLabels = { "0.5 m/s", "1 m/s", "Instant" };
-    private static readonly float[] AssistantSpeedValues = { 0.5f, 1f, 0f };
-
-    private GameObject _assistantContent;
-    private ButtonList _assistantSpeedRow;
-    private int _assistantSpeedIndex;
 
     public static readonly ToolType[] Tools =
     {
-        ToolType.Move,
-        ToolType.Rotate,
-        ToolType.Scale,
-
-        ToolType.Profile,
-        ToolType.Filter,
-        ToolType.Sort
+        ToolType.Move, ToolType.Rotate, ToolType.Scale,
+        ToolType.Profile, ToolType.Filter, ToolType.Sort
     };
+
+    private static readonly Dictionary<ToolType, int> StepCounts = new Dictionary<ToolType, int>
+    {
+        { ToolType.Move, 3 }, { ToolType.Rotate, 3 }, { ToolType.Scale, 3 }
+    };
+
+    public ManageTools toolManager;
+
+    private Watch _assistant;
+    private ToolType _stepsShown = ToolType.None;
+    private AppLanguage _stepsLanguage;
+    private Coroutine _connectingPulse;
+    private int _connectingDots;
 
     public static string Label(ToolType tool) => tool.ToString();
 
-    private static string NameKey(ToolType tool) => $"tool.{Label(tool)}";
-
-    private static string DescriptionKey(ToolType tool) => $"tool.{Label(tool)}.desc";
-
-    private class ToolButtonVisual
-    {
-        public ToolType Tool;
-        public UIButton.Handle Handle;
-    }
-
-    private class OptionsCard
-    {
-        public GameObject Root;
-        public RectTransform Rect;
-        public Transform Content;
-    }
-
     private void Awake()
     {
-        InitPanel(Style.Panel);
+        BuildPanel("panel.tools", "ToolGrid", hasRight: true);
         if (toolManager == null) toolManager = GetComponent<ManageTools>();
 
-        GameObject optionsPanel = FindTransform.FindDeep(transform, "OptionsPanel")?.gameObject;
-        _primaryRect = FindTransform.FindDeep(transform, "PrimaryPanel") as RectTransform;
-        _panelRootRect = FindTransform.FindDeep(transform, "PanelRoot") as RectTransform;
+        HideTitleBarButtons();
 
-        _toolCard = AdoptCard(optionsPanel);
-        _assistantCard = CloneCard(_toolCard, "AssistantPanel");
+        foreach (ToolType tool in Tools)
+        {
+            ToolType captured = tool;
+            Rows.Add(new PanelRow
+            {
+                NameKey = $"tool.{Label(tool)}",
+                Value = () => Strings.Get(ManageTools.OnHold(captured) ? "option.onHold"
+                    : toolManager != null && toolManager.SelectedTool == captured ? "option.on" : "option.off"),
+                Step = _ => { if (toolManager != null) toolManager.SelectTool(captured); },
+                Enabled = () => !ManageTools.OnHold(captured)
+            });
+        }
 
-        BindToolButtons();
-        BindToolContents();
-        BindTitleBar();
+        Rows.Add(new PanelRow
+        {
+            NameKey = "assistant",
+            Value = AssistantValue,
+            Step = _ => ToggleAssistant()
+        });
+        Rows.Add(PanelRow.Action("undo", () => { if (toolManager != null) toolManager.Undo(); }));
+        Rows.Add(PanelRow.Action("undo.all", OnUndoAll));
 
-        SetGrabRects(_primaryRect,
-            _toolCard != null ? _toolCard.Rect : null,
-            _assistantCard != null ? _assistantCard.Rect : null);
-
-        if (toolManager != null)
-            toolManager.OnToolChanged += OnToolChanged;
-        Strings.Changed += OnLanguageChanged;
-
-        OnToolChanged(toolManager != null ? toolManager.SelectedTool : ToolType.None);
+        if (toolManager != null) toolManager.OnToolChanged += OnToolChanged;
+        RefreshPanel();
 
         if (_canvas != null) StartHidden();
     }
 
-    private static OptionsCard AdoptCard(GameObject root)
+    private void HideTitleBarButtons()
     {
-        if (root == null) return null;
-
-        RectTransform rect = root.transform as RectTransform;
-        if (rect == null) return null;
-
-        rect.sizeDelta = new Vector2(rect.sizeDelta.x, Style.Subpanel.y);
-        UILayout.ShowPart(root, false);
-
-        return new OptionsCard
-        {
-            Root = root,
-            Rect = rect,
-            Content = FindTransform.FindDeep(root.transform, "ContentArea")
-        };
-    }
-
-    private OptionsCard CloneCard(OptionsCard source, string name)
-    {
-        if (source == null || source.Root == null) return null;
-
-        GameObject root = Instantiate(source.Root, source.Root.transform.parent, false);
-        root.name = name;
-
-        OptionsCard card = AdoptCard(root);
-        if (card != null && card.Content != null) UILayout.Clear(card.Content);
-        return card;
+        Transform undoAll = FindTransform.FindDeep(transform, "UndoAll_Btn");
+        if (undoAll == null) return;
+        Transform target = undoAll.parent != null && undoAll.parent.name.EndsWith("_Border") ? undoAll.parent : undoAll;
+        target.gameObject.SetActive(false);
     }
 
     private Watch Assistant
@@ -128,404 +83,88 @@ public class ToolPanelUI : PanelUI
             if (_assistant == null)
             {
                 _assistant = Scene.Assistant;
-                if (_assistant != null)
-                {
-                    _assistant.AssistantActiveChanged += OnAssistantActiveChanged;
-                    OnAssistantActiveChanged(_assistant.IsGeminiActive, _assistant.Status);
-                }
+                if (_assistant != null) _assistant.AssistantActiveChanged += OnAssistantActiveChanged;
             }
             return _assistant;
         }
     }
 
-    protected override void ResolveDeferredLayout() => RefreshOptionCards();
-
-    private void OnEnable()
-    {
-        if (_assistant != null) OnAssistantActiveChanged(_assistant.IsGeminiActive, _assistant.Status);
-    }
-
-    private void OnDisable()
-    {
-        _connectingPulse = null;
-        _resizeRoutine = null;
-        _fitTiles = null;
-    }
-
     private void Start()
     {
         ResolveLayoutNow();
-
-        if (ManageDatasets.Instance != null)
-        {
-            ManageDatasets.Instance.OnActiveDatasetChanged += OnActiveDatasetChanged;
-        }
-
+        if (ManageCharts.Instance != null) ManageCharts.Instance.OnChartChanged += OnChartChanged;
         _ = Assistant;
+        RefreshPanel();
     }
 
-    private void OnDestroy()
+    protected override void OnDisable()
     {
-        Strings.Changed -= OnLanguageChanged;
-        if (toolManager != null)
-            toolManager.OnToolChanged -= OnToolChanged;
-        if (ManageDatasets.Instance != null)
-        {
-            ManageDatasets.Instance.OnActiveDatasetChanged -= OnActiveDatasetChanged;
-        }
-        if (_assistant != null)
-            _assistant.AssistantActiveChanged -= OnAssistantActiveChanged;
+        base.OnDisable();
+        _connectingPulse = null;
     }
 
-    private void OnActiveDatasetChanged(int index)
+    protected override void OnDestroy()
     {
-        _suspendedSlot = -1;
+        base.OnDestroy();
+        if (toolManager != null) toolManager.OnToolChanged -= OnToolChanged;
+        if (ManageCharts.Instance != null) ManageCharts.Instance.OnChartChanged -= OnChartChanged;
+        if (_assistant != null) _assistant.AssistantActiveChanged -= OnAssistantActiveChanged;
+    }
+
+    private void OnChartChanged()
+    {
         if (toolManager != null) toolManager.ForgetSuspendedTool();
     }
 
-    private void BindToolButtons()
+    private void OnToolChanged(ToolType selected) => RefreshPanel();
+
+    private string AssistantValue()
     {
-        Transform toolGrid = FindTransform.FindDeep(transform, "ToolGrid");
-        if (toolGrid == null) return;
-
-        for (int i = 0; i < Tools.Length; i++)
-        {
-            ToolType tool = Tools[i];
-            Transform btnT = toolGrid.Find($"Tool_{Label(tool)}");
-            if (btnT == null)
-            {
-                Debug.LogError($"[ToolPanelUI] No button named 'Tool_{Label(tool)}' under ToolGrid; " +
-                               $"the {Label(tool)} tool will not be selectable.");
-                continue;
-            }
-
-            btnT.SetSiblingIndex(i);
-
-            UIButton.Handle h = UIButton.Adopt(btnT.gameObject);
-            StyleTileLabel(h);
-            Strings.Bind(h.Text, NameKey(tool));
-            ToolButtonVisual visual = new ToolButtonVisual { Tool = tool, Handle = h };
-            _toolButtons.Add(visual);
-
-            ToolType captured = tool;
-            Button btn = btnT.GetComponent<Button>();
-            if (btn != null)
-                btn.onClick.AddListener(() => OnToolButtonClicked(captured));
-        }
-
-        BindAssistantButton(toolGrid);
-        DropUnboundTiles(toolGrid);
-        SquareTiles(toolGrid.GetComponent<GridLayoutGroup>());
+        Watch assistant = _assistant;
+        if (assistant == null || !assistant.IsGeminiActive) return Strings.Get("option.off");
+        if (assistant.Status == GeminiStatus.Live) return Strings.Get("option.on");
+        return Strings.Get("assistant.connecting") + new string('.', _connectingDots);
     }
 
-    private static void StyleTileLabel(UIButton.Handle h)
-    {
-        if (h != null) Style.ApplyTitle(h.Text);
-    }
-
-    private void DropUnboundTiles(Transform toolGrid)
-    {
-        for (int i = toolGrid.childCount - 1; i >= 0; i--)
-        {
-            GameObject child = toolGrid.GetChild(i).gameObject;
-            if (child == _assistantButton.Root || IsBoundTile(child)) continue;
-
-            Debug.LogWarning($"[ToolPanelUI] '{child.name}' under ToolGrid matches no tool in Tools; " +
-                             "dropping it from the grid.");
-
-            child.SetActive(false);
-            child.name += "_Unbound";
-            Destroy(child);
-        }
-    }
-
-    private bool IsBoundTile(GameObject go)
-    {
-        for (int i = 0; i < _toolButtons.Count; i++)
-            if (_toolButtons[i].Handle.Root == go) return true;
-        return false;
-    }
-
-    private void SquareTiles(GridLayoutGroup grid)
-    {
-        if (grid == null) return;
-        _toolGrid = grid;
-
-        grid.padding = PanePadding();
-        grid.spacing = new Vector2(Style.SmallPadding, Style.SmallPadding);
-
-        LayoutElement le = UILayout.Ensure<LayoutElement>(grid.gameObject);
-        le.minHeight = 0f;
-        le.preferredHeight = 0f;
-        le.flexibleHeight = 1f;
-    }
-
-    private Coroutine _fitTiles;
-
-    private void QueueFitTiles()
-    {
-        FitTiles();
-
-        if (!isActiveAndEnabled) return;
-        if (_fitTiles != null) StopCoroutine(_fitTiles);
-        _fitTiles = StartCoroutine(FitTilesUntilStable());
-    }
-
-    private IEnumerator FitTilesUntilStable()
-    {
-        yield return UILayout.Converge(
-            () => IsVisible,
-            FitTiles,
-            () => _toolGrid != null ? _toolGrid.cellSize.x : -1f);
-
-        _fitTiles = null;
-    }
-
-    private void FitTiles()
-    {
-        if (_toolGrid == null) return;
-
-        RectTransform gridRect = _toolGrid.transform as RectTransform;
-        if (gridRect == null || _panelRootRect == null) return;
-
-        LayoutRebuilder.ForceRebuildLayoutImmediate(_panelRootRect);
-
-        int columns = Mathf.Max(1, _toolGrid.constraintCount);
-        int span = Mathf.Min(AssistantSpan, columns);
-        int cells = _toolButtons.Count + span;
-        int rows = Mathf.Max(1, Mathf.CeilToInt(cells / (float)columns));
-
-        float byWidth = (gridRect.rect.width - _toolGrid.padding.left - _toolGrid.padding.right
-            - (columns - 1) * _toolGrid.spacing.x) / columns;
-        float byHeight = (gridRect.rect.height - _toolGrid.padding.top - _toolGrid.padding.bottom
-            - (rows - 1) * _toolGrid.spacing.y) / rows;
-
-        float cell = Mathf.Max(1f, Mathf.Min(byWidth, byHeight));
-        if (!Mathf.Approximately(cell, _toolGrid.cellSize.x))
-            _toolGrid.cellSize = new Vector2(cell, cell);
-
-        RoundTiles(cell);
-        PlaceAssistantTile(cell, columns, span);
-    }
-
-    private void RoundTiles(float cell)
-    {
-        float radius = Style.TileRadius(cell);
-
-        for (int i = 0; i < _toolButtons.Count; i++)
-            UIButton.SetRadius(_toolButtons[i].Handle, radius);
-
-        UIButton.SetRadius(_assistantButton, radius);
-    }
-
-    private const int AssistantSpan = 3;
-
-    private void BindAssistantButton(Transform toolGrid)
-    {
-        _assistantButton = UIButton.Create(toolGrid, "Tool_Assistant", Strings.Get("assistant"));
-        _assistantButton.Button.onClick.AddListener(OnAssistantClicked);
-        StyleTileLabel(_assistantButton);
-
-        RectTransform rect = _assistantButton.Root.GetComponent<RectTransform>();
-        LayoutElement le = UILayout.Ensure<LayoutElement>(_assistantButton.Root);
-        le.ignoreLayout = true;
-
-        rect.anchorMin = new Vector2(0f, 1f);
-        rect.anchorMax = new Vector2(0f, 1f);
-        rect.pivot = new Vector2(0f, 1f);
-    }
-
-    private void PlaceAssistantTile(float cell, int columns, int span)
-    {
-        if (_assistantButton.Root == null || _toolGrid == null) return;
-
-        RectTransform rect = _assistantButton.Root.GetComponent<RectTransform>();
-        if (rect == null) return;
-
-        int at = _toolButtons.Count;
-
-        int row = at / columns;
-        int column = at % columns;
-        if (column + span > columns) { row++; column = 0; }
-
-        float pitchX = cell + _toolGrid.spacing.x;
-        float pitchY = cell + _toolGrid.spacing.y;
-
-        rect.sizeDelta = new Vector2(span * cell + (span - 1) * _toolGrid.spacing.x, cell);
-        rect.anchoredPosition = new Vector2(
-            _toolGrid.padding.left + ColumnInset(cell, columns) + column * pitchX,
-            -(_toolGrid.padding.top + row * pitchY));
-    }
-
-    private float ColumnInset(float cell, int columns)
-    {
-        RectTransform gridRect = _toolGrid.transform as RectTransform;
-        if (gridRect == null) return 0f;
-
-        TextAnchor at = _toolGrid.childAlignment;
-        bool centred = at == TextAnchor.UpperCenter || at == TextAnchor.MiddleCenter ||
-                       at == TextAnchor.LowerCenter;
-        if (!centred) return 0f;
-
-        float columnsWidth = columns * cell + (columns - 1) * _toolGrid.spacing.x;
-        float free = gridRect.rect.width - _toolGrid.padding.left - _toolGrid.padding.right
-            - columnsWidth;
-
-        return Mathf.Max(0f, free * 0.5f);
-    }
-
-    private void OnAssistantClicked()
+    private void ToggleAssistant()
     {
         Watch assistant = Assistant;
         if (assistant == null) return;
-        bool turningOn = !assistant.IsGeminiActive;
-        assistant.SetGeminiActive(turningOn, AssistantCause.User);
+        assistant.SetGeminiActive(!assistant.IsGeminiActive, AssistantCause.User);
     }
 
     private void OnAssistantActiveChanged(bool active, GeminiStatus status)
     {
-        bool live = active && status == GeminiStatus.Live;
-        UIButton.SetSelected(_assistantButton, live);
-
-        RefreshOptionCards();
-
-        if (active && !live)
-        {
-            if (_connectingPulse == null && isActiveAndEnabled)
-                _connectingPulse = StartCoroutine(ConnectingPulse());
-            return;
-        }
-
-        if (_connectingPulse != null)
+        bool connecting = active && status != GeminiStatus.Live;
+        if (connecting && _connectingPulse == null && isActiveAndEnabled && Style.Animate)
+            _connectingPulse = StartCoroutine(ConnectingPulse());
+        if (!connecting && _connectingPulse != null)
         {
             StopCoroutine(_connectingPulse);
             _connectingPulse = null;
         }
-        SetAssistantLabel(Strings.Get("assistant"));
+        RefreshPanel();
     }
-
-    private Coroutine _connectingPulse;
-    private const float ConnectingPulseSeconds = 0.4f;
 
     private IEnumerator ConnectingPulse()
     {
-        if (!Style.Animate)
-        {
-            SetAssistantLabel(Strings.Get("assistant.connecting") + "...");
-            yield break;
-        }
-
-        int dots = 0;
         var wait = new WaitForSeconds(ConnectingPulseSeconds);
         while (true)
         {
-            SetAssistantLabel(Strings.Get("assistant.connecting") + new string('.', dots));
-            dots = (dots + 1) % 4;
+            _connectingDots = (_connectingDots + 1) % 4;
+            Rows.Refresh();
             yield return wait;
         }
     }
 
-    private void OnLanguageChanged()
-    {
-        if (_connectingPulse == null) SetAssistantLabel(Strings.Get("assistant"));
-    }
-
-    private void SetAssistantLabel(string text)
-    {
-        if (_assistantButton != null && _assistantButton.Text != null)
-            _assistantButton.Text.text = text;
-    }
-
-    private void BindToolContents()
-    {
-        Transform contentArea = _toolCard != null ? _toolCard.Content : null;
-        if (contentArea == null) return;
-
-        _toolContents.Clear();
-        for (int i = 0; i < Tools.Length; i++)
-        {
-            ToolType tool = Tools[i];
-            Transform content = contentArea.Find($"{Label(tool)}Content");
-            if (content == null)
-            {
-                Debug.LogError($"[ToolPanelUI] No pane named '{Label(tool)}Content' under ContentArea; " +
-                               $"the {Label(tool)} tool will show an empty subpanel.");
-                continue;
-            }
-
-            _toolContents[tool] = content.gameObject;
-            SizeHeader(content.gameObject);
-            Transform header = content.Find("Header");
-            if (header != null) Strings.Bind(header.GetComponent<TMP_Text>(), NameKey(tool));
-            AddDescription(content.gameObject, DescriptionKey(tool));
-
-            VerticalLayoutGroup contentLayout = content.GetComponent<VerticalLayoutGroup>();
-            if (contentLayout != null) ApplyPaneLayout(contentLayout);
-        }
-
-        if (_assistantCard != null && _assistantCard.Content != null)
-            _assistantContent = BuildAssistantContent(_assistantCard.Content);
-
-        ApplyDividers(transform);
-    }
-
-    private GameObject BuildAssistantContent(Transform contentArea)
-    {
-        GameObject content = new GameObject("AssistantContent");
-        content.transform.SetParent(contentArea, false);
-
-        RectTransform rect = content.AddComponent<RectTransform>();
-        rect.pivot = new Vector2(0.5f, 0.5f);
-        UILayout.Stretch(rect);
-
-        VerticalLayoutGroup layout = content.AddComponent<VerticalLayoutGroup>();
-        ApplyPaneLayout(layout);
-        layout.childControlWidth = true;
-        layout.childControlHeight = true;
-        layout.childForceExpandWidth = true;
-        layout.childForceExpandHeight = false;
-
-        AddHeader(content, "assistant");
-        AddDescription(content, "assistant.desc");
-
-        var buttons = new (string, string, UnityEngine.Events.UnityAction)[AssistantSpeedLabels.Length];
-        for (int i = 0; i < AssistantSpeedLabels.Length; i++)
-        {
-            int captured = i;
-            buttons[i] = ("AssistantSpeed_" + i, AssistantSpeedLabels[i], () => OnAssistantSpeedClicked(captured));
-        }
-        _assistantSpeedRow = AddToggleRow(content, "AssistantSpeedRow", buttons);
-        Strings.Bind(_assistantSpeedRow.Items[AssistantSpeedLabels.Length - 1].Text, "speed.instant");
-        _assistantSpeedRow.SetSelected(0);
-
-        UILayout.ShowPart(content, false);
-        return content;
-    }
-
-    private void OnAssistantSpeedClicked(int index)
-    {
-        if (!ApplyAssistantSpeed(index)) return;
-        StateChannel.RecordState("assistantSpeed",
-            $"the assistant's motion speed is {AssistantSpeedLabels[_assistantSpeedIndex]}");
-    }
-
-    private bool ApplyAssistantSpeed(int index)
-    {
-        if (index < 0 || index >= AssistantSpeedLabels.Length || _assistantSpeedIndex == index) return false;
-        _assistantSpeedIndex = index;
-        _assistantSpeedRow?.SetSelected(index);
-        var sheets = Scene.Sheets;
-        if (sheets != null) sheets.SetAgentMotion(AssistantSpeedValues[index], AssistantSpeedValues[index] <= 0f);
-        return true;
-    }
-
-    public string AssistantSpeedName => AssistantSpeedLabels[_assistantSpeedIndex];
+    public string AssistantSpeedName => AssistantSpeedLabels[(int)Settings.AssistantSpeed];
 
     public bool SetAssistantSpeed(string option)
     {
         int index = MatchAssistantSpeed(option);
         if (index < 0) return false;
-        OnAssistantSpeedClicked(index);
+        Settings.AssistantSpeed = (AssistantSpeed)index;
+        StateChannel.RecordState("assistantSpeed", $"the assistant's motion speed is {AssistantSpeedLabels[index]}");
         return true;
     }
 
@@ -547,314 +186,106 @@ public class ToolPanelUI : PanelUI
         return -1;
     }
 
-    private void BindTitleBar()
-    {
-        Transform titleBar = FindTransform.FindDeep(transform, "TitleBar");
-        if (titleBar == null) return;
-
-        Transform title = titleBar.Find("Title");
-        if (title != null) Strings.Bind(title.GetComponent<TMP_Text>(), "panel.tools");
-
-        Transform undoAllBtn = FindTransform.FindDeep(titleBar, "UndoAll_Btn");
-        if (undoAllBtn != null)
-        {
-            Button btn = undoAllBtn.GetComponent<Button>();
-            if (btn != null) btn.onClick.AddListener(OnUndoAll);
-
-            Transform textT = undoAllBtn.Find("Text");
-            TextMeshProUGUI label = textT != null
-                ? textT.GetComponent<TextMeshProUGUI>()
-                : undoAllBtn.GetComponentInChildren<TextMeshProUGUI>(true);
-            if (label != null) Strings.Bind(label, "undo.all");
-
-            UIButton.Adopt(undoAllBtn.gameObject);
-
-            LayoutElement undoAllLE = UILayout.Ensure<LayoutElement>(undoAllBtn.gameObject);
-            undoAllLE.minHeight = Style.Button.y;
-            undoAllLE.preferredHeight = Style.Button.y;
-            undoAllLE.preferredWidth = Style.TitleBarButtonWidth;
-            undoAllLE.flexibleWidth = 0f;
-
-            Transform anchor = undoAllBtn.parent != null && undoAllBtn.parent.name.EndsWith("_Border")
-                ? undoAllBtn.parent
-                : undoAllBtn;
-            UIButton.Handle undo = UIButton.Create(anchor.parent, "Undo_Btn", Strings.Get("undo"),
-                width: Style.TitleBarButtonWidth);
-            Strings.Bind(undo.Text, "undo");
-            undo.Root.transform.SetSiblingIndex(anchor.GetSiblingIndex());
-            undo.Button.onClick.AddListener(OnUndo);
-        }
-    }
-
-    private void OnUndo()
-    {
-        if (toolManager != null) toolManager.Undo();
-    }
-
-    private void OnToolButtonClicked(ToolType tool)
-    {
-        if (toolManager == null) return;
-        toolManager.SelectTool(tool);
-    }
-
     private void OnUndoAll()
     {
-        if (toolManager != null)
-        {
-            toolManager.UndoAll();
-            toolManager.DeselectTool();
-            toolManager.ForgetSuspendedTool();
-            _suspendedSlot = -1;
-        }
+        if (toolManager == null) return;
+        toolManager.UndoAll();
+        toolManager.DeselectTool();
+        toolManager.ForgetSuspendedTool();
     }
 
-    private static bool HasOptions(ToolType tool) => tool != ToolType.None;
-
-    private bool AssistantPaneWanted() => _assistant != null && _assistant.IsGeminiActive;
-
-    private void OnToolChanged(ToolType selected)
+    protected override void RefreshPanel()
     {
-        for (int i = 0; i < _toolButtons.Count; i++)
-            ApplyToolButtonVisual(_toolButtons[i], _toolButtons[i].Tool == selected);
+        Rows.Refresh();
 
-        foreach (KeyValuePair<ToolType, GameObject> pair in _toolContents)
-            UILayout.ShowPart(pair.Value, pair.Key == selected);
-
-        RefreshOptionCards();
-    }
-
-    private void RefreshOptionCards()
-    {
         ToolType selected = toolManager != null ? toolManager.SelectedTool : ToolType.None;
-        bool assistantPane = AssistantPaneWanted();
+        bool hasTool = selected != ToolType.None;
+        bool assistantOn = _assistant != null && _assistant.IsGeminiActive;
 
-        UILayout.ShowPart(_assistantContent, assistantPane);
+        SetRightOpen(hasTool);
+        if (hasTool) ShowSteps(selected);
 
-        SetCardOpen(_toolCard, HasOptions(selected));
-        SetCardOpen(_assistantCard, assistantPane);
-
-        ReportCardStack();
-        QueueOptionsResize();
-    }
-
-    private void SetCardOpen(OptionsCard card, bool open)
-    {
-        if (card == null || card.Root == null) return;
-
-        if (UILayout.PartShown(card.Root) != open) UILayout.ShowPart(card.Root, open);
-
-        bool listed = _stack.Contains(card);
-        if (open && !listed) OpenCard(card);
-        else if (!open && listed) _stack.Remove(card);
-    }
-
-    private void OpenCard(OptionsCard card)
-    {
-        int slot = card == _toolCard ? _suspendedSlot : -1;
-        if (card == _toolCard) _suspendedSlot = -1;
-
-        if (slot >= 0 && slot <= _stack.Count) _stack.Insert(slot, card);
-        else _stack.Add(card);
-    }
-
-    private void LayoutOptionCards()
-    {
-        float offset = Style.Panel.y;
-
-        for (int i = 0; i < _stack.Count; i++)
+        SetBottomOpen(hasTool || assistantOn);
+        if (hasTool)
         {
-            RectTransform rect = _stack[i].Rect;
-            if (rect == null) continue;
-
-            offset += Style.SmallPadding;
-
-            Vector2 pos = rect.anchoredPosition;
-            pos.y = -offset;
-            rect.anchoredPosition = pos;
-
-            offset += rect.sizeDelta.y;
+            Strings.Bind(BottomHeader, $"tool.{Label(selected)}");
+            Strings.Bind(BottomText, $"tool.{Label(selected)}.desc");
+        }
+        else if (assistantOn)
+        {
+            Strings.Bind(BottomHeader, "assistant");
+            Strings.Bind(BottomText, "assistant.desc");
         }
 
-        RectTransform canvas = CanvasRect;
-        if (canvas != null) canvas.sizeDelta = new Vector2(Style.Panel.x, offset);
-
-        InvalidateGrabBounds();
+        QueueSettle();
+        StateChannel.SetState("optionsPanels", hasTool
+            ? "the selected tool's steps and description are open"
+            : assistantOn ? "the assistant's description is open" : "no subpanel is open");
     }
 
-    private float StackHeight()
+    private void ShowSteps(ToolType tool)
     {
-        float total = 0f;
-        for (int i = 0; i < _stack.Count; i++)
-            if (_stack[i].Rect != null) total += _stack[i].Rect.sizeDelta.y;
-        return total;
+        if (RightContent == null) return;
+        if (_stepsShown == tool && _stepsLanguage == Settings.Language) return;
+        _stepsShown = tool;
+        _stepsLanguage = Settings.Language;
+
+        Strings.Bind(RightHeader, "tool.steps");
+        UILayout.Clear(RightContent);
+
+        if (!StepCounts.TryGetValue(tool, out int count)) return;
+        for (int step = 1; step <= count; step++)
+        {
+            TextMeshProUGUI text = UILabel.Make(RightContent, $"Step_{step}", Style.Black,
+                TextAlignmentOptions.TopLeft, TextOverflowModes.Overflow, wrap: true);
+            text.text = $"{step}. {Strings.Get($"tool.{Label(tool)}.step{step}")}";
+            AddStepImage(tool, step);
+        }
     }
 
-    private RectTransform PaneRect(OptionsCard card)
+    private void AddStepImage(ToolType tool, int step)
     {
-        GameObject pane = card == _assistantCard
-            ? _assistantContent
-            : GetToolContent(toolManager != null ? toolManager.SelectedTool : ToolType.None);
+        RectTransform frame = UILayout.EnsureChild(RightContent, $"StepFrame_{step}");
+        UILayout.FixedHeight(frame.gameObject, StepImageHeight);
+        Image border = UILayout.Ensure<Image>(frame.gameObject);
+        RoundedSprite.Apply(border, Style.ChipRadius);
+        border.color = Style.Black;
+        border.raycastTarget = false;
 
-        return pane != null ? pane.transform as RectTransform : null;
-    }
-
-    private void SizeCardToContent(OptionsCard card)
-    {
-        if (card == null || card.Rect == null) return;
-
-        RectTransform paneRect = PaneRect(card);
-        if (paneRect == null) return;
-
-        if (!UIMeasure.TryPreferredHeight(card.Rect, paneRect, out float contentHeight)) return;
-
-        Vector2 size = card.Rect.sizeDelta;
-        size.y = Mathf.Min(contentHeight + Style.SmallPadding, Style.Subpanel.y);
-        card.Rect.sizeDelta = size;
-    }
-
-    private void SizeCardsToContent()
-    {
-        for (int i = 0; i < _stack.Count; i++) SizeCardToContent(_stack[i]);
-    }
-
-    private void ResizeOptionCards()
-    {
-        if (_stack.Count == 0) return;
-
-        RectTransform canvas = CanvasRect;
-        if (canvas != null) LayoutRebuilder.ForceRebuildLayoutImmediate(canvas);
-        SizeCardsToContent();
-        LayoutOptionCards();
-    }
-
-    private void QueueOptionsResize()
-    {
-        SizeCardsToContent();
-        LayoutOptionCards();
-
-        if (!isActiveAndEnabled) return;
-        if (_resizeRoutine != null) StopCoroutine(_resizeRoutine);
-        _resizeRoutine = StartCoroutine(ResizeOptionsUntilStable());
-    }
-
-    private IEnumerator ResizeOptionsUntilStable()
-    {
-        yield return UILayout.Converge(
-            () => _stack.Count > 0,
-            ResizeOptionCards,
-            StackHeight);
-
-        _resizeRoutine = null;
-    }
-
-    private void ReportCardStack()
-    {
-        bool tool = _toolCard != null && _stack.Contains(_toolCard);
-        bool assistant = _assistantCard != null && _stack.Contains(_assistantCard);
-
-        string what;
-        if (tool && assistant)
-            what = _stack.IndexOf(_assistantCard) < _stack.IndexOf(_toolCard)
-                ? "the assistant options sit above the tool options"
-                : "the tool options sit above the assistant options";
-        else if (tool) what = "only the tool options are open";
-        else if (assistant) what = "only the assistant options are open";
-        else what = "no options subpanel is open";
-
-        StateChannel.SetState("optionsPanels", what);
-    }
-
-    private void ApplyToolButtonVisual(ToolButtonVisual visual, bool active)
-    {
-        if (visual == null) return;
-        UIButton.SetSelected(visual.Handle, active);
+        RectTransform fill = UILayout.EnsureChild(frame, "Picture");
+        UILayout.Stretch(fill, Style.SmallBorder);
+        Image picture = UILayout.Ensure<Image>(fill.gameObject);
+        picture.raycastTarget = false;
+        picture.preserveAspect = true;
+        Sprite sprite = Resources.Load<Sprite>($"ToolSteps/{Label(tool)}_{step}");
+        picture.sprite = sprite;
+        picture.color = Style.White;
+        if (sprite == null) RoundedSprite.Apply(picture, Style.InnerRadius(Style.ChipRadius));
     }
 
     public override void ShowPanel()
     {
         if (_canvas == null) return;
         ShowCanvas();
-        QueueFitTiles();
         PanelGuard.ClearToolPanel();
-        StateChannel.RecordState("toolPanel", "the tool panel is open, so the tool buttons are on screen");
+        StateChannel.RecordState("toolPanel", "the tool panel is open, so the tool rows are on screen");
 
         Watch assistant = Assistant;
         if (assistant != null) assistant.NotifyIntent();
 
         if (toolManager != null) toolManager.ResumeTool();
-
-        RefreshOptionCards();
-
-        InvalidateGrabBounds();
+        RefreshPanel();
     }
 
     public override void HidePanel()
     {
         if (_canvas == null) return;
-        if (IsVisible && toolManager != null)
-        {
-            _suspendedSlot = _stack.IndexOf(_toolCard);
-            toolManager.SuspendTool();
-        }
+        if (IsVisible && toolManager != null) toolManager.SuspendTool();
         HideCanvas();
         if (StateChannel.UserDriven) PanelGuard.MarkToolPanelClosedByUser();
-        StateChannel.RecordState("toolPanel", "the tool panel is closed, so the tool buttons are off screen");
+        StateChannel.RecordState("toolPanel", "the tool panel is closed, so the tool rows are off screen");
 
         Watch assistant = Assistant;
         if (assistant != null) assistant.NotifyIntentEnded();
-    }
-
-    private GameObject GetToolContent(ToolType tool) =>
-        _toolContents.TryGetValue(tool, out GameObject go) ? go : null;
-
-    private static ButtonList AddToggleRow(GameObject content, string rowName,
-        params (string name, string label, UnityEngine.Events.UnityAction onClick)[] buttons)
-    {
-        GameObject row = new GameObject(rowName);
-        row.transform.SetParent(content.transform, false);
-        RectTransform rowRect = row.AddComponent<RectTransform>();
-
-        UILayout.FixedHeight(row, Style.Button.y);
-        InsertBelowHeader(content, row.transform);
-
-        ButtonList list = new ButtonList(rowRect);
-        for (int i = 0; i < buttons.Length; i++)
-            list.Add(buttons[i].name, buttons[i].label, buttons[i].onClick);
-        return list;
-    }
-
-    private static void SizeHeader(GameObject content)
-    {
-        Transform header = content.transform.Find("Header");
-        if (header != null) UILayout.FixedHeight(header.gameObject, Style.HeaderHeight);
-    }
-
-    private static void AddHeader(GameObject content, string key)
-    {
-        if (content.transform.Find("Header") != null) return;
-
-        TextMeshProUGUI label = UILabel.Make(content.transform, "Header", Style.Black,
-            TextAlignmentOptions.Left, TextOverflowModes.Ellipsis, bold: true);
-        Strings.Bind(label, key);
-        label.transform.SetAsFirstSibling();
-
-        SizeHeader(content);
-    }
-
-    private void AddDescription(GameObject content, string key)
-    {
-        if (string.IsNullOrEmpty(key) || content.transform.Find("Description") != null) return;
-
-        TextMeshProUGUI label = UILabel.Make(content.transform, "Description", Style.Black,
-            TextAlignmentOptions.TopLeft, TextOverflowModes.Overflow, wrap: true);
-        Strings.Bind(label, key);
-
-        InsertBelowHeader(content, label.transform);
-    }
-
-    private static void InsertBelowHeader(GameObject content, Transform child)
-    {
-        Transform anchor = content.transform.Find("Header");
-        child.SetSiblingIndex(anchor != null ? anchor.GetSiblingIndex() + 1 : 0);
     }
 }

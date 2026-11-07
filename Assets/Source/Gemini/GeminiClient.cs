@@ -29,10 +29,16 @@ public class GeminiClient : MonoBehaviour {
     public event Action ContextWarning;
     public event Action ContextExhausted;
 
-    void OnEnable() => Settings.Changed += OnSettingChanged;
+    void OnEnable() {
+        Settings.Changed += OnSettingChanged;
+        Gemini.SetAssistantVolume(ChartDisplay.PercentOf(Settings.AssistantVolume));
+    }
 
     private void OnSettingChanged(Setting which) {
-        if (which == Setting.Language) {
+        if (which == Setting.AssistantVolume) {
+            Gemini.SetAssistantVolume(ChartDisplay.PercentOf(Settings.AssistantVolume));
+        }
+        else if (which == Setting.Language || which == Setting.AssistantVoice || which == Setting.WebSearch) {
             Gemini.Reconfigure(fresh: true);
             if (_ready && _active && isActiveAndEnabled) {
                 Gemini.Disconnect();

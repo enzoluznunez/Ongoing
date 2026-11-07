@@ -4,9 +4,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Google.GenAI;
-using Google.GenAI.Types;
-using GTool = Google.GenAI.Types.Tool;
+using GeminiLive;
+using GTool = GeminiLive.Tool;
 using UnityEngine;
 using UnityEngine.Android;
 
@@ -21,7 +20,7 @@ public enum GeminiStatus {
 
 public static class Gemini {
 
-    public const string ModelId = "gemini-3.1-flash-live-preview";
+    public const string ModelId = "gemini-3.8-live";
 
     private static Client client;
     private static LiveConnectConfig config;
@@ -225,10 +224,11 @@ public static class Gemini {
 
     private static void RebuildConfig() {
         var tools = new List<GTool>();
-        if (webSearchEnabled) tools.Add(new GTool { GoogleSearch = new GoogleSearch() });
+        bool search = webSearchEnabled && Settings.WebSearch;
+        if (search) tools.Add(new GTool { GoogleSearch = new GoogleSearch() });
         tools.Add(new GTool { FunctionDeclarations = SystemPrompt.ToolDeclarations() });
 
-        string instruction = SystemPrompt.PromptBody(webSearchEnabled) + SystemPrompt.PromptTail();
+        string instruction = SystemPrompt.PromptBody(search) + SystemPrompt.PromptTail();
         instructionChars = instruction.Length;
 
         config = new LiveConnectConfig {
@@ -243,7 +243,7 @@ public static class Gemini {
             SpeechConfig = new SpeechConfig {
                 LanguageCode = SpeechLanguage,
                 VoiceConfig = new VoiceConfig {
-                    PrebuiltVoiceConfig = new PrebuiltVoiceConfig { VoiceName = "Charon" }
+                    PrebuiltVoiceConfig = new PrebuiltVoiceConfig { VoiceName = Settings.AssistantVoice.ToString() }
                 }
             },
             Tools = tools,
@@ -791,13 +791,20 @@ public static class Gemini {
 
         var inTx = content.InputTranscription;
         if (inTx != null) {
-            if (!string.IsNullOrEmpty(inTx.Text)) inTranscript.Append(inTx.Text);
+            if (!string.IsNullOrEmpty(inTx.Text)) {
+                inTranscript.Append(inTx.Text);
+                CaptionBar.Post(inTranscript.ToString(), true);
+            }
             if (inTx.Finished == true) FlushUtterance(inTranscript, user: true);
         }
 
         var outTx = content.OutputTranscription;
         if (outTx != null) {
-            if (!string.IsNullOrEmpty(outTx.Text)) { outTranscript.Append(outTx.Text); generationActive = true; }
+            if (!string.IsNullOrEmpty(outTx.Text)) {
+                outTranscript.Append(outTx.Text);
+                generationActive = true;
+                CaptionBar.Post(outTranscript.ToString(), false);
+            }
             if (outTx.Finished == true) FlushUtterance(outTranscript, user: false);
         }
 
@@ -837,8 +844,24 @@ public static class Gemini {
             var data = parts[i].InlineData;
             if (data?.Data != null && data.Data.Length > 0 &&
                 data.MimeType != null && data.MimeType.StartsWith("audio/pcm")) {
+                ApplyVolume(data.Data);
                 Speaker.write(data.Data);
             }
+        }
+    }
+
+    private static volatile float assistantVolume = 1f;
+
+    public static void SetAssistantVolume(float volume) => assistantVolume = volume;
+
+    private static void ApplyVolume(byte[] pcm) {
+        float volume = assistantVolume;
+        if (volume >= 0.999f) return;
+        for (int i = 0; i + 1 < pcm.Length; i += 2) {
+            short sample = (short)(pcm[i] | (pcm[i + 1] << 8));
+            int scaled = (int)(sample * volume);
+            pcm[i] = (byte)scaled;
+            pcm[i + 1] = (byte)(scaled >> 8);
         }
     }
 
@@ -865,7 +888,6 @@ public static class Gemini {
         ResetContextEstimate();
         StateChannel.ClearPending();
         PanelGuard.ClearToolPanel();
-        DescribeDataset.Forget();
     }
 
     private static void ResetContextEstimate() {

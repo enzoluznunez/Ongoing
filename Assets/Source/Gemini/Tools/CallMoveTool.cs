@@ -1,5 +1,5 @@
 using System.Collections.Generic;
-using Google.GenAI.Types;
+using GeminiLive;
 using UnityEngine;
 
 public sealed class CallMoveTool : AgenticTool<CallMoveTool.Args> {
@@ -9,7 +9,7 @@ public sealed class CallMoveTool : AgenticTool<CallMoveTool.Args> {
     private const float MaxDistance = 100f;
 
     public class Args {
-        [Doc("Which way to slide the sheet, from the user's point of view; 'forward' is away from them.")]
+        [Doc("Which way to slide the chart, from the user's point of view; 'forward' is away from them.")]
         [Values("left", "right", "forward", "back", "up", "down",
                 "forward-left", "forward-right", "back-left", "back-right")]
         public string direction;
@@ -21,7 +21,7 @@ public sealed class CallMoveTool : AgenticTool<CallMoveTool.Args> {
 
     public override FunctionDeclaration Declaration => new FunctionDeclaration {
         Name = "CallMoveTool",
-        Description = "Move the sheet, as if the user grabbed and slid it: a distance in a direction, including " +
+        Description = "Move the chart, as if the user grabbed and slid it: a distance in a direction, including " +
                       "diagonals.",
         Parameters = ParametersFor(typeof(Args))
     };
@@ -36,23 +36,23 @@ public sealed class CallMoveTool : AgenticTool<CallMoveTool.Args> {
             return;
         }
 
-        if (!TryResolveSheet(result, "move", out var mgr, out var sheet)) return;
+        if (!TryResolveChart(result, "move", out var mgr, out var chart)) return;
 
         float asked = args.distance ?? DefaultDistance;
         float distance = Mathf.Clamp(asked, MinDistance, MaxDistance);
-        Slide(mgr, sheet, dir, dirVec * distance, result);
+        Slide(mgr, chart, dir, dirVec * distance, result);
         result["requestedMeters"] = Round(asked);
         if (distance != asked)
             result["note"] = $"The distance was limited to the {MinDistance} to {MaxDistance} meter range; {distance} m was used.";
     }
 
-    private static void Slide(ManageSheets mgr, CreateSheet sheet, string direction,
+    private static void Slide(ManageCharts mgr, ChartView chart, string direction,
         Vector3 worldDelta, Dictionary<string, object> result) {
 
-        var pre = ApplyPieceTransform(mgr, sheet, t =>
+        var pre = ApplyChartTransform(mgr, chart, t =>
             t.localPosition += mgr.transform.InverseTransformVector(worldDelta));
 
-        mgr.GetCommittedPose(sheet, out Vector3 nowPos, out _, out _);
+        mgr.GetCommittedPose(chart, out Vector3 nowPos, out _, out _);
         float actual = mgr.transform.TransformVector(nowPos - pre.pos).magnitude;
         result["moved"] = direction;
         result["actualMeters"] = Round(actual);

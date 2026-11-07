@@ -3,30 +3,17 @@ using Oculus.Interaction;
 using Oculus.Interaction.Input;
 using UnityEngine;
 
-[RequireComponent(typeof(ReadSheets))]
 public class HandRays : MonoBehaviour
 {
     private const float CanvasRescanSeconds = 2f;
     private const int ExpectedCanvases = 3;
 
-    public static HandRay SheetEventsOwner { get; set; }
-
     private readonly Dictionary<IHand, HandRay> _rays = new Dictionary<IHand, HandRay>();
     private readonly HashSet<IHand> _tracked = new HashSet<IHand>();
     private readonly List<PointableCanvas> _canvases = new List<PointableCanvas>();
     private float _nextCanvasScan;
-    private ReadSheets _hub;
-    private SheetTouch _touch;
 
     public IReadOnlyList<PointableCanvas> Canvases => _canvases;
-    public ReadSheets Hub => _hub;
-    public bool FingertipOnSheet => _touch != null && _touch.Driving;
-
-    private void Awake()
-    {
-        _hub = GetComponent<ReadSheets>();
-        _touch = GetComponent<SheetTouch>();
-    }
 
     private void Update()
     {
@@ -63,7 +50,4 @@ public class HandRays : MonoBehaviour
     {
         foreach (HandRay ray in _rays.Values) ray.Lose();
     }
-
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-    private static void ResetStatics() => SheetEventsOwner = null;
 }

@@ -10,7 +10,7 @@ public sealed class HandRay
     private const float NearestUse = 0.12f;
     private const int FirstPointerId = -1000;
 
-    private enum Hold { None, Canvas, Carry, Slide, Profile, Spent }
+    private enum Hold { None, Canvas, Carry }
 
     private readonly HandRays _owner;
     private readonly IHand _hand;
@@ -19,17 +19,12 @@ public sealed class HandRay
     private static readonly List<Selectable> ControlBuffer = new List<Selectable>();
 
     private PointableCanvas _hoveredCanvas;
-    private bool _hoveringSheet;
     private Vector3 _end;
 
     private Hold _hold;
     private PointableCanvas _heldCanvas;
     private Grabbable _carried;
     private float _carryDistance;
-    private Plane _slidePlane;
-    private Vector3 _lastSlidePoint;
-    private CreateCube _pressedCube;
-    private Vector3 _pressedTip;
 
     private bool _wasPinching;
 
@@ -62,26 +57,23 @@ public sealed class HandRay
         }
 
         FindTarget(origin, direction, out PointableCanvas canvas, out Vector3 canvasPoint,
-            out SheetRaycast.RayHit sheetHit, out bool onSheet);
+            out ChartRaycast.Hit chartHit, out bool onChart);
 
         if (canvas != null)
         {
-            StopHoveringSheet();
             HoverCanvas(canvas, canvasPoint);
             _end = canvasPoint;
             if (pinchStarted) PressCanvas(canvas, canvasPoint, Vector3.Distance(origin, canvasPoint));
         }
-        else if (onSheet)
+        else if (onChart)
         {
             StopHoveringCanvas();
-            HoverSheet(sheetHit, origin);
-            _end = sheetHit.point;
-            if (pinchStarted) PressSheet(sheetHit, origin);
+            _end = chartHit.point;
+            if (pinchStarted) PressChart(chartHit);
         }
         else
         {
             StopHoveringCanvas();
-            StopHoveringSheet();
             _visual.Hide();
             return;
         }
@@ -90,7 +82,7 @@ public sealed class HandRay
     }
 
     private void FindTarget(Vector3 origin, Vector3 direction, out PointableCanvas canvas, out Vector3 canvasPoint,
-        out SheetRaycast.RayHit sheetHit, out bool onSheet)
+        out ChartRaycast.Hit chartHit, out bool onChart)
     {
         canvas = null;
         canvasPoint = default;
@@ -105,15 +97,15 @@ public sealed class HandRay
             canvasPoint = point;
         }
 
-        sheetHit = default;
-        onSheet = false;
+        chartHit = default;
+        onChart = false;
         ManageTools tools = Scene.Tools;
         ToolType tool = tools != null ? tools.SelectedTool : ToolType.None;
         if (tool != ToolType.None &&
-            SheetRaycast.Cast(origin, direction, nearest, tool == ToolType.Filter, out sheetHit) &&
-            sheetHit.distance >= NearestUse)
+            ChartRaycast.Cast(origin, direction, nearest, out chartHit) &&
+            chartHit.distance >= NearestUse)
         {
-            onSheet = true;
+            onChart = true;
             canvas = null;
         }
 
@@ -206,98 +198,10 @@ public sealed class HandRay
         Send(grabbable, PointerEventType.Select, point);
     }
 
-    private void HoverSheet(SheetRaycast.RayHit hit, Vector3 origin)
+    private void PressChart(ChartRaycast.Hit hit)
     {
-        _hoveringSheet = true;
-        ToolType tool = Scene.Tools.SelectedTool;
-
-        if (tool == ToolType.Profile)
-        {
-            if (!TakeSheetEvents() || hit.cube == null) return;
-            _owner.Hub.Hover(ReadingOf(hit.cube, hit.point, hit.point, origin));
-            return;
-        }
-
-        if (tool != ToolType.Filter && tool != ToolType.Sort) return;
-
-        bool rows = hit.PicksRow;
-        int line = hit.sheet.LineAtSlot(!rows, hit.SlotOfPick);
-        if (line < 0) return;
-        if (tool == ToolType.Filter) Scene.Filter?.TintFromRay(hit.sheet, !rows, line);
-        else Scene.Sort?.TintFromRay(hit.sheet, !rows, line);
-    }
-
-    private void StopHoveringSheet()
-    {
-        if (!_hoveringSheet) return;
-        _hoveringSheet = false;
-        ReleaseSheetEvents();
-    }
-
-    private bool TakeSheetEvents()
-    {
-        if (HandRays.SheetEventsOwner == this) return true;
-        if (HandRays.SheetEventsOwner != null || _owner.FingertipOnSheet) return false;
-        HandRays.SheetEventsOwner = this;
-        return true;
-    }
-
-    private void ReleaseSheetEvents()
-    {
-        if (HandRays.SheetEventsOwner != this) return;
-        HandRays.SheetEventsOwner = null;
-        _owner.Hub.Cleared();
-    }
-
-    private void PressSheet(SheetRaycast.RayHit hit, Vector3 origin)
-    {
-        switch (Scene.Tools.SelectedTool)
-        {
-            case ToolType.Move:
-            case ToolType.Rotate:
-            case ToolType.Scale:
-                Grabbable grip = hit.sheet.Grip;
-                if (grip != null && grip.isActiveAndEnabled) BeginCarry(grip, hit.point, hit.distance);
-                break;
-            case ToolType.Profile:
-                PressProfile(hit, origin);
-                break;
-            case ToolType.Sort:
-                PressSort(hit);
-                break;
-            case ToolType.Filter:
-                Scene.Filter?.PokeFromRay(hit.PicksRow, hit.SlotOfPick);
-                _hold = Hold.Spent;
-                break;
-        }
-    }
-
-    private void PressProfile(SheetRaycast.RayHit hit, Vector3 origin)
-    {
-        if (hit.cube == null || !TakeSheetEvents()) return;
-
-        _hold = Hold.Profile;
-        _pressedCube = hit.cube;
-        _pressedTip = hit.point;
-        _slidePlane = new Plane(hit.sheet.transform.up, hit.point);
-        _owner.Hub.Select(ReadingOf(hit.cube, hit.point, hit.point, origin));
-    }
-
-    private void PressSort(SheetRaycast.RayHit hit)
-    {
-        bool columns = !hit.PicksRow;
-        int visibleLine = hit.sheet.LineAtSlot(columns, hit.SlotOfPick);
-        if (visibleLine < 0) return;
-        int block = visibleLine / hit.sheet.GroupSizeOn(columns);
-        Grabbable line = Scene.Sort != null ? Scene.Sort.GripOfLine(columns, block) : null;
-        if (line == null || !line.isActiveAndEnabled) return;
-
-        _hold = Hold.Slide;
-        _carried = line;
-        _slidePlane = new Plane(hit.sheet.transform.up, hit.point);
-        _lastSlidePoint = hit.point;
-        Send(line, PointerEventType.Hover, hit.point);
-        Send(line, PointerEventType.Select, hit.point);
+        Grabbable grip = hit.view.Grip;
+        if (grip != null && grip.isActiveAndEnabled) BeginCarry(grip, hit.point, hit.distance);
     }
 
     private void ContinueHold(Vector3 origin, Vector3 direction, bool pinching)
@@ -309,15 +213,6 @@ public sealed class HandRay
                 break;
             case Hold.Carry:
                 ContinueCarry(origin, direction, pinching);
-                break;
-            case Hold.Slide:
-                ContinueSlide(origin, direction, pinching);
-                break;
-            case Hold.Profile:
-                ContinueProfile(origin, direction, pinching);
-                break;
-            case Hold.Spent:
-                if (!pinching) _hold = Hold.None;
                 break;
         }
 
@@ -366,68 +261,12 @@ public sealed class HandRay
         EndGrab();
     }
 
-    private void ContinueSlide(Vector3 origin, Vector3 direction, bool pinching)
-    {
-        if (_carried == null || !_carried.isActiveAndEnabled)
-        {
-            _hold = Hold.None;
-            _carried = null;
-            return;
-        }
-
-        Ray ray = new Ray(origin, direction);
-        if (_slidePlane.Raycast(ray, out float distance) && distance <= MaxDistance)
-            _lastSlidePoint = ray.GetPoint(distance);
-        _end = _lastSlidePoint;
-        Send(_carried, PointerEventType.Move, _end);
-        if (pinching) return;
-        EndGrab();
-    }
-
     private void EndGrab()
     {
         Send(_carried, PointerEventType.Unselect, _end);
         Send(_carried, PointerEventType.Unhover, _end);
         _carried = null;
         _hold = Hold.None;
-    }
-
-    private void ContinueProfile(Vector3 origin, Vector3 direction, bool pinching)
-    {
-        if (_pressedCube == null)
-        {
-            _hold = Hold.None;
-            _owner.Hub.Cleared();
-            return;
-        }
-
-        Ray ray = new Ray(origin, direction);
-        if (_slidePlane.Raycast(ray, out float distance) && distance <= MaxDistance)
-            _pressedTip = ray.GetPoint(distance);
-
-        if (SheetRaycast.Cast(origin, direction, MaxDistance, false, out SheetRaycast.RayHit hit) && hit.cube != null)
-            _pressedCube = hit.cube;
-
-        _end = _pressedTip;
-        ReadSheets.Reading reading = ReadingOf(_pressedCube, _pressedTip, _pressedTip, origin);
-
-        if (pinching)
-        {
-            _owner.Hub.Hover(reading);
-            return;
-        }
-
-        _owner.Hub.Release(reading);
-        _hold = Hold.None;
-        _pressedCube = null;
-    }
-
-    private static ReadSheets.Reading ReadingOf(CreateCube cube, Vector3 point, Vector3 tip, Vector3 origin)
-    {
-        ReadSheets.Reading reading = ReadSheets.Describe(cube, point);
-        reading.tip = tip;
-        reading.wrist = origin;
-        return reading;
     }
 
     public void Lose()
@@ -442,7 +281,6 @@ public sealed class HandRay
                 _hoveredCanvas = null;
                 break;
             case Hold.Carry:
-            case Hold.Slide:
                 if (_carried != null) Send(_carried, PointerEventType.Cancel, _end);
                 break;
         }
@@ -450,10 +288,7 @@ public sealed class HandRay
         _hold = Hold.None;
         _heldCanvas = null;
         _carried = null;
-        _pressedCube = null;
         StopHoveringCanvas();
-        _hoveringSheet = true;
-        StopHoveringSheet();
     }
 
     private void Send(PointableElement target, PointerEventType type, Vector3 point) =>

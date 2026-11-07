@@ -2,6 +2,11 @@ Shader "Custom/SheetVertexColor"
 {
     Properties
     {
+        _Grow ("Grow", Range(0, 1)) = 1
+        _BaseY ("Base Y", Float) = 0
+        _Shaded ("Shaded", Range(0, 1)) = 1
+        _Alpha ("Alpha", Range(0, 1)) = 1
+        _ColorMask ("Color Mask", Float) = 15
         [Enum(UnityEngine.Rendering.BlendMode)] _SrcBlend ("Src Blend", Float) = 1
         [Enum(UnityEngine.Rendering.BlendMode)] _DstBlend ("Dst Blend", Float) = 0
         [Enum(Off, 0, On, 1)] _ZWrite ("Z Write", Float) = 1
@@ -25,6 +30,7 @@ Shader "Custom/SheetVertexColor"
             Blend [_SrcBlend] [_DstBlend]
             ZWrite [_ZWrite]
             Cull [_Cull]
+            ColorMask [_ColorMask]
 
             HLSLPROGRAM
             #pragma vertex vert
@@ -32,6 +38,13 @@ Shader "Custom/SheetVertexColor"
             #pragma multi_compile_instancing
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+
+            CBUFFER_START(UnityPerMaterial)
+                float _Grow;
+                float _BaseY;
+                float _Shaded;
+                float _Alpha;
+            CBUFFER_END
 
             struct Attributes
             {
@@ -52,8 +65,11 @@ Shader "Custom/SheetVertexColor"
                 Varyings output;
                 UNITY_SETUP_INSTANCE_ID(input);
                 UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
-                output.positionCS = TransformObjectToHClip(input.positionOS.xyz);
-                output.color = input.color;
+                float3 position = input.positionOS.xyz;
+                position.y = lerp(_BaseY, position.y, _Grow);
+                output.positionCS = TransformObjectToHClip(position);
+                half alpha = (half)_Alpha;
+                output.color = half4(input.color.rgb * lerp((half)1.0, input.color.a, (half)_Shaded) * alpha, alpha);
                 return output;
             }
 

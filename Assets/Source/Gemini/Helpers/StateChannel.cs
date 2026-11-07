@@ -67,7 +67,6 @@ public static class StateChannel
         _agentBatch.Clear();
         _agentDepth = 0;
         _snapshotWanted = false;
-        StalePositions.ClearAll();
     }
 
     public static void RequestSnapshot()

@@ -25,6 +25,11 @@ public class Recenter : MonoBehaviour
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void Create() => Spawn.Once(ref _instance);
 
+    public static void Request()
+    {
+        if (_instance != null) _instance._pending = true;
+    }
+
     public static void NoteHome()
     {
         if (_hasHome) return;

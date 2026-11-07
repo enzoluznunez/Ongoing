@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using Google.GenAI.Types;
+using GeminiLive;
 using UnityEngine;
 
 public sealed class CallRotateTool : AgenticTool<CallRotateTool.Args> {
@@ -9,11 +9,11 @@ public sealed class CallRotateTool : AgenticTool<CallRotateTool.Args> {
     private const float MaxDegrees = 3600f;
 
     public class Args {
-        [Doc("'by' turns the sheet a set amount, 'face' squares it to the user so its columns run left to right, " +
+        [Doc("'by' turns the chart a set amount, 'face' squares it to the user so its columns run left to right, " +
              "'reset' returns it to the orientation it was built with. Defaults to 'by'."),
          Values("by", "face", "reset"), Optional]
         public string mode;
-        [Doc("For 'by': which way to turn the sheet, seen from above from the user's point of view; " +
+        [Doc("For 'by': which way to turn the chart, seen from above from the user's point of view; " +
              "'right' is clockwise, 'left' is counterclockwise."), Optional]
         public string direction;
         [Doc("For 'by': how far to turn, in degrees. More than a full turn is fine; it is reduced to the equivalent turn, so 730 becomes 10."), Limits(1, 3600), DefaultsTo(90), Optional]
@@ -24,9 +24,9 @@ public sealed class CallRotateTool : AgenticTool<CallRotateTool.Args> {
 
     public override FunctionDeclaration Declaration => new FunctionDeclaration {
         Name = "CallRotateTool",
-        Description = "Turn the sheet about the upright axis, as if the user grabbed it with both hands and " +
+        Description = "Turn the chart about the upright axis, as if the user grabbed it with both hands and " +
                       "twisted. Mode 'by' is the default and also needs 'direction'; modes 'face' (square it to the " +
-                      "user) and 'reset' (undo any twisting) take neither 'direction' nor 'degrees'. The sheet spins in " +
+                      "user) and 'reset' (undo any twisting) take neither 'direction' nor 'degrees'. The chart spins in " +
                       "place; its position is unchanged.",
         Parameters = ParametersFor(typeof(Args))
     };
@@ -36,23 +36,23 @@ public sealed class CallRotateTool : AgenticTool<CallRotateTool.Args> {
 
         string mode = args.mode ?? "by";
 
-        if (!TryResolveSheet(result, "rotate", out var mgr, out var sheet)) return;
+        if (!TryResolveChart(result, "rotate", out var mgr, out var chart)) return;
 
-        Apply(mgr, sheet, mode, args, result);
+        Apply(mgr, chart, mode, args, result);
     }
 
-    private static void Apply(ManageSheets mgr, CreateSheet sheet, string mode, Args args, Dictionary<string, object> step) {
+    private static void Apply(ManageCharts mgr, ChartView chart, string mode, Args args, Dictionary<string, object> step) {
         switch (mode) {
-            case "by": By(mgr, sheet, args, step); break;
-            case "face": Face(mgr, sheet, step); break;
+            case "by": By(mgr, chart, args, step); break;
+            case "face": Face(mgr, chart, step); break;
             case "reset":
-                ApplyPieceTransform(mgr, sheet, t => t.localRotation = Quaternion.identity);
+                ApplyChartTransform(mgr, chart, t => t.localRotation = Quaternion.identity);
                 step["rotated"] = "reset";
                 break;
         }
     }
 
-    private static void By(ManageSheets mgr, CreateSheet sheet, Args args, Dictionary<string, object> result) {
+    private static void By(ManageCharts mgr, ChartView chart, Args args, Dictionary<string, object> result) {
         string direction = args.direction?.Trim().ToLowerInvariant();
         if (!TryTurnSign(direction, out float sign)) {
             NeedChoice(result, "direction", new List<string> { "left", "right" },
@@ -68,26 +68,26 @@ public sealed class CallRotateTool : AgenticTool<CallRotateTool.Args> {
         if (degrees < 0.05f) {
             result["degrees"] = 0;
             result["note"] = asked >= 360f
-                ? $"{Math.Round(asked, 1)} degrees is a whole number of full turns, so the sheet ends where it started."
+                ? $"{Math.Round(asked, 1)} degrees is a whole number of full turns, so the chart ends where it started."
                 : "That is too small a turn to see.";
             return;
         }
 
-        ApplyPieceTransform(mgr, sheet, t =>
+        ApplyChartTransform(mgr, chart, t =>
             t.rotation = Quaternion.AngleAxis(sign * degrees, Vector3.up) * t.rotation);
 
         result["rotated"] = direction;
         result["degrees"] = Math.Round(degrees, 1);
     }
 
-    private static void Face(ManageSheets mgr, CreateSheet sheet, Dictionary<string, object> result) {
+    private static void Face(ManageCharts mgr, ChartView chart, Dictionary<string, object> result) {
         Transform cam = CameraRig.MainTransform;
         if (cam == null) { result["error"] = "The user's viewpoint could not be found."; return; }
 
         Vector3 forward = CameraRig.Flatten(cam.forward, Vector3.zero);
         if (forward == Vector3.zero) { result["error"] = "The user is looking straight up or down."; return; }
 
-        ApplyPieceTransform(mgr, sheet, t => t.rotation = Quaternion.LookRotation(forward, Vector3.up));
+        ApplyChartTransform(mgr, chart, t => t.rotation = Quaternion.LookRotation(forward, Vector3.up));
         result["rotated"] = "face";
     }
 }

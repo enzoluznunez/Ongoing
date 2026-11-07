@@ -1,5 +1,6 @@
 using System;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 public enum ToolType { None, Filter, Move, Sort, Rotate, Scale, Profile }
 
@@ -9,18 +10,21 @@ public class ManageTools : MonoBehaviour
 
     public event Action<ToolType> OnToolReset;
 
-    public ManageSheets sheetManager;
-
+    [FormerlySerializedAs("sheetManager")] public ManageCharts chartManager;
 
     public ToolType SelectedTool { get; private set; } = ToolType.None;
 
+    public static bool OnHold(ToolType tool) =>
+        tool == ToolType.Sort || tool == ToolType.Filter || tool == ToolType.Profile;
+
     private void Start()
     {
-        if (sheetManager == null) sheetManager = Scene.Sheets;
+        if (chartManager == null) chartManager = Scene.Charts;
     }
 
     public void SelectTool(ToolType tool)
     {
+        if (OnHold(tool)) return;
         if (StateChannel.UserDriven) AgentTurn.UserTookControl();
         ToolType next = SelectedTool == tool ? ToolType.None : tool;
         if (next == SelectedTool) return;
@@ -64,96 +68,55 @@ public class ManageTools : MonoBehaviour
     public void ResetTool(ToolType tool)
     {
         OnToolReset?.Invoke(tool);
-        if (TryEditKindOf(tool, out EditKind kind)) ManageDatasets.ActiveEdits.DropKind(kind);
-        if (sheetManager != null) sheetManager.SyncProjectionToStack();
+        if (TryEditKindOf(tool, out EditKind kind)) ManageCharts.ActiveEdits.DropKind(kind);
     }
 
     private static bool TryEditKindOf(ToolType tool, out EditKind kind) =>
         Enum.TryParse(tool.ToString(), out kind);
 
-    private ManageSheets.UndoResult UndoTop(out string kindName)
-    {
-        Edit rec = ManageDatasets.ActiveEdits.Peek();
-        kindName = rec != null ? Edit.KindName(rec.kind) : null;
-
-        if (rec == null) return ManageSheets.UndoResult.Stale;
-        if (sheetManager == null) return ManageSheets.UndoResult.Unreachable;
-
-        ManageSheets.UndoResult outcome = sheetManager.Undo(rec);
-        if (outcome != ManageSheets.UndoResult.Unreachable)
-        {
-            ManageDatasets.ActiveEdits.Pop();
-            sheetManager.SyncProjectionToStack(StateChannel.InAgentCall);
-        }
-        return outcome;
-    }
-
     public bool Undo()
     {
-        Edit top = ManageDatasets.ActiveEdits.Peek();
+        EditList edits = ManageCharts.ActiveEdits;
+        Edit top = edits.Peek();
         if (top == null) return false;
 
-        if (top.kind == EditKind.Sort)
+        string kindName = Edit.KindName(top.kind);
+        int inGroup = edits.TopGroupSize();
+        bool applied = chartManager != null && chartManager.Undo(top);
+        edits.Pop();
+
+        if (!applied)
         {
-            SortTool sort = Scene.Sort;
-            if (sort != null) sort.HaltOrderSequence();
+            Debug.LogWarning($"[ManageTools] {kindName} undo no longer matches the scene; the record was dropped.");
+            return false;
         }
 
-        int inGroup = ManageDatasets.ActiveEdits.TopGroupSize();
-
-        bool sortRows = false, sortColumns = false;
-        for (int i = ManageDatasets.ActiveEdits.Count - inGroup; i < ManageDatasets.ActiveEdits.Count; i++)
+        for (int i = 1; i < inGroup; i++)
         {
-            if (i < 0) continue;
-            Edit rec = ManageDatasets.ActiveEdits[i];
-            if (rec.kind != EditKind.Sort) continue;
-            if (rec.reorderIsColumn) sortColumns = true;
-            else sortRows = true;
+            Edit next = edits.Pop();
+            if (next != null && chartManager != null) chartManager.Undo(next);
         }
 
-        switch (UndoTop(out string kindName))
-        {
-            case ManageSheets.UndoResult.Applied:
-                for (int i = 1; i < inGroup; i++)
-                    if (UndoTop(out _) == ManageSheets.UndoResult.Unreachable) break;
-                if (sortRows) StalePositions.MarkDirty(false);
-                if (sortColumns) StalePositions.MarkDirty(true);
-                StateChannel.Record(inGroup > 1
-                    ? $"undid the {kindName} edit ({inGroup} steps, one action)"
-                    : $"undid the {kindName} edit");
-                return true;
-
-            case ManageSheets.UndoResult.Unreachable:
-                Debug.LogWarning($"[ManageTools] {kindName} undo could not run; the record was kept.");
-                return false;
-
-            default:
-                Debug.LogWarning($"[ManageTools] {kindName} undo no longer matches the scene; the record was dropped.");
-                return false;
-        }
+        StateChannel.Record(inGroup > 1
+            ? $"undid the {kindName} edit ({inGroup} steps, one action)"
+            : $"undid the {kindName} edit");
+        return true;
     }
 
     public void UndoAll()
     {
-        int had = ManageDatasets.ActiveEdits.Count;
+        EditList edits = ManageCharts.ActiveEdits;
+        int had = edits.Count;
 
-        bool hadSort = false;
-        for (int i = 0; i < had; i++)
-            if (ManageDatasets.ActiveEdits[i].kind == EditKind.Sort) { hadSort = true; break; }
-
-        for (int i = 0; i < had && ManageDatasets.ActiveEdits.Peek() != null; i++)
-            if (UndoTop(out _) == ManageSheets.UndoResult.Unreachable) break;
-
-        foreach (ToolType tool in System.Enum.GetValues(typeof(ToolType)))
-            if (tool != ToolType.None) OnToolReset?.Invoke(tool);
-
-        ManageDatasets.ActiveEdits.Clear();
-        if (sheetManager != null) sheetManager.SyncProjectionToStack();
-        if (hadSort)
+        while (edits.Peek() != null)
         {
-            StalePositions.MarkDirty(false);
-            StalePositions.MarkDirty(true);
+            Edit top = edits.Pop();
+            if (chartManager != null) chartManager.Undo(top);
         }
+
+        foreach (ToolType tool in Enum.GetValues(typeof(ToolType)))
+            if (tool != ToolType.None && !OnHold(tool)) OnToolReset?.Invoke(tool);
+
         if (had > 0) StateChannel.Record($"undid all {had} edits");
     }
 }

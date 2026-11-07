@@ -6,11 +6,11 @@ public class MoveTool : GrabTool
 
     protected override bool ReattachOnReset => true;
 
-    protected override string Describe(float distance) => $"moved the sheet {distance:0.00}m";
+    protected override string Describe(float distance) => $"moved the chart {distance:0.00}m";
 
     protected override void Arm()
     {
-        sheetManager.SetOneGrab();
-        sheetManager.SetGrabbable(true);
+        chartManager.SetOneGrab();
+        chartManager.SetGrabbable(true);
     }
 }

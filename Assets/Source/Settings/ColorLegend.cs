@@ -7,7 +7,7 @@ public abstract class ColorLegend
 {
     public abstract void Build(RectTransform parent);
 
-    public static ColorLegend For(DataSource data) => DiscreteLegend.Of(data);
+    public static ColorLegend For(ChartGeometry geometry) => DiscreteLegend.Of(geometry);
 }
 
 public sealed class DiscreteLegend : ColorLegend
@@ -16,41 +16,21 @@ public sealed class DiscreteLegend : ColorLegend
 
     private const int Columns = 2;
 
-    public static DiscreteLegend Of(DataSource data)
+    public float Width;
+    public string Title;
+
+    public static DiscreteLegend Of(ChartGeometry geometry)
     {
         var legend = new DiscreteLegend();
-        if (data == null || !data.IsLoaded || !data.HasRowCategories) return legend;
-
-        bool national = ColorModes.IsNational(data);
-        bool others = false;
-        var seen = new HashSet<string>();
-
-        for (int row = 0; row < data.RowCount; row++)
+        if (geometry == null) return legend;
+        legend.Title = geometry.LegendTitle;
+        foreach (LegendEntry entry in geometry.Legend)
         {
-            Color source = data.RowColorAt(row);
-            if (CreateSheet.Uncoloured(source) || ColorModes.IsGrey(source)) { others = true; continue; }
-
-            string label = national ? RegionOf(source) ?? data.RowCategoryAt(row) : data.RowCategoryAt(row);
-            if (string.IsNullOrEmpty(label) || !seen.Add(label)) continue;
-            legend.Entries.Add((ColorModes.RowColor(data, row), label));
+            Color top = entry.slot < 0 ? Color.white : ColorModes.ColorAt(entry.slot);
+            legend.Entries.Add((Color.Lerp(Color.black, top, entry.shade), entry.label));
         }
-
-        if (others) legend.Entries.Add((OtherGrey, Strings.Get("colorkey.other")));
         return legend;
     }
-
-    private static string RegionOf(Color source)
-    {
-        Color32 s = source;
-        for (int i = 0; i < ColorModes.RegionCount; i++)
-        {
-            Color32 r = ColorModes.RegionColor(i);
-            if (r.r == s.r && r.g == s.g && r.b == s.b) return ColorModes.RegionName(i);
-        }
-        return null;
-    }
-
-    private static readonly Color OtherGrey = new Color(0.5f, 0.5f, 0.5f);
 
     public override void Build(RectTransform parent)
     {
@@ -64,13 +44,20 @@ public sealed class DiscreteLegend : ColorLegend
             return;
         }
 
+        if (!string.IsNullOrEmpty(Title))
+        {
+            TextMeshProUGUI title = UILabel.Make(parent, "KeyTitle", Style.Black,
+                TextAlignmentOptions.Left, TextOverflowModes.Overflow, wrap: true);
+            title.text = Title;
+        }
+
         RectTransform swatches = UILayout.EnsureChild(parent, "Swatches");
         GridLayoutGroup grid = UILayout.Ensure<GridLayoutGroup>(swatches.gameObject);
         grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
         grid.constraintCount = Columns;
         grid.spacing = new Vector2(Style.SmallPadding, Style.SmallPadding);
         grid.childAlignment = TextAnchor.UpperLeft;
-        float width = Style.Panel.x - Style.PanelInset * 2f - Style.SmallBorder * 2f;
+        float width = Width > 0f ? Width : Style.Panel.x - Style.PanelInset * 2f - Style.SmallBorder * 2f;
         grid.cellSize = new Vector2((width - Style.SmallPadding * (Columns - 1)) / Columns, Style.Button.y);
 
         for (int i = 0; i < Entries.Count; i++) AddEntry(swatches, i, Entries[i].color, Entries[i].label);

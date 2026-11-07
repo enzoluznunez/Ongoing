@@ -1,5 +1,5 @@
 using System.Collections.Generic;
-using Google.GenAI.Types;
+using GeminiLive;
 using UnityEngine;
 
 public sealed class CallScaleTool : AgenticTool<CallScaleTool.Args> {
@@ -9,7 +9,7 @@ public sealed class CallScaleTool : AgenticTool<CallScaleTool.Args> {
     private const float MaxPercent = 100f;
 
     public class Args {
-        [Doc("'enlarge' makes the sheet bigger, 'shrink' makes it smaller.")]
+        [Doc("'enlarge' makes the chart bigger, 'shrink' makes it smaller.")]
         [Values("enlarge", "shrink")]
         public string direction;
         [Doc("How much to resize, as a percentage of the current size. Shrink by 42 leaves it at 58 percent; enlarge by 42 leaves it at 142 percent. Enlarge by 100 doubles it.")]
@@ -21,7 +21,7 @@ public sealed class CallScaleTool : AgenticTool<CallScaleTool.Args> {
 
     public override FunctionDeclaration Declaration => new FunctionDeclaration {
         Name = "CallScaleTool",
-        Description = "Resize the sheet, as if the user grabbed it with both hands and moved them apart to enlarge " +
+        Description = "Resize the chart, as if the user grabbed it with both hands and moved them apart to enlarge " +
                       "or together to shrink. Its built size is scale 1. It never goes above 1.25 times that, and never " +
                       "shrinks below 0.75 times it, the same limits the user's hands have, so 'scale' in the result is " +
                       "the size it actually reached.",
@@ -42,12 +42,12 @@ public sealed class CallScaleTool : AgenticTool<CallScaleTool.Args> {
             t.localScale = new Vector3(v, v, v);
         };
 
-        if (!TryResolveSheet(result, "resize", out var mgr, out var sheet)) return;
+        if (!TryResolveChart(result, "resize", out var mgr, out var chart)) return;
 
-        var pre = ApplyPieceTransform(mgr, sheet, resize);
+        var pre = ApplyChartTransform(mgr, chart, resize);
 
         float before = pre.scale.x;
-        mgr.GetCommittedPose(sheet, out _, out _, out Vector3 nowScale);
+        mgr.GetCommittedPose(chart, out _, out _, out Vector3 nowScale);
         float after = nowScale.x;
 
         result["resized"] = direction;
@@ -55,6 +55,6 @@ public sealed class CallScaleTool : AgenticTool<CallScaleTool.Args> {
         result["scaleBefore"] = System.Math.Round(before, 3);
         result["scale"] = System.Math.Round(after, 3);
         if (Mathf.Abs(after - before * mult) > 1e-3f)
-            result["note"] = "The sheet reached its size limit and changed less than asked.";
+            result["note"] = "The chart reached its size limit and changed less than asked.";
     }
 }

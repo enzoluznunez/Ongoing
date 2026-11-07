@@ -1,10 +1,13 @@
 # Ongoing
 
-A mixed-reality data visualization for Meta Quest 3, built in Unity, for exploring
-cyberattacks on publicly traded US companies. In passthrough, a 3D bar chart of breach
-data (the **sheet**) stands in front of you, showing the breaches in the whole country, one
-of its six regions or one of their metros. You reshape the sheet with your hands, and a
-voice assistant can drive the same tools and open any place's sheet.
+A mixed-reality data visualization for Meta Quest 3, built in Unity. In passthrough, a 3D
+chart stands in front of you. You place it with your hands, and a voice assistant can move
+it, open other charts and answer questions about its data.
+
+The project is growing toward twelve chart types on one engine: bar, surface, ridgeline,
+volume, trajectory, vector field, scatter, histogram, pie, treemap, network and Sankey.
+Bar, histogram, scatter, treemap, vector field and network are built on that engine today;
+the datasets for the others are in place.
 
 - [What you will see](#what-you-will-see)
 - [Using the app](#using-the-app)
@@ -13,20 +16,17 @@ voice assistant can drive the same tools and open any place's sheet.
 
 ## What you will see
 
-When the app starts, a **Loading** line floats ahead of you while every sheet is fetched
-and prepared. When it finishes, the **sheet** for the whole United States appears in front
-of you.
+When the app starts, a **Loading** line floats ahead of you while the first chart is read
+and built. When it finishes, the chart named by `start` in the catalog rises in front of you.
 
-The sheet has one row per breach, titled by the company's ticker and disclosure date, and a
-column for each of six figures: revenue, net income, assets, book value, market cap and
-stock price. Each bar is as tall as that figure's place among every US breach, so bars
-compare across every sheet.
-
-There is a sheet for the United States, one for each of its six regions, and one for each
-metro. A metro is a city, or several neighbouring cities merged into one and named after
-the largest. On the United States sheet each row is coloured by its region; on a region's
-or a metro's sheet, by its metro. Each region colours its ten largest metros; the rest are
-drawn in greys. To open another place's sheet, ask the assistant ("show me the West").
+| Chart | Dataset | How it reads |
+|---|---|---|
+| **Bar** | Quarterly revenue review | One row per region, one column per quarter; height and colour both show revenue |
+| **Histogram** | Web engagement analysis | Sessions counted by length and pages viewed; taller and brighter means more |
+| **Scatter** | Customer segmentation | One sphere per customer, placed by recency, order frequency and order value (vertical), sized by lifetime value, coloured by segment |
+| **Treemap** | Product portfolio profitability | One tile per product line: area is revenue share, height is operating margin, colour is segment |
+| **Vector field** | Wind and airflow modeling | One arrow per point, pointing with the wind; longer and brighter is faster |
+| **Network** | Team collaboration mapping | One sphere per person, coloured by team and sized by how many ties they have, with a beam for each tie |
 
 ## Using the app
 
@@ -44,83 +44,104 @@ whenever it is tracked:
 - **Tool Panel** opens and closes the tool panel.
 
 A button is filled black while its panel is open. A panel opens ahead of you, beside the
-other when that one is open. The sheet belongs to neither panel; it stays up whichever is
+other when that one is open. The chart belongs to neither panel; it stays up whichever is
 open.
 
 ### Settings
 
-Each tile shows a setting and what it is set to. Settings are kept between sessions.
+Each row shows a setting and its value. Poke `<` or `>` to step through its options, and
+scroll the list by dragging it. A subpanel below explains the row you last changed. Settings
+are kept between sessions.
 
-| Setting | Options | Default |
-|---|---|---|
-| **Animations** | On, Off. Off makes everything land in place at once instead of moving there | On |
-| **Sound Effects** | On, Off. The click a press makes | On |
-| **Handedness** | Left, Right. Which hand the wrist buttons float over | Left |
-| **Text Size** | Small, Medium, Large. Panel and button text; the panels keep their size | Large |
-| **Color Mode** | Standard, Red-Green, Blue-Yellow. Palettes for red-green and blue-yellow colour blindness | Standard |
-| **Language Mode** | English, Español. The app's text and the assistant's language | English |
-| **Voice Assistant's Explanation Level** | Simple, Standard, Expert. How simply or technically the assistant explains | Standard |
-
-Poke **Animations** or **Sound Effects** to switch it; it is filled black while on. Poke any
-other tile to drop a list of its options and poke one to choose it. Choosing a Color Mode
-also drops the **Color Mode** subpanel under the grid: a swatch for each colour on the open
-sheet and what it stands for. Poke another tile, or close the panel, to put it away.
+| Group | Setting | Options | Default |
+|---|---|---|---|
+| Interface | **Animations** | On, Off | On |
+| | **Sound Effects** | On, Off | On |
+| | **Sound Volume** | 25%, 50%, 75%, 100% | 100% |
+| | **Handedness** | Left, Right. Which hand the wrist buttons float over | Left |
+| | **Text Size** | Small, Medium, Large. Panel and button text | Large |
+| | **Panel Contrast** | Standard, High. Bolder text and clearer greyed-out rows | Standard |
+| | **Language Mode** | English, Español | English |
+| Chart Parts | **Backdrop** | On, Off. A floor and two back walls that swap sides to stay behind the chart | On |
+| | **Backdrop Gridlines** | On, Off | On |
+| | **Ticker Labels** | On, Off. Values and names along the axes, and names on tiles and people | On |
+| | **Axis Labels** | On, Off | On |
+| | **Chart Key** | On, Off. On a card beside the chart | On |
+| | **Chart Description** | On, Off. The title and what the chart shows, on the same card | On |
+| Chart Look | **Chart Style** | Solid, Shaded | Shaded |
+| | **Chart Opacity** | 25%, 50%, 75%, 100% | 100% |
+| | **Backdrop Opacity** | Low, Medium, High | Medium |
+| | **Chart Label Size** | Small, Medium, Large | Medium |
+| | **Chart Theme** | Dark, Light. Light uses dark labels on a pale backdrop for bright rooms | Dark |
+| | **Color Mode** | Standard, Red-Green, Blue-Yellow. The subpanel keys the open chart's colours | Standard |
+| Comfort and Accessibility | **Default Chart Size** | 75%, 100%, 125% | 100% |
+| | **Motion Speed** | Slow, Normal, Fast | Normal |
+| | **Chart Height** | Low, Medium, High. Low suits sitting | Medium |
+| | **Open Distance** | Near, Normal, Far. For charts and panels | Normal |
+| | **Captions** | On, Off. What you and the assistant say, in a bar low in your view | Off |
+| Voice Assistant | **Explanation Level** | Simple, Standard, Expert | Standard |
+| | **Assistant Speed** | 0.5 m/s, 1 m/s, Instant | 0.5 m/s |
+| | **Assistant Voice** | Charon, Puck, Kore, Aoede, Fenrir. Changing it starts a new conversation | Charon |
+| | **Assistant Volume** | 25%, 50%, 75%, 100% | 100% |
+| | **Web Search** | On, Off. Changing it starts a new conversation | On |
+| Data | **Number Format** | Short (12.5k), Full (12,500) | Short |
+| | **Network Labels** | Hubs only, Everyone | Hubs only |
+| | **Startup Chart** | Default, or any chart in the catalog | Default |
+| App | **Recenter** | Run. Brings the layout back in front of you | |
+| | **Reset All Settings** | Run. Puts every setting back to its default | |
 
 ### The tool panel
 
 The panel is titled **Tools**. Pinch it to carry it, or pinch with both hands and twist to
 turn it.
 
-Poke a tool to select it; poke it again to put it down. Each tool's subpanel describes it
-in a sentence.
+Each tool is a row: poke `<` or `>` to switch it on, and again to put it down. While a tool
+is on, the subpanel to the right lists how to use it step by step, with an image under each
+step, and the subpanel below describes it. **Undo** and **Undo All** are rows too.
 
 | Tool | What it does | How |
 |---|---|---|
-| **Move** | Moves the sheet anywhere in the room | Pinch the sheet with one hand and carry it |
-| **Rotate** | Turns the sheet to face any direction | Pinch it with both hands and twist |
-| **Scale** | Makes the sheet larger or smaller, from 75% to 125% of its starting size | Pinch it with both hands and move them apart or together |
-| **Profile** | Raises rows or columns above the sheet so they stand out | Press a bar, then sweep your fingertip along the row or column. Do it again on a raised line to lower it |
-| **Sort** | Reorders the rows and columns | Pinch low on the bars to take a row, high on the bars to take a column, and slide it to its new place |
-| **Filter** | Hides or shows rows and columns | Poke low on the bars to hide that row, high to hide that column. Poke the empty place where it stood to bring it back |
+| **Move** | Moves the chart anywhere in the room | Pinch the chart with one hand and carry it |
+| **Rotate** | Turns the chart to face any direction | Pinch it with both hands and twist |
+| **Scale** | Makes the chart larger or smaller, from 75% to 125% of its starting size | Pinch it with both hands and move them apart or together |
 | **Assistant** | Turns the voice assistant on or off | See below |
 
-**Undo** reverses the last change; **Undo All** reverses every change to the current
-sheet. Each sheet keeps its own changes, so switching to another sheet and back finds it
-as you left it.
+**Sort**, **Filter** and **Profile** are greyed out for now, until their behaviour on each
+chart type is decided.
+
+**Undo** reverses the last change; **Undo All** reverses every change to the current chart.
+Each chart keeps its own changes, so switching to another chart and back finds it as you
+left it.
 
 ### The voice assistant
 
 Poke **Assistant** on the tool panel and allow the microphone when asked. While the
 button is filled black it is listening; speak naturally. It can:
 
-- Open any place's sheet ("show me the West", "open the Seattle metro").
-- Use every tool ("sort the rows by market cap", "hide net income", "raise the third row").
-- Answer questions about what is on the sheet: counts, averages, totals, comparisons.
+- Move, turn and resize the chart ("move it a bit to the left").
+- Open another chart ("show me the customer segmentation").
+- Answer questions about the open chart's data: totals, averages, counts, comparisons.
 - Open and close the tool panel and place it.
 
-The assistant's subpanel has a speed setting for its changes: **0.5 m/s**, **1 m/s** or
-**Instant**. Poke **Assistant** again to turn it off.
+Its speed, voice and volume are in Settings. Poke **Assistant** again to turn it off.
 
 ### Pointing from a distance
 
 Both hands always have a ray, alongside poke; there is nothing to switch on. A white line
 and dot appear while a hand points at something it can use: a panel, a wrist button, or the
-sheet while a tool is selected. Bring your hand within about 12 cm and the ray gives way
+chart while a tool is selected. Bring your hand within about 12 cm and the ray gives way
 to poke and grab. Pinch to press; the dot turns black while you hold.
 
 | Pointing at | What a pinch does |
 |---|---|
 | A button or tile | Presses it when you let go |
 | A panel, away from its buttons | Carries it at the same distance as your ray moves. Use both hands to turn it |
-| The sheet, with **Move** | Carries it the same way |
-| The sheet, with **Rotate** or **Scale** | Pinch it with both rays, then twist or move them apart |
-| A bar, with **Profile** | Press, sweep along the row or column, and let go |
-| A bar, with **Sort** | The lower half of the bar takes its row, the upper half its column; move the ray to slide it |
-| A bar, with **Filter** | The lower half of the bar hides its row, the upper half its column. Pinch the empty place where one stood to bring it back |
+| The chart, with **Move** | Carries it the same way |
+| The chart, with **Rotate** or **Scale** | Pinch it with both rays, then twist or move them apart |
 
 ### Putting things back in front of you
 
-The sheet and the tool panel stay where you leave them. If you take the headset off for five seconds
+The chart and the tool panel stay where you leave them. If you take the headset off for five seconds
 or more, or recenter from the Quest menu (hold the Meta button), the view turns and
 shifts so the layout is in front of you again, at the height it first opened at.
 
@@ -157,33 +178,26 @@ shifts so the layout is in front of you again, at the height it first opened at.
    with 6000.6.8f1.
 3. Open `Assets/Scenes/Main.unity`.
 
-### Add the datasets
+### The charts and their data
 
 Everything the app shows is read from files in `Assets/StreamingAssets`, packed into the
 build; nothing is fetched from a server.
 
 ```
 Assets/StreamingAssets/
-  map.json                  regions, their colours, and every city's metro and colour
-  Sheets/United States.csv  the national sheet
-  Sheets/<region>.csv       one per region in map.json, such as "US West.csv"
-  Sheets/<metro>.csv        one per metro in map.json, such as "Boston.csv"
+  Charts/catalog.json    the charts that can be opened: dataset, blueprint, and which
+                         data column drives which part of the chart
+  Blueprints/<kind>.json one chart type: the channels it needs and its layout settings
+  <name>.csv             the datasets, with a header row
 ```
 
-`map.json` is `{"regions": [{"region", "color", "breaches"}], "cities": [{"city",
-"region", "metro", "color", "lat", "lon", "breaches", "charted"}]}`, colours as `#rrggbb`.
-A sheet is a CSV whose first header cell is `Rows / Columns`; an ordinary CSV works, and
-optional leading `#metro`, `#city`, `#color` and `#heights` lines add row colours and
-bar heights.
+Step images for the tool panel go in `Assets/Resources/ToolSteps`, named like `Move_1`, as
+sprites. A step with no image shows an empty frame.
 
-To generate all of it from the `Cyberattack-Platform` backend's local exports in
-`Backend/data`, using that backend's virtual environment, run this from the project root:
-
-```
-../Cyberattack-Platform/Backend/.venv/bin/python Tools/export_sheets.py
-```
-
-Git ignores the generated files, as it does the exports they come from.
+To add a chart, add its CSV and a catalog entry: its `blueprint` (a file in `Blueprints`) and
+an `encoding` that gives a data column for each channel that blueprint lists, plus optional
+`titles` for its axes. `start` in the catalog names the chart that opens first, unless **Startup Chart** in
+Settings picks another.
 
 ### Add your Gemini API key
 
@@ -203,22 +217,13 @@ Without it everything works except the assistant, which turns itself off when st
 4. In the headset, accept the microphone prompt. Denying it leaves everything working
    except the assistant.
 
-You are done when the loading line finishes and the United States sheet stands in front
-of you in passthrough. A **No Sheets** notice means `Assets/StreamingAssets/map.json` was
+You are done when the loading line finishes and the chart stands in front of you in
+passthrough. A **No Charts** notice means `Assets/StreamingAssets/Charts/catalog.json` was
 missing when the app was built, not that the build failed.
 
 ## FAQ
 
 ### Getting started
-
-**What is this for?**
-Seeing, side by side, where breaches at publicly traded US companies happened and how
-those companies compared financially when they were breached. Each sheet is one place's
-breaches; its bars show the figures.
-
-**Where does the data come from?**
-For now, placeholder datasets in `Assets/StreamingAssets` (see
-[Add the datasets](#add-the-datasets)).
 
 **Do I need to know Unity to use it?**
 No. Setting up a build needs Unity once; using the app needs only the headset.
@@ -231,45 +236,21 @@ Yes. Everything opens at the height of your head when it first appears. If you c
 between sitting and standing, take the headset off for five seconds or recenter, and the
 layout comes back to eye level.
 
-**Why does it take a few seconds to start?**
-The loading line reads every sheet and builds everything it needs up front, so that
-nothing has to load or be built while you are using the app. Switching between sheets is
-smooth because of it.
-
-### The sheet
+### The chart
 
 **What does a bar's height mean?**
-Where that figure ranks among every US breach. A tall bar is near the top of all US
-breaches for that figure, not just the top of this sheet, so the same company looks the
-same on every sheet.
+Its value, summed if the data has several rows for that bar, scaled so the largest bar is
+full height.
+
+**Why are only some people named on the network?**
+Only hubs are labelled: people with far more ties than the rest.
 
 **What do the colours mean?**
-On a region's or a metro's sheet, each row is its metro's colour. On the United States
-sheet, each row is its region's colour. Each region colours only its ten largest metros,
-so the colours stay easy to tell apart; the rest are grey. Within a row, brighter bars
-rank higher.
+Whichever column the catalog names as `color`. The key is on the card beside the chart.
 
-**I cannot grab the sheet.**
+**I cannot grab the chart.**
 Select Move, Rotate or Scale on the tool panel first. With any other tool, or none, the
-sheet stays put so it is not moved by accident.
-
-**I moved the sheet. Where does the next one open?**
-Each sheet remembers its own moves. One you have moved opens where you left it; one you
-have not opens where the first sheet appeared.
-
-**Why does the sheet sink and rise when I switch?**
-The old sheet sinks away and the new one rises in the same place, so you can see the
-switch happen.
-
-### The tools
-
-**How does Filter know whether I mean a row or a column?**
-By height: poking low on the bars means the row, high means the column. Poking just past
-the end of a row or column always means that line.
-
-**How long do raised lines stay up?**
-Until you lower them, even when you change tools. For a raised line's average, minimum,
-maximum or sum, ask the assistant.
+chart stays put so it is not moved by accident.
 
 ### The assistant
 
@@ -279,12 +260,12 @@ conversation grew too long for it to hold. Poke Assistant to start a fresh conve
 
 ### Troubleshooting
 
-**The app says "No Sheets" and nothing loads.**
-`Assets/StreamingAssets/map.json` was missing or unreadable when the app was built.
+**The app says "No Charts" and nothing loads.**
+`Assets/StreamingAssets/Charts/catalog.json` was missing or unreadable when the app was built.
 
-**A "Sheet Unavailable" notice appeared.**
-That one sheet's file in `Assets/StreamingAssets/Sheets` is missing or could not be
-read. The current sheet stays up.
+**A "Chart Unavailable" notice appeared.**
+That chart's dataset or blueprint is missing, or its catalog entry names a column the
+dataset does not have. The notice names the problem.
 
 **The loading line never finishes.**
 It gives up waiting after 45 seconds and opens with whatever loaded.
@@ -306,5 +287,5 @@ Anything within about 2 cm of your eyes is not drawn. Lean back a little.
 Only the Gemini API, for whatever the assistant is used. The data ships with the app.
 
 **Does the app store anything about me?**
-No. It reads breach data, and sends your speech to the assistant only while the assistant
+No. It reads the bundled data, and sends your speech to the assistant only while the assistant
 is on.

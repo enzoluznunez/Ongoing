@@ -1,5 +1,5 @@
 using System.Collections.Generic;
-using Google.GenAI.Types;
+using GeminiLive;
 
 public sealed class SetAssistant : AgenticTool<SetAssistant.Args> {
 

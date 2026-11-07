@@ -1,9 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
-using System.Text.Json;
-using Google.GenAI.Types;
-using GType = Google.GenAI.Types.Type;
+using GeminiLive;
+using GType = GeminiLive.Type;
 
 [AttributeUsage(AttributeTargets.Field)]
 public sealed class DocAttribute : Attribute {
@@ -189,10 +188,7 @@ public static class ToolArguments {
 
     private static Dictionary<string, object> AsMap(object value) {
         var map = new Dictionary<string, object>();
-        if (value is JsonElement je && je.ValueKind == JsonValueKind.Object) {
-            foreach (var prop in je.EnumerateObject()) map[prop.Name] = prop.Value;
-        }
-        else if (value is Dictionary<string, object> d) {
+        if (value is Dictionary<string, object> d) {
             foreach (var kv in d) map[kv.Key] = kv.Value;
         }
         return map;
@@ -202,44 +198,17 @@ public static class ToolArguments {
         if (target.IsArray || IsList(target)) return ConvertList(value, target);
 
         if (IsComplex(target)) {
-            bool isObject = (value is JsonElement obj && obj.ValueKind == JsonValueKind.Object)
-                            || value is Dictionary<string, object>;
-            if (!isObject) throw new InvalidOperationException("not an object");
+            if (!(value is Dictionary<string, object>)) throw new InvalidOperationException("not an object");
             object bound = Bind(target, AsMap(value), out string error);
             if (bound == null) throw new InvalidOperationException(error ?? "bad object");
             return bound;
         }
 
         if (target.IsEnum) {
-            string name = value is JsonElement e
-                ? (e.ValueKind == JsonValueKind.String ? e.GetString() : e.ToString())
-                : value.ToString();
-            return System.Enum.Parse(target, name.Trim(), true);
+            return System.Enum.Parse(target, LiveWire.Text(value).Trim(), true);
         }
 
-        if (value is JsonElement je) {
-            if (target == typeof(string))
-                return je.ValueKind == JsonValueKind.String ? je.GetString() : je.ToString();
-            if (target == typeof(int))
-                return je.ValueKind == JsonValueKind.Number ? je.GetInt32() : int.Parse(je.GetString());
-            if (target == typeof(long))
-                return je.ValueKind == JsonValueKind.Number ? je.GetInt64() : long.Parse(je.GetString());
-            if (target == typeof(float))
-                return je.ValueKind == JsonValueKind.Number
-                    ? (float)je.GetDouble()
-                    : float.Parse(je.GetString(), System.Globalization.CultureInfo.InvariantCulture);
-            if (target == typeof(double))
-                return je.ValueKind == JsonValueKind.Number
-                    ? je.GetDouble()
-                    : double.Parse(je.GetString(), System.Globalization.CultureInfo.InvariantCulture);
-            if (target == typeof(bool)) {
-                if (je.ValueKind == JsonValueKind.True || je.ValueKind == JsonValueKind.False) return je.GetBoolean();
-                if (je.ValueKind == JsonValueKind.Number) return je.GetInt32() != 0;
-                return bool.Parse(je.GetString());
-            }
-        }
-
-        if (target == typeof(string)) return value.ToString();
+        if (target == typeof(string)) return LiveWire.Text(value);
         return System.Convert.ChangeType(value, target, System.Globalization.CultureInfo.InvariantCulture);
     }
 
@@ -247,10 +216,7 @@ public static class ToolArguments {
         System.Type element = ElementType(target);
         var items = new List<object>();
 
-        if (value is JsonElement je && je.ValueKind == JsonValueKind.Array) {
-            foreach (var el in je.EnumerateArray()) items.Add(Convert(el, element));
-        }
-        else if (value is System.Collections.IEnumerable en && !(value is string)) {
+        if (value is System.Collections.IEnumerable en && !(value is string)) {
             foreach (var el in en) items.Add(Convert(el, element));
         }
         else {

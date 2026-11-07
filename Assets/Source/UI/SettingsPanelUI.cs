@@ -1,377 +1,191 @@
-using System.Collections;
+using System;
 using System.Collections.Generic;
-using TMPro;
-using UnityEngine;
-using UnityEngine.UI;
 
-public class SettingsPanelUI : PanelUI
+public class SettingsPanelUI : ModularPanel
 {
-    private static readonly Setting[] GridTiles =
-    {
-        Setting.Animations, Setting.SoundEffects, Setting.Handedness,
-        Setting.TextSize, Setting.ColorMode, Setting.Language,
-    };
+    private static readonly string[] Levels = { "option.Low", "option.Medium", "option.High" };
+    private static readonly string[] Sizes = { "option.Small", "option.Medium", "option.Large" };
+    private static readonly string[] Percents = { "option.P25", "option.P50", "option.P75", "option.P100" };
 
-    private const Setting WideTile = Setting.ExplanationLevel;
-    private const int Columns = 3;
-    private const int Rows = 3;
-
-    private class Tile
-    {
-        public Setting Setting;
-        public UIButton.Handle Handle;
-        public RectTransform Rect;
-    }
-
-    private readonly List<Tile> _tiles = new List<Tile>();
-    private Tile _wide;
-    private GridLayoutGroup _grid;
-    private RectTransform _panelRootRect;
-    private RectTransform _primaryRect;
-    private OptionList _options;
-
-    private RectTransform _cardRect;
-    private RectTransform _keyPane;
-    private RectTransform _legendRect;
-    private bool _keyOpen;
-
-    private Coroutine _settle;
+    private readonly Dictionary<PanelRow, string> _keyOf = new Dictionary<PanelRow, string>();
+    private string _focus;
 
     private void Awake()
     {
-        InitPanel(Style.Panel);
+        BuildPanel("panel.settings", "SettingsGrid", hasRight: false);
 
-        _primaryRect = FindTransform.FindDeep(transform, "PrimaryPanel") as RectTransform;
-        _panelRootRect = _primaryRect != null ? FindTransform.FindDeep(_primaryRect, "PanelRoot") as RectTransform : null;
-        _options = new OptionList(CanvasRect);
+        Rows.AddHeading("section.Interface");
+        Toggle(Setting.Animations, () => Settings.Animations, on => Settings.Animations = on);
+        Toggle(Setting.SoundEffects, () => Settings.SoundEffects, on => Settings.SoundEffects = on);
+        Choice(Setting.SoundVolume, Percents, () => (int)Settings.SoundVolume, v => Settings.SoundVolume = (PercentLevel)v);
+        Choice(Setting.Handedness, new[] { "option.Left", "option.Right" },
+            () => (int)Settings.Handedness, v => Settings.Handedness = (WristHand)v);
+        Choice(Setting.TextSize, Sizes, () => (int)Settings.TextSize, v => Settings.TextSize = (TextSize)v);
+        Choice(Setting.PanelContrast, new[] { "option.Standard", "option.High" },
+            () => (int)Settings.PanelContrast, v => Settings.PanelContrast = (PanelContrast)v);
+        Choice(Setting.Language, new[] { "option.English", "option.Spanish" },
+            () => (int)Settings.Language, v => Settings.Language = (AppLanguage)v);
 
-        Transform title = FindTransform.FindDeep(transform, "Title");
-        if (title != null) Strings.Bind(title.GetComponent<TMP_Text>(), "panel.settings");
+        Rows.AddHeading("section.ChartParts");
+        Toggle(Setting.Backdrop, () => Settings.Backdrop, on => Settings.Backdrop = on);
+        Toggle(Setting.BackdropGridlines, () => Settings.BackdropGridlines, on => Settings.BackdropGridlines = on);
+        Toggle(Setting.TickerLabels, () => Settings.TickerLabels, on => Settings.TickerLabels = on);
+        Toggle(Setting.AxisLabels, () => Settings.AxisLabels, on => Settings.AxisLabels = on);
+        Toggle(Setting.ChartKey, () => Settings.ChartKey, on => Settings.ChartKey = on);
+        Toggle(Setting.ChartDescription, () => Settings.ChartDescription, on => Settings.ChartDescription = on);
 
-        BuildTiles();
-        BuildKeyCard();
+        Rows.AddHeading("section.ChartLook");
+        Choice(Setting.ChartStyle, new[] { "option.Solid", "option.Shaded" },
+            () => (int)Settings.ChartStyle, v => Settings.ChartStyle = (MarkStyle)v);
+        Choice(Setting.ChartOpacity, Percents, () => (int)Settings.ChartOpacity, v => Settings.ChartOpacity = (PercentLevel)v);
+        Choice(Setting.BackdropOpacity, Levels, () => (int)Settings.BackdropOpacity, v => Settings.BackdropOpacity = (Level3)v);
+        Choice(Setting.ChartLabelSize, Sizes, () => (int)Settings.ChartLabelSize, v => Settings.ChartLabelSize = (Level3)v);
+        Choice(Setting.ChartTheme, new[] { "option.Dark", "option.Light" },
+            () => (int)Settings.ChartTheme, v => Settings.ChartTheme = (ChartTheme)v);
+        Choice(Setting.ColorMode, new[] { "option.Standard", "option.RedGreen", "option.BlueYellow" },
+            () => (int)Settings.ColorMode, v => Settings.ColorMode = (ColorMode)v);
 
-        SetGrabRects(_primaryRect, _cardRect);
+        Rows.AddHeading("section.Comfort");
+        Choice(Setting.DefaultChartSize, new[] { "option.P75", "option.P100", "option.P125" },
+            () => (int)Settings.DefaultChartSize, v => Settings.DefaultChartSize = (Level3)v);
+        Choice(Setting.MotionSpeed, new[] { "option.Slow", "option.Normal", "option.Fast" },
+            () => (int)Settings.MotionSpeed, v => Settings.MotionSpeed = (Level3)v);
+        Choice(Setting.ChartHeight, Levels, () => (int)Settings.ChartHeight, v => Settings.ChartHeight = (Level3)v);
+        Choice(Setting.ChartDistance, new[] { "option.Near", "option.Normal", "option.Far" },
+            () => (int)Settings.ChartDistance, v => Settings.ChartDistance = (Level3)v);
+        Toggle(Setting.Captions, () => Settings.Captions, on => Settings.Captions = on);
+
+        Rows.AddHeading("section.Assistant");
+        Choice(Setting.ExplanationLevel, new[] { "option.Simple", "option.Standard", "option.Expert" },
+            () => (int)Settings.ExplanationLevel, v => Settings.ExplanationLevel = (ExplanationLevel)v);
+        Choice(Setting.AssistantSpeed, new[] { "speed.half", "speed.one", "speed.instant" },
+            () => (int)Settings.AssistantSpeed, v => Settings.AssistantSpeed = (AssistantSpeed)v);
+        AddVoiceRow();
+        Choice(Setting.AssistantVolume, Percents, () => (int)Settings.AssistantVolume, v => Settings.AssistantVolume = (PercentLevel)v);
+        Toggle(Setting.WebSearch, () => Settings.WebSearch, on => Settings.WebSearch = on);
+
+        Rows.AddHeading("section.Data");
+        Choice(Setting.NumberFormat, new[] { "option.Short", "option.Full" },
+            () => (int)Settings.NumberFormat, v => Settings.NumberFormat = (NumberFormat)v);
+        Choice(Setting.NetworkLabels, new[] { "option.Hubs", "option.Everyone" },
+            () => (int)Settings.NetworkLabels, v => Settings.NetworkLabels = (NetworkLabels)v);
+        AddStartupRow();
+
+        Rows.AddHeading("section.App");
+        Track(Rows.Add(PanelRow.Action("setting.Recenter", Recenter.Request)), "setting.Recenter");
+        Track(Rows.Add(PanelRow.Action("setting.Reset", Settings.ResetAll)), "setting.Reset");
 
         Settings.Changed += OnSettingChanged;
-        Strings.Changed += RefreshTiles;
-        RefreshTiles();
+        RefreshPanel();
 
         if (_canvas != null) StartHidden();
+    }
+
+    private void Track(PanelRow row, string key) => _keyOf[row] = key;
+
+    private void Toggle(Setting setting, Func<bool> get, Action<bool> set) =>
+        Track(Rows.Add(PanelRow.Toggle("setting." + setting, get, set)), "setting." + setting);
+
+    private void Choice(Setting setting, string[] options, Func<int> get, Action<int> set) =>
+        Track(Rows.Add(PanelRow.Choice("setting." + setting, options, get, set)), "setting." + setting);
+
+    private void AddVoiceRow()
+    {
+        int count = Enum.GetValues(typeof(AssistantVoice)).Length;
+        Track(Rows.Add(new PanelRow
+        {
+            NameKey = "setting.AssistantVoice",
+            Value = () => Settings.AssistantVoice.ToString(),
+            Step = direction => Settings.AssistantVoice = (AssistantVoice)(((int)Settings.AssistantVoice + direction + count) % count)
+        }), "setting.AssistantVoice");
+    }
+
+    private void AddStartupRow()
+    {
+        Track(Rows.Add(new PanelRow
+        {
+            NameKey = "setting.StartupChart",
+            Value = StartupValue,
+            Step = StepStartup
+        }), "setting.StartupChart");
+    }
+
+    private static string StartupValue()
+    {
+        ManageCharts charts = Scene.Charts;
+        ManageCharts.Entry entry = charts != null && !string.IsNullOrEmpty(Settings.StartupChart)
+            ? charts.Find(Settings.StartupChart)
+            : null;
+        return entry != null ? entry.Spec.Title : Strings.Get("option.CatalogDefault");
+    }
+
+    private void StepStartup(int direction)
+    {
+        ManageCharts charts = Scene.Charts;
+        if (charts == null || charts.Entries.Count == 0) return;
+
+        int count = charts.Entries.Count + 1;
+        int current = 0;
+        for (int i = 0; i < charts.Entries.Count; i++)
+            if (charts.Entries[i].Spec.Id == Settings.StartupChart) current = i + 1;
+
+        int next = (current + direction + count) % count;
+        Settings.StartupChart = next == 0 ? "" : charts.Entries[next - 1].Spec.Id;
     }
 
     private void Start()
     {
         ResolveLayoutNow();
-        if (ManageDatasets.Instance != null) ManageDatasets.Instance.OnActiveDatasetChanged += OnSheetChanged;
+        if (ManageCharts.Instance != null) ManageCharts.Instance.OnChartChanged += RefreshPanel;
     }
 
-    private void OnDestroy()
+    protected override void OnDestroy()
     {
+        base.OnDestroy();
         Settings.Changed -= OnSettingChanged;
-        Strings.Changed -= RefreshTiles;
-        if (ManageDatasets.Instance != null) ManageDatasets.Instance.OnActiveDatasetChanged -= OnSheetChanged;
+        if (ManageCharts.Instance != null) ManageCharts.Instance.OnChartChanged -= RefreshPanel;
     }
 
-    private void OnDisable()
+    private void OnSettingChanged(Setting which) => RefreshPanel();
+
+    protected override void OnRowPressed(PanelRow row)
     {
-        _settle = null;
+        if (_keyOf.TryGetValue(row, out string key)) _focus = key;
+        RefreshPanel();
     }
 
-    protected override void ResolveDeferredLayout()
+    protected override void RefreshPanel()
     {
-        FitTiles();
-        LayoutCard();
+        Rows.Refresh();
+        bool focused = _focus != null;
+        SetBottomOpen(focused);
+        if (focused)
+        {
+            Strings.Bind(BottomHeader, _focus);
+            Strings.Bind(BottomText, _focus + ".desc");
+            UILayout.Clear(BottomExtra);
+            if (_focus == "setting." + Setting.ColorMode)
+                ColorLegend.For(Scene.Charts != null && Scene.Charts.Active != null ? Scene.Charts.Active.Geometry : null)
+                    .Build(BottomExtra);
+        }
+        QueueSettle();
     }
 
     public override void ShowPanel()
     {
         if (_canvas == null) return;
         ShowCanvas();
-        QueueSettle();
+        RefreshPanel();
         StateChannel.RecordState("settingsPanel", "the settings panel is open");
-        InvalidateGrabBounds();
     }
 
     public override void HidePanel()
     {
         if (_canvas == null) return;
-        _options.Close();
-        SetKeyOpen(false);
+        _focus = null;
+        SetBottomOpen(false);
+        QueueSettle();
         HideCanvas();
         StateChannel.RecordState("settingsPanel", "the settings panel is closed");
-    }
-
-    private void BuildTiles()
-    {
-        Transform gridT = FindTransform.FindDeep(transform, "SettingsGrid");
-        if (gridT == null)
-        {
-            Debug.LogError("[SettingsPanelUI] No 'SettingsGrid' under the panel; it has no settings to show.");
-            return;
-        }
-        UILayout.Clear(gridT);
-
-        _grid = UILayout.Ensure<GridLayoutGroup>(gridT.gameObject);
-        _grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
-        _grid.constraintCount = Columns;
-        _grid.childAlignment = TextAnchor.UpperCenter;
-        _grid.padding = PanePadding();
-        _grid.spacing = new Vector2(Style.SmallPadding, Style.SmallPadding);
-
-        LayoutElement le = UILayout.Ensure<LayoutElement>(gridT.gameObject);
-        le.minHeight = 0f;
-        le.preferredHeight = 0f;
-        le.flexibleHeight = 1f;
-
-        foreach (Setting setting in GridTiles) _tiles.Add(MakeTile(gridT, setting));
-
-        _wide = MakeTile(gridT, WideTile);
-        UILayout.Ensure<LayoutElement>(_wide.Handle.Root).ignoreLayout = true;
-        _wide.Rect.anchorMin = _wide.Rect.anchorMax = new Vector2(0f, 1f);
-        _wide.Rect.pivot = new Vector2(0f, 1f);
-    }
-
-    private Tile MakeTile(Transform parent, Setting setting)
-    {
-        UIButton.Handle h = UIButton.Create(parent, $"Setting_{setting}", "");
-        Style.ApplyTitle(h.Text);
-        h.Text.textWrappingMode = TextWrappingModes.Normal;
-        h.Text.overflowMode = TextOverflowModes.Overflow;
-
-        var tile = new Tile { Setting = setting, Handle = h, Rect = h.Root.GetComponent<RectTransform>() };
-        h.Button.onClick.AddListener(() => OnTilePressed(tile));
-        return tile;
-    }
-
-    private IEnumerable<Tile> AllTiles()
-    {
-        foreach (Tile t in _tiles) yield return t;
-        if (_wide != null) yield return _wide;
-    }
-
-    private void RefreshTiles()
-    {
-        foreach (Tile tile in AllTiles())
-        {
-            tile.Handle.Text.text =
-                $"{Strings.Get("setting." + tile.Setting)}\n<size=75%>{Strings.Get(OptionKeys(tile.Setting)[Current(tile.Setting)])}</size>";
-            UIButton.SetSelected(tile.Handle, Selected(tile));
-        }
-        RefreshKey();
-    }
-
-    private bool Selected(Tile tile)
-    {
-        if (IsSwitch(tile.Setting)) return Current(tile.Setting) == 0;
-        if (_options.IsOpen && _options.Owner == tile.Rect) return true;
-        return tile.Setting == Setting.ColorMode && _keyOpen;
-    }
-
-    private void OnTilePressed(Tile tile)
-    {
-        if (tile.Setting != Setting.ColorMode) SetKeyOpen(false);
-
-        if (IsSwitch(tile.Setting))
-        {
-            _options.Close();
-            Apply(tile.Setting, Current(tile.Setting) == 0 ? 1 : 0);
-            return;
-        }
-
-        if (_options.IsOpen && _options.Owner == tile.Rect)
-        {
-            _options.Close();
-            return;
-        }
-
-        string[] keys = OptionKeys(tile.Setting);
-        var labels = new List<string>(keys.Length);
-        foreach (string key in keys) labels.Add(Strings.Get(key));
-
-        _options.Open(tile.Rect, labels, Current(tile.Setting),
-            picked =>
-            {
-                Apply(tile.Setting, picked);
-                if (tile.Setting == Setting.ColorMode) SetKeyOpen(true);
-            },
-            RefreshTiles);
-        RefreshTiles();
-    }
-
-    private static bool IsSwitch(Setting s) => s == Setting.Animations || s == Setting.SoundEffects;
-
-    private static string[] OptionKeys(Setting s)
-    {
-        switch (s)
-        {
-            case Setting.Animations:
-            case Setting.SoundEffects: return new[] { "option.on", "option.off" };
-            case Setting.Handedness: return new[] { "option.Left", "option.Right" };
-            case Setting.TextSize: return new[] { "option.Small", "option.Medium", "option.Large" };
-            case Setting.ColorMode: return new[] { "option.Standard", "option.RedGreen", "option.BlueYellow" };
-            case Setting.Language: return new[] { "option.English", "option.Spanish" };
-            default: return new[] { "option.Simple", "option.Standard", "option.Expert" };
-        }
-    }
-
-    private static int Current(Setting s)
-    {
-        switch (s)
-        {
-            case Setting.Animations: return Settings.Animations ? 0 : 1;
-            case Setting.SoundEffects: return Settings.SoundEffects ? 0 : 1;
-            case Setting.Handedness: return (int)Settings.Handedness;
-            case Setting.TextSize: return (int)Settings.TextSize;
-            case Setting.ColorMode: return (int)Settings.ColorMode;
-            case Setting.Language: return (int)Settings.Language;
-            default: return (int)Settings.ExplanationLevel;
-        }
-    }
-
-    private static void Apply(Setting s, int option)
-    {
-        switch (s)
-        {
-            case Setting.Animations: Settings.Animations = option == 0; break;
-            case Setting.SoundEffects: Settings.SoundEffects = option == 0; break;
-            case Setting.Handedness: Settings.Handedness = (WristHand)option; break;
-            case Setting.TextSize: Settings.TextSize = (TextSize)option; break;
-            case Setting.ColorMode: Settings.ColorMode = (ColorMode)option; break;
-            case Setting.Language: Settings.Language = (AppLanguage)option; break;
-            default: Settings.ExplanationLevel = (ExplanationLevel)option; break;
-        }
-    }
-
-    private void OnSettingChanged(Setting which) => RefreshTiles();
-
-    private void QueueSettle()
-    {
-        FitTiles();
-        LayoutCard();
-        if (!isActiveAndEnabled) return;
-        if (_settle != null) StopCoroutine(_settle);
-        _settle = StartCoroutine(SettleLayout());
-    }
-
-    private IEnumerator SettleLayout()
-    {
-        yield return UILayout.Converge(() => IsVisible, () => { FitTiles(); LayoutCard(); },
-            () => _grid != null ? _grid.cellSize.x + (_cardRect != null ? _cardRect.sizeDelta.y : 0f) : -1f);
-        _settle = null;
-    }
-
-    private void FitTiles()
-    {
-        if (_grid == null || _panelRootRect == null) return;
-        RectTransform gridRect = _grid.transform as RectTransform;
-        LayoutRebuilder.ForceRebuildLayoutImmediate(_panelRootRect);
-
-        float byWidth = (gridRect.rect.width - _grid.padding.left - _grid.padding.right
-            - (Columns - 1) * _grid.spacing.x) / Columns;
-        float byHeight = (gridRect.rect.height - _grid.padding.top - _grid.padding.bottom
-            - (Rows - 1) * _grid.spacing.y) / Rows;
-        float cell = Mathf.Max(1f, Mathf.Min(byWidth, byHeight));
-        if (!Mathf.Approximately(cell, _grid.cellSize.x)) _grid.cellSize = new Vector2(cell, cell);
-
-        float radius = Style.TileRadius(cell);
-        foreach (Tile tile in AllTiles()) UIButton.SetRadius(tile.Handle, radius);
-
-        if (_wide == null) return;
-        float rowsWidth = Columns * cell + (Columns - 1) * _grid.spacing.x;
-        float inset = Mathf.Max(0f, (gridRect.rect.width - _grid.padding.left - _grid.padding.right - rowsWidth) * 0.5f);
-        _wide.Rect.sizeDelta = new Vector2(rowsWidth, cell);
-        _wide.Rect.anchoredPosition = new Vector2(
-            _grid.padding.left + inset,
-            -(_grid.padding.top + (Rows - 1) * (cell + _grid.spacing.y)));
-    }
-
-    private void BuildKeyCard()
-    {
-        Transform card = FindTransform.FindDeep(transform, "OptionsPanel");
-        Transform contentArea = card != null ? FindTransform.FindDeep(card, "ContentArea") : null;
-        if (card == null || contentArea == null)
-        {
-            Debug.LogError("[SettingsPanelUI] No 'OptionsPanel' with a 'ContentArea'; the Color Mode key cannot open.");
-            return;
-        }
-
-        _cardRect = card as RectTransform;
-        UILayout.Clear(contentArea);
-
-        var pane = new GameObject("ColorKeyContent", typeof(RectTransform));
-        pane.transform.SetParent(contentArea, false);
-        _keyPane = pane.GetComponent<RectTransform>();
-        UILayout.Stretch(_keyPane);
-
-        VerticalLayoutGroup layout = pane.AddComponent<VerticalLayoutGroup>();
-        ApplyPaneLayout(layout);
-        layout.childControlWidth = true;
-        layout.childControlHeight = true;
-        layout.childForceExpandWidth = true;
-        layout.childForceExpandHeight = false;
-
-        TextMeshProUGUI header = UILabel.Make(pane.transform, "Header", Style.Black,
-            TextAlignmentOptions.Left, TextOverflowModes.Ellipsis, bold: true);
-        Strings.Bind(header, "setting.ColorMode");
-        UILayout.FixedHeight(header.gameObject, Style.HeaderHeight);
-
-        TextMeshProUGUI description = UILabel.Make(pane.transform, "Description", Style.Black,
-            TextAlignmentOptions.TopLeft, TextOverflowModes.Overflow, wrap: true);
-        Strings.Bind(description, "colorkey.desc");
-
-        _legendRect = new GameObject("Legend", typeof(RectTransform)).GetComponent<RectTransform>();
-        _legendRect.SetParent(pane.transform, false);
-        VerticalLayoutGroup legendLayout = _legendRect.gameObject.AddComponent<VerticalLayoutGroup>();
-        legendLayout.childControlWidth = true;
-        legendLayout.childControlHeight = true;
-        legendLayout.childForceExpandWidth = true;
-        legendLayout.childForceExpandHeight = false;
-
-        ApplyDividers(card);
-        PanelUI.ApplyTitleBars(card);
-        UILayout.ShowPart(card.gameObject, false);
-    }
-
-    private void SetKeyOpen(bool open)
-    {
-        if (_cardRect == null || _keyOpen == open) return;
-        _keyOpen = open;
-        UILayout.ShowPart(_cardRect.gameObject, open);
-        if (open) RefreshKey();
-        LayoutCard();
-        QueueSettle();
-        RefreshTiles();
-    }
-
-    private void OnSheetChanged(int index) => RefreshKey();
-
-    private void RefreshKey()
-    {
-        if (!_keyOpen || _legendRect == null) return;
-        ColorLegend.For(Scene.Data).Build(_legendRect);
-        QueueSettle();
-    }
-
-    private void LayoutCard()
-    {
-        RectTransform canvas = CanvasRect;
-        if (canvas == null) return;
-
-        float height = Style.Panel.y;
-        if (_keyOpen && _cardRect != null && _keyPane != null)
-        {
-            LayoutRebuilder.ForceRebuildLayoutImmediate(canvas);
-            if (UIMeasure.TryPreferredHeight(_cardRect, _keyPane, out float content))
-                _cardRect.sizeDelta = new Vector2(_cardRect.sizeDelta.x, content + Style.SmallPadding);
-
-            Vector2 pos = _cardRect.anchoredPosition;
-            pos.y = -(Style.Panel.y + Style.SmallPadding);
-            _cardRect.anchoredPosition = pos;
-            height += Style.SmallPadding + _cardRect.sizeDelta.y;
-        }
-
-        canvas.sizeDelta = new Vector2(Style.Panel.x, height);
-        InvalidateGrabBounds();
     }
 }

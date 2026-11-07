@@ -2,10 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using System.Text.Json;
 using System.Threading.Tasks;
-using Google.GenAI;
-using Google.GenAI.Types;
+using GeminiLive;
 using UnityEngine;
 
 public abstract class Function {
@@ -51,7 +49,7 @@ public abstract class Function {
                 Gemini.NoteToolSettled(call.Id);
                 await Respond(session, call, new Dictionary<string, object> {
                     { "error", "The tool result could not be delivered. The action may still have applied; " +
-                               "verify with DescribeSheet before retrying." }
+                               "verify with DescribeChart before retrying." }
                 }).ConfigureAwait(false);
             }
             catch (Exception e2) {
@@ -92,41 +90,9 @@ public abstract class Function {
     }
 
     protected static string BriefJson(object value, int maxBytes, out long totalBytes) {
-        var sink = new TruncatingStream(maxBytes);
-        using (var writer = new Utf8JsonWriter(sink))
-            JsonSerializer.Serialize(writer, value);
-        totalBytes = sink.Total;
-        return sink.Head;
-    }
-
-    private sealed class TruncatingStream : System.IO.Stream {
-        private readonly byte[] head;
-        private int headLen;
-        private long total;
-
-        public TruncatingStream(int maxBytes) { head = new byte[maxBytes]; }
-
-        public long Total => total;
-        public string Head => System.Text.Encoding.UTF8.GetString(head, 0, headLen);
-
-        public override void Write(byte[] buffer, int offset, int count) {
-            int keep = Math.Min(count, head.Length - headLen);
-            if (keep > 0) {
-                Buffer.BlockCopy(buffer, offset, head, headLen, keep);
-                headLen += keep;
-            }
-            total += count;
-        }
-
-        public override bool CanRead => false;
-        public override bool CanSeek => false;
-        public override bool CanWrite => true;
-        public override long Length => total;
-        public override long Position { get => total; set => throw new NotSupportedException(); }
-        public override void Flush() { }
-        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
-        public override long Seek(long offset, System.IO.SeekOrigin origin) => throw new NotSupportedException();
-        public override void SetLength(long value) => throw new NotSupportedException();
+        string json = LiveWire.ToJson(value);
+        totalBytes = System.Text.Encoding.UTF8.GetByteCount(json);
+        return json.Length > maxBytes ? json.Substring(0, maxBytes) : json;
     }
 
     static Dictionary<string, Function> registry;

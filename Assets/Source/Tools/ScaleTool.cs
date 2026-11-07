@@ -3,24 +3,24 @@ using Oculus.Interaction;
 
 public class ScaleTool : GrabTool
 {
-    public const float MinScale = CreateSheet.DefaultScale * 0.75f;
-    public const float MaxScale = CreateSheet.DefaultScale * 1.25f;
+    public const float MinScale = ChartView.DefaultScale * 0.75f;
+    public const float MaxScale = ChartView.DefaultScale * 1.25f;
 
-    private static ITransformer ScaleTransformerFor(CreateSheet sheet)
+    private static ITransformer ScaleTransformerFor(ChartView chart)
     {
-        GrabFreeTransformer scale = sheet.GetComponent<GrabFreeTransformer>();
+        GrabFreeTransformer scale = chart.GetComponent<GrabFreeTransformer>();
         if (scale == null)
         {
-            scale = sheet.gameObject.AddComponent<GrabFreeTransformer>();
+            scale = chart.gameObject.AddComponent<GrabFreeTransformer>();
             scale.InjectOptionalPositionConstraints(PinnedPosition());
             scale.InjectOptionalScaleConstraints(ScaleLimits());
         }
 
-        scale.InjectOptionalRotationConstraints(PinnedRotation(sheet.transform.localEulerAngles));
+        scale.InjectOptionalRotationConstraints(PinnedRotation(chart.transform.localEulerAngles));
         return scale;
     }
 
-    protected override void PrepareSheet(CreateSheet sheet) => ScaleTransformerFor(sheet);
+    protected override void PrepareChart(ChartView chart) => ScaleTransformerFor(chart);
 
     private static TransformerUtils.ConstrainedAxis Pin(float value) => Range(value, value);
 
@@ -61,11 +61,11 @@ public class ScaleTool : GrabTool
 
     protected override EditKind RecordKind => EditKind.Scale;
 
-    protected override string Describe(float distance) => "resized the sheet";
+    protected override string Describe(float distance) => "resized the chart";
 
     protected override void Arm()
     {
-        sheetManager.SetGrabbable(true);
-        sheetManager.SetTwoGrab(ScaleTransformerFor);
+        chartManager.SetGrabbable(true);
+        chartManager.SetTwoGrab(ScaleTransformerFor);
     }
 }

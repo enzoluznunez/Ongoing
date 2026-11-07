@@ -1,0 +1,9 @@
+segment,product_line,revenue_share_pct,operating_margin_pct
+Hardware,Laptops,22,12
+Hardware,Phones,18,18
+Hardware,Wearables,7,9
+Software,Cloud,20,34
+Software,Security,10,28
+Software,Analytics,8,22
+Services,Advisory,9,15
+Services,Support,6,20

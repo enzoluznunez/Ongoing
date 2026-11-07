@@ -4,6 +4,9 @@
     "references": [
         "Oculus.VR",
         "Oculus.Interaction",
+        "Unity.Burst",
+        "Unity.Collections",
+        "Unity.Mathematics",
         "Unity.TextMeshPro",
         "UnityEngine.UI"
     ],

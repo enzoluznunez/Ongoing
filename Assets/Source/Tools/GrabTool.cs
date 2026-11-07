@@ -10,63 +10,62 @@ public abstract class GrabTool : Tool
 
     protected abstract void Arm();
 
-    protected virtual void PrepareSheet(CreateSheet sheet) { }
+    protected virtual void PrepareChart(ChartView view) { }
 
     protected override void OnToolStart()
     {
-        ManageSheets.PrepareGrabs += PrepareSheet;
-        if (sheetManager == null) return;
-        sheetManager.OnSheetsChanged += ApplyGrabEnabled;
-        sheetManager.OnSheetMoveCommitted += OnSheetMoveCommitted;
+        ManageCharts.PrepareGrabs += PrepareChart;
+        if (chartManager == null) return;
+        chartManager.OnChartChanged += ApplyGrabEnabled;
+        chartManager.OnChartMoveCommitted += OnChartMoveCommitted;
     }
 
     protected override void OnToolDestroy()
     {
-        ManageSheets.PrepareGrabs -= PrepareSheet;
-        if (sheetManager == null) return;
-        sheetManager.OnSheetsChanged -= ApplyGrabEnabled;
-        sheetManager.OnSheetMoveCommitted -= OnSheetMoveCommitted;
+        ManageCharts.PrepareGrabs -= PrepareChart;
+        if (chartManager == null) return;
+        chartManager.OnChartChanged -= ApplyGrabEnabled;
+        chartManager.OnChartMoveCommitted -= OnChartMoveCommitted;
     }
 
     protected virtual bool ReattachOnReset => false;
 
     protected override void OnResetTool()
     {
-        if (sheetManager != null) sheetManager.ResetGrabs(ReattachOnReset);
+        if (chartManager != null) chartManager.ResetGrabs(ReattachOnReset);
     }
 
     protected override void OnActiveChanged(bool active)
     {
-        if (sheetManager == null) return;
+        if (chartManager == null) return;
         if (active) { _armPending = true; return; }
         _armPending = false;
-        sheetManager.SetGrabbable(false);
+        chartManager.SetGrabbable(false);
     }
 
-    private void OnSheetMoveCommitted(CreateSheet sheet, Vector3 prePos, Quaternion preRot, Vector3 preScale)
+    private void OnChartMoveCommitted(ChartView view, Vector3 prePos, Quaternion preRot, Vector3 preScale)
     {
-        if (!Active || sheet == null || toolManager == null || sheetManager == null) return;
+        if (!Active || view == null || toolManager == null || chartManager == null) return;
 
-        Transform t = sheet.transform;
+        Transform t = view.transform;
         if (MoveRecord.SamePose(t.localPosition, t.localRotation, t.localScale, prePos, preRot, preScale)) return;
 
-        float distance = sheetManager.transform
-            .TransformVector(sheet.transform.localPosition - prePos).magnitude;
+        float distance = chartManager.transform.TransformVector(t.localPosition - prePos).magnitude;
 
         Report(Describe(distance));
 
-        ManageDatasets.ActiveEdits.PushMove(new MoveRecord
+        ManageCharts.ActiveEdits.PushMove(new MoveRecord
         {
-            sheetId = sheet.sheetId,
+            chartId = view.chartId,
             prePos = prePos,
             preRot = preRot,
             preScale = preScale,
-            postPos = sheet.transform.localPosition,
-            postRot = sheet.transform.localRotation,
-            postScale = sheet.transform.localScale,
+            postPos = t.localPosition,
+            postRot = t.localRotation,
+            postScale = t.localScale,
             distance = distance,
-            anchorPos = sheetManager.transform.position,
-            anchorRot = sheetManager.transform.rotation
+            anchorPos = chartManager.transform.position,
+            anchorRot = chartManager.transform.rotation
         }, RecordKind);
     }
 
@@ -79,7 +78,7 @@ public abstract class GrabTool : Tool
     {
         if (!_armPending) return;
         _armPending = false;
-        if (!Active || sheetManager == null) return;
+        if (!Active || chartManager == null) return;
         Arm();
     }
 }

@@ -19,7 +19,7 @@ public class HitchLog : MonoBehaviour
     private float _frameMs = 1000f / 72f;
 
     private ToolType _tool = ToolType.None;
-    private int _dataset = int.MinValue;
+    private string _chart;
     private bool _panel, _agent;
 
     private float _summaryStart;
@@ -96,13 +96,12 @@ public class HitchLog : MonoBehaviour
         ToolType tool = tools != null ? tools.SelectedTool : ToolType.None;
         if (tool != _tool) { _tool = tool; Note($"tool -> {tool}"); }
 
-        ManageDatasets datasets = ManageDatasets.Instance;
-        int dataset = datasets != null ? datasets.ActiveIndex : -1;
-        if (dataset != _dataset)
+        string chart = Scene.ChartLabel;
+        if (chart != _chart)
         {
-            bool first = _dataset == int.MinValue;
-            _dataset = dataset;
-            if (!first) Note($"dataset -> {Scene.DatasetLabel ?? dataset.ToString()}");
+            bool first = _chart == null;
+            _chart = chart;
+            if (!first) Note($"chart -> {chart}");
         }
 
         ToolPanelUI panel = Scene.ToolPanel;
@@ -124,13 +123,8 @@ public class HitchLog : MonoBehaviour
         if (collected) _line.Append(" | GC ran");
 
         _line.Append(" | tool ").Append(_tool);
-        ManageSheets sheets = Scene.Sheets;
-        if (sheets != null)
-        {
-            CreateSheet sheet = sheets.Sheet;
-            if (sheet != null && sheet.IsGrabbed) _line.Append(", sheet held");
-            if (sheets.LinesDragged) _line.Append(", sort drag");
-        }
+        ManageCharts charts = Scene.Charts;
+        if (charts != null && charts.View != null && charts.View.IsGrabbed) _line.Append(", chart held");
         if (_agent) _line.Append(", assistant working");
 
         float now = Time.unscaledTime;

@@ -61,7 +61,7 @@ public class UIPressFeedback : MonoBehaviour
         if (now - _lastEmit < MinGapSeconds) return;
         _lastEmit = now;
 
-        if (Settings.SoundEffects && _source != null && _click != null) _source.PlayOneShot(_click);
+        if (Settings.SoundEffects && _source != null && _click != null) _source.PlayOneShot(_click, ChartDisplay.PercentOf(Settings.SoundVolume));
         OVRInput.SetControllerVibration(HapticFrequency, HapticAmplitude, OVRInput.Controller.Active);
         StopAllCoroutines();
         StartCoroutine(StopHaptic());

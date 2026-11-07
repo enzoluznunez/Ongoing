@@ -487,7 +487,7 @@ public abstract class PanelUI : MonoBehaviour
         }
 
         Vector3 forward = CameraRig.FlatForward;
-        transform.SetPositionAndRotation(cam.position + forward * zOffsetFromCamera, Quaternion.LookRotation(forward));
+        transform.SetPositionAndRotation(cam.position + forward * (zOffsetFromCamera * ChartDisplay.PanelAheadScale), Quaternion.LookRotation(forward));
     }
 
     public bool SquareTo(Vector3 eye)

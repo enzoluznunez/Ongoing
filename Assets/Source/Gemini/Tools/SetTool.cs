@@ -1,11 +1,11 @@
 using System.Collections.Generic;
-using Google.GenAI.Types;
+using GeminiLive;
 
 public sealed class SetTool : AgenticTool<SetTool.Args> {
 
     public class Args {
         [Doc("The tool to arm, or 'none' to clear the selection.")]
-        [Values("filter", "move", "rotate", "scale", "sort", "profile", "none")]
+        [Values("move", "rotate", "scale", "none")]
         public string tool;
     }
 
@@ -20,6 +20,11 @@ public sealed class SetTool : AgenticTool<SetTool.Args> {
     protected override void Run(Args args, Dictionary<string, object> result) {
         if (!System.Enum.TryParse(args.tool, true, out ToolType tool)) {
             result["error"] = $"Unknown tool '{args.tool}'.";
+            return;
+        }
+
+        if (ManageTools.OnHold(tool)) {
+            result["error"] = $"The {args.tool} tool is on hold and cannot be used yet.";
             return;
         }
 

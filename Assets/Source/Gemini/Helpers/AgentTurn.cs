@@ -11,7 +11,7 @@ public static class AgentTurn
     public static void NoteToolCall()
     {
         Marked = true;
-        EditList edits = ManageDatasets.ActiveEdits;
+        EditList edits = ManageCharts.ActiveEdits;
         if (edits != null && !baselines.ContainsKey(edits)) baselines[edits] = edits.Count;
     }
 
@@ -20,31 +20,28 @@ public static class AgentTurn
 
     public static int AppliedSoFar()
     {
-        EditList edits = ManageDatasets.ActiveEdits;
+        EditList edits = ManageCharts.ActiveEdits;
         if (!Marked || edits == null) return 0;
         return Mathf.Max(0, edits.Count - BaselineOf(edits));
     }
 
     public static void UserTookControl()
     {
-        ManageSheets sheets = Scene.Sheets;
-        if (sheets != null) sheets.Interrupt();
-
-        SortTool sort = Scene.Sort;
-        if (sort != null && sort.HaltOrderSequence() && sheets != null) sheets.AmendReorderRecord();
+        ManageCharts charts = Scene.Charts;
+        if (charts != null) charts.Interrupt();
 
         UserTookOver = true;
 
         int applied = AppliedSoFar();
         if (applied <= 0) return;
 
-        int stamped = ManageDatasets.ActiveEdits.StampGroup(BaselineOf(ManageDatasets.ActiveEdits));
+        int stamped = ManageCharts.ActiveEdits.StampGroup(BaselineOf(ManageCharts.ActiveEdits));
         if (stamped <= 0) return;
 
         StateChannel.Record($"the user stopped you after {stamped} of your changes had been applied");
 
-        if (sheets != null)
-            Notices.Show(sheets, Strings.Get("notice.stopped"), stamped == 1
+        if (charts != null)
+            Notices.Show(charts, Strings.Get("notice.stopped"), stamped == 1
                 ? Strings.Get("notice.stopped.one")
                 : Strings.Format("notice.stopped.many", stamped));
     }

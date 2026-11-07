@@ -1,5 +1,5 @@
 using System.Collections.Generic;
-using Google.GenAI.Types;
+using GeminiLive;
 
 public sealed class Undo : AgenticTool<Undo.Args> {
 
@@ -10,7 +10,7 @@ public sealed class Undo : AgenticTool<Undo.Args> {
         [Doc("Undo every edit. Confirm with the user before setting this."), Optional]
         public bool? all;
         [Doc("The tool whose edit you expect to be newest. Only checked for a single undo.")]
-        [Values("move", "rotate", "scale", "sort", "filter", "profile"), Optional]
+        [Values("move", "rotate", "scale"), Optional]
         public string tool;
     }
 
@@ -30,8 +30,7 @@ public sealed class Undo : AgenticTool<Undo.Args> {
             return new FunctionDeclaration {
                 Name = "Undo",
                 Description = "Undo recent edits, newest first (the tool panel's Undo / Undo All buttons). " +
-                              "All edits share one timeline: moved/rotated/scaled pieces, Sort reorders, " +
-                              "the projections raised by the Profile tool, and what the Filter tool took off the sheet. " +
+                              "All edits share one timeline of the chart being moved, turned and resized. " +
                               "Set 'all' to undo everything and clear the tool selection; 'count' never turns into Undo All, " +
                               "it stops when the timeline runs out. " +
                               "Optionally pass 'tool' to assert what the newest edit is; if it does not match, this refuses and names " +
@@ -48,7 +47,7 @@ public sealed class Undo : AgenticTool<Undo.Args> {
         var controller = Scene.Tools;
         if (controller == null) { result["error"] = "Tool controller not found in scene."; return; }
 
-        var top = ManageDatasets.ActiveEdits.Peek();
+        var top = ManageCharts.ActiveEdits.Peek();
         if (top == null) {
             result["undone"] = 0;
             result["remaining"] = 0;
@@ -69,14 +68,14 @@ public sealed class Undo : AgenticTool<Undo.Args> {
                     $"The newest edit is from the {Edit.KindName(top.kind)} tool, not the {requested} tool. Undo always " +
                     "removes the newest edit first. Ask the user which they meant, then call again without 'tool'.");
                 result["nextUndo"] = Edit.KindName(top.kind);
-                result["remaining"] = ManageDatasets.ActiveEdits.Count;
+                result["remaining"] = ManageCharts.ActiveEdits.Count;
                 return;
             }
         }
 
         if (undoAll) {
-            int had = ManageDatasets.ActiveEdits.Count;
-            int steps = ManageDatasets.ActiveEdits.UndoStepCount();
+            int had = ManageCharts.ActiveEdits.Count;
+            int steps = ManageCharts.ActiveEdits.UndoStepCount();
             controller.UndoAll();
             controller.DeselectTool();
             result["undone"] = steps;
@@ -89,7 +88,7 @@ public sealed class Undo : AgenticTool<Undo.Args> {
         }
 
         int did = 0, failed = 0;
-        for (int i = 0; i < count && ManageDatasets.ActiveEdits.Peek() != null; i++) {
+        for (int i = 0; i < count && ManageCharts.ActiveEdits.Peek() != null; i++) {
             if (controller.Undo()) did++;
             else failed++;
         }
@@ -102,8 +101,8 @@ public sealed class Undo : AgenticTool<Undo.Args> {
             result["note"] = failed + " edit(s) could not be reverted because they no longer matched the scene; " +
                              "they were dropped from the history. Tell the user rather than reporting success.";
         }
-        result["remaining"] = ManageDatasets.ActiveEdits.Count;
-        var next = ManageDatasets.ActiveEdits.Peek();
+        result["remaining"] = ManageCharts.ActiveEdits.Count;
+        var next = ManageCharts.ActiveEdits.Peek();
         if (next != null) result["nextUndo"] = Edit.KindName(next.kind);
     }
 }

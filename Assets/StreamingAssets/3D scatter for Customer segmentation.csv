@@ -1,0 +1,166 @@
+customer_id,segment,recency_days,frequency_orders_per_year,avg_order_value_usd,est_lifetime_value_usd
+C001,Champions,3,19.8,106,6285
+C002,Champions,1,19.3,133,7668
+C003,Champions,6,26.3,111,8793
+C004,Champions,4,27.6,98,8136
+C005,Champions,13,24.4,94,6889
+C006,Champions,17,27.8,139,11586
+C007,Champions,7,19.2,126,7246
+C008,Champions,10,30.8,145,13414
+C009,Champions,3,15.9,133,6334
+C010,Champions,14,19.8,114,6795
+C011,Champions,5,22.7,120,8160
+C012,Champions,2,28,149,12505
+C013,Champions,6,17.1,146,7492
+C014,Champions,7,29.8,97,8693
+C015,Champions,1,35.3,89,9470
+C016,Champions,18,20.3,138,8423
+C017,Champions,5,26.4,100,7943
+C018,Champions,4,17.7,138,7353
+C019,Champions,12,18,115,6212
+C020,Champions,8,21.9,106,6994
+C021,Champions,4,24.7,111,8234
+C022,Champions,1,26.9,131,10566
+C023,Champions,13,27.8,111,9248
+C024,Champions,14,18.1,133,7205
+C025,Champions,19,23.7,127,9069
+C026,Champions,11,30,100,9026
+C027,Champions,3,35.3,114,12136
+C028,Champions,8,20.5,102,6289
+C029,Champions,9,24.2,110,7994
+C030,Champions,6,35.7,136,14585
+C031,Champions,13,17.9,117,6279
+C032,Champions,12,23.6,147,10420
+C033,Champions,15,22.4,102,6874
+C034,Champions,8,24.6,129,9501
+C035,Champions,2,9.8,122,3571
+C036,Champions,13,12.2,118,4302
+C037,Champions,10,21.5,127,8146
+C038,Champions,2,29.2,151,13275
+C039,Champions,19,19.1,152,8724
+C040,Champions,15,31.4,97,9182
+C041,Champions,2,32,96,9197
+C042,Champions,9,18.9,82,4637
+C043,Champions,8,18.9,122,6901
+C044,Champions,14,23.4,128,8965
+C045,Champions,10,20,104,6244
+C046,Champions,12,22.2,151,10056
+C047,Champions,7,33.4,124,12460
+C048,Champions,7,20.3,133,8089
+C049,Champions,10,22.3,136,9088
+C050,Champions,12,24.3,145,10566
+C051,Champions,12,29.3,177,15560
+C052,Champions,4,20.5,119,7301
+C053,Champions,14,25.9,99,7718
+C054,Champions,15,13.7,105,4306
+C055,Champions,11,23.2,146,10135
+C056,Regulars,32,4.2,74,940
+C057,Regulars,69,16.7,86,4280
+C058,Regulars,26,16,47,2236
+C059,Regulars,36,15.7,76,3580
+C060,Regulars,59,16.1,89,4303
+C061,Regulars,55,15,90,4080
+C062,Regulars,46,16.9,107,5439
+C063,Regulars,18,19.7,68,4038
+C064,Regulars,53,19.6,69,4050
+C065,Regulars,30,9.8,50,1480
+C066,Regulars,31,10.4,52,1612
+C067,Regulars,56,7.9,43,1025
+C068,Regulars,19,14.4,72,3121
+C069,Regulars,35,13.4,103,4140
+C070,Regulars,10,13.6,94,3843
+C071,Regulars,20,8.6,102,2636
+C072,Regulars,59,7.2,68,1480
+C073,Regulars,27,14.7,41,1817
+C074,Regulars,29,15.3,67,3083
+C075,Regulars,24,12.5,95,3580
+C076,Regulars,67,6,92,1655
+C077,Regulars,35,8.9,84,2262
+C078,Regulars,40,12.4,67,2473
+C079,Regulars,59,11.9,104,3737
+C080,Regulars,54,11,54,1784
+C081,Regulars,60,11.4,52,1789
+C082,Regulars,17,14.5,62,2679
+C083,Regulars,56,8,48,1158
+C084,Regulars,26,10.2,71,2179
+C085,Regulars,19,10.8,92,3001
+C086,Regulars,48,11.5,49,1700
+C087,Regulars,22,14.5,71,3089
+C088,Regulars,40,1.3,95,375
+C089,Regulars,35,12,114,4126
+C090,Regulars,63,23.2,69,4833
+C091,Regulars,27,11.8,38,1354
+C092,Regulars,33,10.9,90,2931
+C093,Regulars,50,14,59,2471
+C094,Regulars,7,13.5,53,2153
+C095,Regulars,42,16.2,93,4532
+C096,Regulars,17,12.3,65,2382
+C097,Regulars,52,8.9,87,2317
+C098,Regulars,2,6.2,82,1526
+C099,Regulars,44,7.3,83,1813
+C100,Regulars,40,15.6,53,2505
+C101,Regulars,27,16.5,64,3178
+C102,Regulars,38,11.9,61,2191
+C103,Regulars,26,9.4,56,1580
+C104,Regulars,30,14.5,70,3047
+C105,Regulars,25,16.1,77,3720
+C106,Regulars,23,17.9,71,3817
+C107,Regulars,44,16.4,32,1546
+C108,Regulars,36,8.8,85,2242
+C109,Regulars,53,7.7,47,1087
+C110,Regulars,55,14.9,62,2775
+C111,At risk,138,0.9,52,139
+C112,At risk,66,2.3,38,262
+C113,At risk,108,7.6,52,1192
+C114,At risk,169,2.4,33,238
+C115,At risk,96,2.2,52,348
+C116,At risk,57,3.9,41,485
+C117,At risk,167,3.5,45,468
+C118,At risk,92,0.7,30,62
+C119,At risk,125,0.5,35,56
+C120,At risk,124,7,41,874
+C121,At risk,111,5,33,496
+C122,At risk,194,4.6,38,525
+C123,At risk,99,2.1,42,269
+C124,At risk,107,1.2,53,200
+C125,At risk,149,4.8,46,659
+C126,At risk,146,1.4,47,204
+C127,At risk,98,3.2,66,632
+C128,At risk,98,3.3,13,134
+C129,At risk,105,4.8,57,813
+C130,At risk,138,0.5,29,44
+C131,At risk,186,5.3,44,709
+C132,At risk,151,5,41,622
+C133,At risk,143,7.4,62,1376
+C134,At risk,130,7.3,45,990
+C135,At risk,114,4,52,632
+C136,At risk,124,2.2,44,288
+C137,At risk,97,3.4,10,102
+C138,At risk,146,2.7,31,247
+C139,At risk,179,0.5,49,74
+C140,At risk,138,3.9,60,697
+C141,At risk,180,2.5,28,206
+C142,At risk,102,4.2,40,502
+C143,At risk,143,4.2,54,672
+C144,At risk,103,2.2,52,336
+C145,At risk,107,4.1,60,731
+C146,At risk,113,3.7,36,401
+C147,At risk,109,4.5,45,608
+C148,At risk,111,6,44,787
+C149,At risk,140,4.5,43,581
+C150,At risk,109,4.2,41,513
+C151,At risk,86,4.9,66,962
+C152,At risk,178,4.9,45,659
+C153,At risk,140,4.9,40,593
+C154,At risk,93,1.7,35,176
+C155,At risk,129,1.8,25,133
+C156,At risk,117,2.5,47,357
+C157,At risk,185,2.2,34,226
+C158,At risk,116,5,38,574
+C159,At risk,83,4.7,34,479
+C160,At risk,118,1.8,39,205
+C161,At risk,65,5.3,33,536
+C162,At risk,91,5.1,56,852
+C163,At risk,47,3,31,273
+C164,At risk,136,2.9,53,455
+C165,At risk,96,0.5,51,77

@@ -4,7 +4,6 @@ using UnityEngine;
 public class LoadingPhase : MonoBehaviour
 {
     private const float GiveUpSeconds = 45f;
-    private const double RoomBudgetMs = 3.0;
     private const float AheadMetres = 1.2f;
     private const float FollowRate = 4f;
     private const float LongestFrame = 0.25f;
@@ -15,9 +14,6 @@ public class LoadingPhase : MonoBehaviour
 
     private TextMeshPro _label;
     private float _elapsed;
-    private bool _measured;
-    private ManageSheets.Room _room;
-    private int _lines;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetStatics()
@@ -71,42 +67,11 @@ public class LoadingPhase : MonoBehaviour
 
     private string Stage()
     {
-        ManageDatasets datasets = ManageDatasets.Instance;
-        if (!ViewCatalog.Settled) return Strings.Get("loading.listing");
-        if (datasets != null && datasets.PreloadsLeft > 0)
-        {
-            int read = datasets.PreloadsQueued - datasets.PreloadsLeft;
-            return Strings.Format("loading.reading", read, datasets.PreloadsQueued);
-        }
-
-        if (datasets != null && !_measured) Measure(datasets);
-        ManageSheets sheets = Scene.Sheets;
-        if (sheets != null && _measured && !sheets.PrepareRoom(_room, RoomBudgetMs)) return Strings.Get("loading.sheets");
-        SortTool sort = Scene.Sort;
-        if (sort != null && _measured && !sort.Prepare(_lines, RoomBudgetMs)) return Strings.Get("loading.tools");
-
+        ManageCharts charts = Scene.Charts;
+        if (charts != null && !charts.CatalogReady) return Strings.Get("loading.listing");
+        if (charts != null && !charts.FirstChartReady) return Strings.Get("loading.reading");
         if (!GraphicsWarm.Step()) return Strings.Get("loading.graphics");
         return null;
-    }
-
-    private void Measure(ManageDatasets datasets)
-    {
-        _measured = true;
-        _room = default;
-        _lines = 0;
-        foreach (ManageDatasets.Dataset d in datasets.Datasets)
-        {
-            DataSource data = d.loaded ? d.source : null;
-            if (data == null) continue;
-            int rows = data.RowCount, cols = data.ColumnCount;
-            int size = Mathf.Max(data.ColumnGroupSize, 1);
-            int groups = size > 1 ? cols / size : 0;
-            _room.cubes = Mathf.Max(_room.cubes, rows * cols);
-            _room.labels = Mathf.Max(_room.labels, rows + cols + groups);
-            _room.stripCubes = Mathf.Max(_room.stripCubes, Mathf.Max(cols, rows * size));
-            _room.stripLabels = Mathf.Max(_room.stripLabels, Mathf.Max(1 + cols + groups, rows + size + 1));
-            _lines = Mathf.Max(_lines, rows + cols / size);
-        }
     }
 
     private void FollowHead()
