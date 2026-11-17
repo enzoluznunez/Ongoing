@@ -125,3 +125,6 @@ ProjectSettings/AI.Assistant/
 
 /[Aa]ssets/[Rr]esources/DevAgentSettings.asset
 /[Aa]ssets/[Rr]esources/DevAgentSettings.asset.meta
+
+/Tools/DocumentTools/Build/
+/Tools/PdfPigPatch/Build/

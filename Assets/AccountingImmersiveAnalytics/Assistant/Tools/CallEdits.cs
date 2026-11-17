@@ -1,0 +1,41 @@
+using System.Collections.Generic;
+using AccountingImmersiveAnalytics.App;
+using AccountingImmersiveAnalytics.Assistant.Live;
+using AccountingImmersiveAnalytics.Assistant.Session;
+using AccountingImmersiveAnalytics.UI.Charts;
+using AccountingImmersiveAnalytics.UI.Charts.Tools;
+
+namespace AccountingImmersiveAnalytics.Assistant.Tools
+{
+    public sealed class CallEdits : AgenticTool<CallEdits.Args> {
+
+        public class Args {
+            [Doc("false switches the button off, closing the Edits panel, as pressing it again does. Defaults to true."), DefaultsTo(true), Optional]
+            public bool? on;
+        }
+
+        public override FunctionDeclaration Declaration => new FunctionDeclaration {
+            Name = "CallEdits",
+            Description = "Press the pinned chart's Edits button, which opens its Edits panel below the chart: the chart's edits, " +
+                          "newest first, each with who made it, and an Undo button. Returns the list. Undo takes back the newest edit.",
+            Parameters = ParametersFor(typeof(Args))
+        };
+
+        protected override void Run(Args args, Dictionary<string, object> result) {
+            if (SwitchedOff(ToolType.Edits, args.on, result)) return;
+            ChartManager charts = Scene.Charts;
+            if (charts == null || charts.Pinned == null) {
+                Refuse(result, "pinned chart", "The Edits button is beside a pinned chart, and none is pinned. Pin one with CallPin first.");
+                return;
+            }
+            if (!EnsureToolSelected(ToolType.Edits, result)) return;
+            result["on"] = true;
+            result["chart"] = charts.Pinned.Title;
+
+            var edits = new List<object>();
+            foreach (Edit edit in ChartManager.ActiveEdits.For(charts.Pinned.Id))
+                edits.Add($"{edit.what ?? Edit.KindName(edit.kind)} ({(edit.byAssistant ? "Assistant" : "You")})");
+            result["edits"] = edits;
+        }
+    }
+}

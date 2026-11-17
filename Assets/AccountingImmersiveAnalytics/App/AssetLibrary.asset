@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3289ffec33974bc4a36436c45b4a334b, type: 3}
+  m_Name: AssetLibrary
+  m_EditorClassIdentifier: 
+  _icons:
+  - {fileID: 21300000, guid: d89d035f63a849559c01bd29f354db50, type: 3}
+  - {fileID: 21300000, guid: 083ce8f921e043ac965d22b38ae35c27, type: 3}
+  - {fileID: 21300000, guid: 191ad18cb17045989c72806c3a5ccad6, type: 3}
+  - {fileID: 21300000, guid: 7feac52d01fb47c281041558b1a1780c, type: 3}
+  - {fileID: 21300000, guid: f5a26fbbad274df1b096ec1c666d5699, type: 3}
+  - {fileID: 21300000, guid: cad080c1492d4b15be592ba9b99892cb, type: 3}
+  - {fileID: 21300000, guid: c202024182c9488582832b25c2b30d99, type: 3}
+  - {fileID: 21300000, guid: 5a79fc2e1f894605a7294b03fccc125a, type: 3}
+  _panelFront: {fileID: 2100000, guid: 721e731846c5a4020a926d3a4729840e, type: 2}
+  _panelBack: {fileID: 2100000, guid: 541671c114a7a4318ac761b41b4f36b2, type: 2}
+  _chartMarks: {fileID: 2100000, guid: 137244d2eaaca4feeadc62007d54ff30, type: 2}
+  _rayLine: {fileID: 2100000, guid: a30b07f471d0437f8888a3cb6602e9f9, type: 2}
+  _pokeCanvas: {fileID: 5940308584734764781, guid: 041116b65f85640d3874d6bf55a89a13, type: 3}

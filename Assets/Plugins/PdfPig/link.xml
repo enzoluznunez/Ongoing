@@ -1,0 +1,9 @@
+<linker>
+  <assembly fullname="UglyToad.PdfPig" preserve="all" />
+  <assembly fullname="UglyToad.PdfPig.Core" preserve="all" />
+  <assembly fullname="UglyToad.PdfPig.DocumentLayoutAnalysis" preserve="all" />
+  <assembly fullname="UglyToad.PdfPig.Fonts" preserve="all" />
+  <assembly fullname="UglyToad.PdfPig.Tokenization" preserve="all" />
+  <assembly fullname="UglyToad.PdfPig.Tokens" preserve="all" />
+  <assembly fullname="UglyToad.PdfPig.Package" preserve="all" />
+</linker>

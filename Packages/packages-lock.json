@@ -35,6 +35,18 @@
       },
       "url": "https://packages.unity.com"
     },
+    "com.onetext.core": {
+      "version": "https://github.com/CodeOneLabs/OneText.git#v0.4.2",
+      "depth": 0,
+      "source": "git",
+      "dependencies": {
+        "com.unity.burst": "1.8.4",
+        "com.unity.collections": "1.4.0",
+        "com.unity.mathematics": "1.2.6",
+        "com.unity.ugui": "1.0.0"
+      },
+      "hash": "c0feeed15922a436b70d5788518ade42e72041cc"
+    },
     "com.unity.burst": {
       "version": "2.0.0",
       "depth": 0,
