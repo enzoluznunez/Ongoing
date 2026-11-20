@@ -1,0 +1,26 @@
+{
+    "name": "AccountingImmersiveAnalytics.Editor",
+    "rootNamespace": "AccountingImmersiveAnalytics.Editor",
+    "references": [
+        "AccountingImmersiveAnalytics",
+        "OneText",
+        "OneText.Editor",
+        "OneText.UGUI",
+        "Unity.RenderPipelines.Universal.Runtime",
+        "Unity.RenderPipelines.Core.Runtime",
+        "Oculus.VR",
+        "Oculus.Interaction",
+        "UnityEngine.UI"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
