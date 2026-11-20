@@ -7,13 +7,13 @@ namespace AccountingImmersiveAnalytics.UI.Charts
 
     public class Edit
     {
-        public EditKind kind;
-        public MoveRecord move;
-        public int chartId;
-        public ChartShaping before;
-        public int pinnedBefore = -1;
-        public string what;
-        public bool byAssistant = ActivityFeed.InAssistantCall;
+        public EditKind Kind;
+        public MoveRecord Move;
+        public int ChartId;
+        public ChartShaping Before;
+        public int PinnedBefore = -1;
+        public string What;
+        public bool ByAssistant = ActivityFeed.InAssistantCall;
 
         public static string KindName(EditKind kind) =>
             kind == EditKind.Rotate ? "turn" : kind == EditKind.Scale ? "resize" : kind.ToString().ToLowerInvariant();

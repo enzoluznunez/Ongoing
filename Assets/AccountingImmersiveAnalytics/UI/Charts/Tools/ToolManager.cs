@@ -13,7 +13,7 @@ namespace AccountingImmersiveAnalytics.UI.Charts.Tools
     {
         public event Action<ToolType> OnToolChanged;
 
-        public ChartManager chartManager;
+        [SerializeField] private ChartManager _chartManager;
 
         public ToolType SelectedTool { get; private set; } = ToolType.None;
 
@@ -46,7 +46,7 @@ namespace AccountingImmersiveAnalytics.UI.Charts.Tools
 
         private void Start()
         {
-            if (chartManager == null) chartManager = Scene.Charts;
+            if (_chartManager == null) _chartManager = Scene.Charts;
         }
 
         public void SelectTool(ToolType tool) => Select(SelectedTool == tool ? ToolType.None : tool);
@@ -73,8 +73,8 @@ namespace AccountingImmersiveAnalytics.UI.Charts.Tools
             Edit top = edits.Peek();
             if (top == null) return false;
 
-            string kindName = Edit.KindName(top.kind);
-            bool applied = chartManager != null && chartManager.Undo(top);
+            string kindName = Edit.KindName(top.Kind);
+            bool applied = _chartManager != null && _chartManager.Undo(top);
             edits.Pop();
             if (!applied)
             {

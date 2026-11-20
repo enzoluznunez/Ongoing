@@ -41,7 +41,7 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools.Chart
 
             var edits = new List<object>();
             foreach (Edit edit in ChartManager.ActiveEdits.For(charts.Pinned.Id))
-                edits.Add($"{edit.what ?? Edit.KindName(edit.kind)} ({(edit.byAssistant ? "Assistant" : "You")})");
+                edits.Add($"{edit.What ?? Edit.KindName(edit.Kind)} ({(edit.ByAssistant ? "Assistant" : "You")})");
             result["edits"] = edits;
         }
     }

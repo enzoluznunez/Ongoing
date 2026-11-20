@@ -84,7 +84,7 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools.Chart
 
             var edits = new List<object>();
             foreach (Edit edit in ChartManager.ActiveEdits.For(entry.Id))
-                edits.Add($"{edit.what} ({(edit.byAssistant ? "Assistant" : "You")})");
+                edits.Add($"{edit.What} ({(edit.ByAssistant ? "Assistant" : "You")})");
             result["edits"] = edits;
             if (TrendFitter.Offered(spec))
             {

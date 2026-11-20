@@ -4,10 +4,10 @@ namespace AccountingImmersiveAnalytics.UI.Charts
 {
     public struct MoveRecord
     {
-        public int chartId;
-        public Vector3 prePos;
-        public Quaternion preRot;
-        public Vector3 preScale;
+        public int ChartId;
+        public Vector3 PrePos;
+        public Quaternion PreRot;
+        public Vector3 PreScale;
 
         public static bool SamePose(Vector3 aPos, Quaternion aRot, Vector3 aScale,
             Vector3 bPos, Quaternion bRot, Vector3 bScale) =>

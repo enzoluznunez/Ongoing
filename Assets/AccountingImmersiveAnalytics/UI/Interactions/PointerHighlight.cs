@@ -11,15 +11,15 @@ namespace AccountingImmersiveAnalytics.UI.Interactions
     {
         private const float LiftDuration = Animate.Fast;
 
-        public Graphic target;
-        public Color restColor;
-        public Color pressColor;
+        public Graphic Target;
+        public Color RestColor;
+        public Color PressColor;
 
-        public Transform liftTarget;
+        public Transform LiftTarget;
 
-        public Graphic textTarget;
-        public Color textRestColor;
-        public Color textPressColor;
+        public Graphic TextTarget;
+        public Color TextRestColor;
+        public Color TextPressColor;
 
         private bool _hovered;
         private bool _pressed;
@@ -27,7 +27,7 @@ namespace AccountingImmersiveAnalytics.UI.Interactions
         private float _liftT;
         private Coroutine _lift;
 
-        private Transform Lifted => liftTarget != null ? liftTarget : transform;
+        private Transform Lifted => LiftTarget != null ? LiftTarget : transform;
 
         private bool Raised => _hovered && !_pressed;
 
@@ -38,11 +38,11 @@ namespace AccountingImmersiveAnalytics.UI.Interactions
 
         public void SetLiftTarget(Transform t)
         {
-            liftTarget = t;
+            LiftTarget = t;
             _baseDepth = Lifted.localPosition.z;
         }
 
-        public void SetTextTarget(Graphic text) => textTarget = text;
+        public void SetTextTarget(Graphic text) => TextTarget = text;
 
         public bool IsEngaged => _hovered || _pressed;
 
@@ -56,10 +56,10 @@ namespace AccountingImmersiveAnalytics.UI.Interactions
 
         public void SetState(Color rest, Color press, Color textRest, Color textPress)
         {
-            restColor = rest;
-            pressColor = press;
-            textRestColor = textRest;
-            textPressColor = textPress;
+            RestColor = rest;
+            PressColor = press;
+            TextRestColor = textRest;
+            TextPressColor = textPress;
             Apply();
         }
 
@@ -146,10 +146,10 @@ namespace AccountingImmersiveAnalytics.UI.Interactions
 
         private void Apply()
         {
-            if (target != null)
-                target.color = _pressed ? pressColor : restColor;
-            if (textTarget != null)
-                textTarget.color = _pressed ? textPressColor : textRestColor;
+            if (Target != null)
+                Target.color = _pressed ? PressColor : RestColor;
+            if (TextTarget != null)
+                TextTarget.color = _pressed ? TextPressColor : TextRestColor;
         }
     }
 }

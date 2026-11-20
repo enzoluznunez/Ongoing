@@ -79,12 +79,12 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools.Chart
             if (args.kind != null)
             {
                 string requested = args.kind.Trim().ToLowerInvariant();
-                if (Edit.KindName(top.kind) != requested)
+                if (Edit.KindName(top.Kind) != requested)
                 {
                     Refuse(result, "matching newest edit",
-                        $"The newest edit is a {Edit.KindName(top.kind)} edit, not a {requested} edit. Undo always " +
+                        $"The newest edit is a {Edit.KindName(top.Kind)} edit, not a {requested} edit. Undo always " +
                         "removes the newest edit first. Ask the user which they meant, then call again without 'kind'.");
-                    result["nextUndo"] = Edit.KindName(top.kind);
+                    result["nextUndo"] = Edit.KindName(top.Kind);
                     result["remaining"] = ChartManager.ActiveEdits.Count;
                     return;
                 }
@@ -108,7 +108,7 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools.Chart
             }
             result["remaining"] = ChartManager.ActiveEdits.Count;
             var next = ChartManager.ActiveEdits.Peek();
-            if (next != null) result["nextUndo"] = Edit.KindName(next.kind);
+            if (next != null) result["nextUndo"] = Edit.KindName(next.Kind);
         }
     }
 }

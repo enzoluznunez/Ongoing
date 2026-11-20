@@ -352,7 +352,7 @@ namespace AccountingImmersiveAnalytics.UI.Charts
             bool applied = Undo(edit);
             _edits.DropAt(index);
             if (!applied) return false;
-            ActivityFeed.Record($"undid the {Edit.KindName(edit.kind)} edit on \"{entry.Title}\"");
+            ActivityFeed.Record($"undid the {Edit.KindName(edit.Kind)} edit on \"{entry.Title}\"");
             return true;
         }
 
@@ -370,11 +370,11 @@ namespace AccountingImmersiveAnalytics.UI.Charts
         public bool Undo(Edit edit)
         {
             if (edit == null) return false;
-            switch (edit.kind)
+            switch (edit.Kind)
             {
                 case EditKind.Pin:
                 {
-                    int id = edit.pinnedBefore;
+                    int id = edit.PinnedBefore;
                     ChartEntry target = id >= 0 ? WithId(id) : null;
                     if (id >= 0 && target == null) return false;
                     Pin(target, record: false);
@@ -384,17 +384,17 @@ namespace AccountingImmersiveAnalytics.UI.Charts
                 case EditKind.Filter:
                 case EditKind.Trend:
                 {
-                    ChartEntry entry = WithId(edit.chartId);
+                    ChartEntry entry = WithId(edit.ChartId);
                     if (entry == null) return false;
-                    Apply(entry, edit.before);
+                    Apply(entry, edit.Before);
                     return true;
                 }
                 default:
                 {
                     Transform pinned = PinnedTransform;
-                    if (pinned == null || _pinnedEntry.Id != edit.move.chartId) return false;
-                    MoveRecord m = edit.move;
-                    RestorePose(pinned, m.prePos, m.preRot, m.preScale);
+                    if (pinned == null || _pinnedEntry.Id != edit.Move.ChartId) return false;
+                    MoveRecord m = edit.Move;
+                    RestorePose(pinned, m.PrePos, m.PreRot, m.PreScale);
                     return true;
                 }
             }
@@ -407,10 +407,10 @@ namespace AccountingImmersiveAnalytics.UI.Charts
             if (MoveRecord.SamePose(chart.localPosition, chart.localRotation, chart.localScale, prePos, preRot, preScale)) return;
             _edits.PushMove(new MoveRecord
             {
-                chartId = _pinnedEntry.Id,
-                prePos = prePos,
-                preRot = preRot,
-                preScale = preScale
+                ChartId = _pinnedEntry.Id,
+                PrePos = prePos,
+                PreRot = preRot,
+                PreScale = preScale
             }, kind, what ?? (kind == EditKind.Scale ? "Resized the chart" : kind == EditKind.Rotate ? "Turned the chart" : "Moved the chart"));
         }
 

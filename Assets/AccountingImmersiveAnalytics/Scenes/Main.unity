@@ -3074,7 +3074,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 99fbc65dfc80643fb99e3bf1b175babe, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::ToolController
-  chartManager: {fileID: 849227661}
+  _chartManager: {fileID: 849227661}
 --- !u!1 &855595706
 GameObject:
   m_ObjectHideFlags: 0
@@ -4770,13 +4770,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 39936687822f44b38b76c0a170fc47c2, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PointerHighlight
-  target: {fileID: 1186701088}
-  restColor: {r: 1, g: 1, b: 1, a: 0.05}
-  pressColor: {r: 1, g: 1, b: 1, a: 0.3}
-  liftTarget: {fileID: 1988225999}
-  textTarget: {fileID: 0}
-  textRestColor: {r: 0, g: 0, b: 0, a: 1}
-  textPressColor: {r: 1, g: 1, b: 1, a: 1}
+  Target: {fileID: 1186701088}
+  RestColor: {r: 1, g: 1, b: 1, a: 0.05}
+  PressColor: {r: 1, g: 1, b: 1, a: 0.3}
+  LiftTarget: {fileID: 1988225999}
+  TextTarget: {fileID: 0}
+  TextRestColor: {r: 0, g: 0, b: 0, a: 1}
+  TextPressColor: {r: 1, g: 1, b: 1, a: 1}
 --- !u!114 &1114226985
 MonoBehaviour:
   m_ObjectHideFlags: 0

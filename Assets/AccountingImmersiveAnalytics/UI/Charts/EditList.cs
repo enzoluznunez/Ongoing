@@ -19,7 +19,7 @@ namespace AccountingImmersiveAnalytics.UI.Charts
         public int NewestFor(int chartId)
         {
             for (int i = Count - 1; i >= 0; i--)
-                if (this[i].kind != EditKind.Pin && this[i].chartId == chartId) return i;
+                if (this[i].Kind != EditKind.Pin && this[i].ChartId == chartId) return i;
             return -1;
         }
 
@@ -27,7 +27,7 @@ namespace AccountingImmersiveAnalytics.UI.Charts
         {
             var found = new List<Edit>();
             for (int i = Count - 1; i >= 0; i--)
-                if (this[i].kind != EditKind.Pin && this[i].chartId == chartId) found.Add(this[i]);
+                if (this[i].Kind != EditKind.Pin && this[i].ChartId == chartId) found.Add(this[i]);
             return found;
         }
 
@@ -48,13 +48,13 @@ namespace AccountingImmersiveAnalytics.UI.Charts
         }
 
         public void PushMove(MoveRecord move, EditKind kind, string what) =>
-            Push(new Edit { kind = kind, move = move, chartId = move.chartId, what = what });
+            Push(new Edit { Kind = kind, Move = move, ChartId = move.ChartId, What = what });
 
         public void PushPin(int before) =>
-            Push(new Edit { kind = EditKind.Pin, pinnedBefore = before });
+            Push(new Edit { Kind = EditKind.Pin, PinnedBefore = before });
 
         public void PushShape(EditKind kind, int chartId, ChartShaping before, string what) =>
-            Push(new Edit { kind = kind, chartId = chartId, before = before, what = what });
+            Push(new Edit { Kind = kind, ChartId = chartId, Before = before, What = what });
 
         private void Push(Edit edit)
         {

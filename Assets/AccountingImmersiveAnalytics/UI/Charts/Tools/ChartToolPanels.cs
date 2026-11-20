@@ -299,10 +299,10 @@ namespace AccountingImmersiveAnalytics.UI.Charts.Tools
             foreach (Edit edit in edits)
             {
                 Edit e = edit;
-                card.Pair(() => Numbers.Text(e.what ?? Edit.KindName(e.kind)),
-                    () => Strings.Get(e.byAssistant ? "assistant" : "edits.you"), true);
+                card.Pair(() => Numbers.Text(e.What ?? Edit.KindName(e.Kind)),
+                    () => Strings.Get(e.ByAssistant ? "assistant" : "edits.you"), true);
             }
-            card.EndList("edits", "edit", i => $"{edits[i].what ?? Edit.KindName(edits[i].kind)} ({(edits[i].byAssistant ? "Assistant" : "You")})");
+            card.EndList("edits", "edit", i => $"{edits[i].What ?? Edit.KindName(edits[i].Kind)} ({(edits[i].ByAssistant ? "Assistant" : "You")})");
             card.Wide(null, () => Strings.Get("edits.undo"), false, false, edits.Count > 0, () =>
             {
                 if (ActivityFeed.UserDriven) AssistantTurn.UserTookControl();

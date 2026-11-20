@@ -164,7 +164,7 @@ namespace AccountingImmersiveAnalytics.UI.Helpers
             SetPalette(h, rest, select, restText, selectText);
             if (h.Highlight == null) return;
 
-            h.Highlight.target = target;
+            h.Highlight.Target = target;
             if (h.Text != null) h.Highlight.SetTextTarget(h.Text);
             h.Highlight.SetState(rest, select, restText, selectText);
             target.color = rest;
