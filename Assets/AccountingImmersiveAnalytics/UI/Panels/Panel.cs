@@ -1,4 +1,3 @@
-using System.Collections;
 using System.Collections.Generic;
 using AccountingImmersiveAnalytics.App;
 using AccountingImmersiveAnalytics.UI.Helpers;
@@ -344,28 +343,6 @@ namespace AccountingImmersiveAnalytics.UI.Panels
             _swell.Set(transform, held);
         }
 
-        private Coroutine _flip;
-
-        private bool Held => _grabbable != null && _grabbable.SelectingPointsCount > 0;
-
-        private void ApplyFacing()
-        {
-            if (_flip != null || !IsVisible || Held || PanelLineup.IsSliding) return;
-
-            Transform cam = CameraRig.MainTransform;
-            if (cam == null) return;
-            if (!PanelPlacement.ShouldFlip(transform.position, transform.forward, cam.position)) return;
-
-            _flip = StartCoroutine(FlipRoutine());
-        }
-
-        private IEnumerator FlipRoutine()
-        {
-            yield return PanelPlacement.Flip(transform, transform.position, () => Held);
-            _flip = null;
-            InvalidateGrabBounds();
-        }
-
         private Vector2 _pokeFitted;
 
         private void FitPokes()
@@ -382,7 +359,6 @@ namespace AccountingImmersiveAnalytics.UI.Panels
             PanelLineup.UndockIfMoved(this);
             ApplyGrabCollider();
             ApplyGrabLook();
-            ApplyFacing();
 
             if (!_grabBoundsDirty || !IsVisible) return;
 
