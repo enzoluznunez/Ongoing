@@ -2,17 +2,16 @@ using System;
 using System.Threading.Tasks;
 using AccountingImmersiveAnalytics.Assistant.Voice;
 using UnityEngine;
-using UnityEngine.Serialization;
 
 namespace AccountingImmersiveAnalytics.Assistant
 {
     public class AssistantSwitch : MonoBehaviour
     {
         [Tooltip("Google Search grounding, always on. It needs a paid-tier (billing-enabled) Gemini API key: on the free tier the session is rejected and the assistant turns itself off.")]
-        [SerializeField, FormerlySerializedAs("enableWebSearch")] private bool _webSearch = true;
+        [SerializeField] private bool _webSearch = true;
 
         [Tooltip("When the voice session, mic permission and audio start. OnFirstConnect defers all of it until the assistant is first needed.")]
-        [SerializeField, FormerlySerializedAs("initPolicy")] private StartPolicy _startPolicy = StartPolicy.AtLaunch;
+        [SerializeField] private StartPolicy _startPolicy = StartPolicy.AtLaunch;
 
         private bool _ready;
         private bool _active;

@@ -30,7 +30,7 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools.General
 
         protected override void Run(Args args, Dictionary<string, object> result)
         {
-            var menu = Scene.Assistant;
+            var menu = Scene.Menu;
             if (menu == null) { result["error"] = "The Menu was not found in the scene."; return; }
 
             bool active;

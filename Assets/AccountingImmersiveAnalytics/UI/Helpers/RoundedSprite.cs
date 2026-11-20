@@ -18,40 +18,8 @@ namespace AccountingImmersiveAnalytics.UI.Helpers
             int r = Mathf.Max(2, Mathf.RoundToInt(radiusUnits * TexelsPerUnit));
             if (_sprites.TryGetValue(r, out Sprite cached) && cached != null) return cached;
 
-            int size = r * 2 + 4;
-
-            Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, 1, false)
-            {
-                filterMode = FilterMode.Bilinear,
-                wrapMode = TextureWrapMode.Clamp
-            };
-
-            Color32[] pixels = new Color32[size * size];
-
-            for (int y = 0; y < size; y++)
-            {
-                float py = y + 0.5f;
-                float dy = py < r ? r - py : (py > size - r ? py - (size - r) : -1f);
-
-                for (int x = 0; x < size; x++)
-                {
-                    float px = x + 0.5f;
-                    float dx = px < r ? r - px : (px > size - r ? px - (size - r) : -1f);
-
-                    byte a = 255;
-                    if (dx > 0f && dy > 0f)
-                        a = Coverage(Mathf.Sqrt(dx * dx + dy * dy), r + 0.5f);
-                    pixels[y * size + x] = new Color32(255, 255, 255, a);
-                }
-            }
-
-            tex.SetPixels32(pixels);
-            tex.Apply(false, true);
-
-            Vector4 border = new Vector4(r, r, r, r);
-            Sprite sprite = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f),
-                ReferencePixelsPerUnit * TexelsPerUnit, 0, SpriteMeshType.FullRect, border);
-
+            Sprite sprite = Paint(r, (dx, dy, x, y) =>
+                dx > 0f && dy > 0f ? Coverage(Mathf.Sqrt(dx * dx + dy * dy), r + 0.5f) : (byte)255);
             _sprites[r] = sprite;
             return sprite;
         }
@@ -62,8 +30,34 @@ namespace AccountingImmersiveAnalytics.UI.Helpers
             int s = Mathf.Clamp(Mathf.RoundToInt(strokeUnits * TexelsPerUnit), 1, r - 1);
             if (_rings.TryGetValue((r, s), out Sprite cached) && cached != null) return cached;
 
-            int size = r * 2 + 4;
+            int size = Size(r);
+            Sprite sprite = Paint(r, (dx, dy, x, y) =>
+            {
+                bool inside = y >= s && y < size - s && x >= s && x < size - s;
+                float frame = 1f, inner = inside ? 1f : 0f;
+                if (dx > 0f && dy > 0f)
+                {
+                    float dist = Mathf.Sqrt(dx * dx + dy * dy);
+                    frame = Coverage(dist, r + 0.5f) / 255f;
+                    inner = inside ? Coverage(dist, r - s + 0.5f) / 255f : 0f;
+                }
+                return (byte)Mathf.RoundToInt(255f * frame * (1f - inner));
+            });
+            _rings[(r, s)] = sprite;
+            return sprite;
+        }
 
+        private static int Size(int r) => r * 2 + 4;
+
+        private static float CornerDistance(int i, int r, int size)
+        {
+            float p = i + 0.5f;
+            return p < r ? r - p : (p > size - r ? p - (size - r) : -1f);
+        }
+
+        private static Sprite Paint(int r, System.Func<float, float, int, int, byte> alpha)
+        {
+            int size = Size(r);
             Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, 1, false)
             {
                 filterMode = FilterMode.Bilinear,
@@ -71,40 +65,18 @@ namespace AccountingImmersiveAnalytics.UI.Helpers
             };
 
             Color32[] pixels = new Color32[size * size];
-
             for (int y = 0; y < size; y++)
             {
-                float py = y + 0.5f;
-                float dy = py < r ? r - py : (py > size - r ? py - (size - r) : -1f);
-                bool innerRow = y >= s && y < size - s;
-
+                float dy = CornerDistance(y, r, size);
                 for (int x = 0; x < size; x++)
-                {
-                    float px = x + 0.5f;
-                    float dx = px < r ? r - px : (px > size - r ? px - (size - r) : -1f);
-                    bool innerColumn = x >= s && x < size - s;
-
-                    float frame = 1f, inner = innerRow && innerColumn ? 1f : 0f;
-                    if (dx > 0f && dy > 0f)
-                    {
-                        float dist = Mathf.Sqrt(dx * dx + dy * dy);
-                        frame = Coverage(dist, r + 0.5f) / 255f;
-                        inner = innerRow && innerColumn ? Coverage(dist, r - s + 0.5f) / 255f : 0f;
-                    }
-                    float alpha = frame * (1f - inner);
-                    pixels[y * size + x] = new Color32(255, 255, 255, (byte)Mathf.RoundToInt(255f * alpha));
-                }
+                    pixels[y * size + x] = new Color32(255, 255, 255, alpha(CornerDistance(x, r, size), dy, x, y));
             }
 
             tex.SetPixels32(pixels);
             tex.Apply(false, true);
 
-            Vector4 border = new Vector4(r, r, r, r);
-            Sprite sprite = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f),
-                ReferencePixelsPerUnit * TexelsPerUnit, 0, SpriteMeshType.FullRect, border);
-
-            _rings[(r, s)] = sprite;
-            return sprite;
+            return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f),
+                ReferencePixelsPerUnit * TexelsPerUnit, 0, SpriteMeshType.FullRect, new Vector4(r, r, r, r));
         }
 
         public static void ApplyRing(Image image, float radiusUnits, float strokeUnits)

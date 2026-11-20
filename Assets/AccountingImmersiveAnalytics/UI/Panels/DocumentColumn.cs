@@ -84,14 +84,7 @@ namespace AccountingImmersiveAnalytics.UI.Panels
             button.targetGraphic = card;
             button.onClick.AddListener(() => press(entry));
 
-            RectTransform paper = LayoutTools.EnsureChild(page, "Paper");
-            LayoutTools.Stretch(paper);
-            RawImage picture = LayoutTools.Ensure<RawImage>(paper.gameObject);
-            picture.color = Style.Card;
-            picture.uvRect = new Rect(0f, 1f, 1f, -1f);
-            picture.raycastTarget = false;
-            if (Panel.FrontMaterial != null) picture.material = Panel.FrontMaterial;
-            picture.enabled = false;
+            RawImage picture = AddPaper(page);
 
             if (!entry.Showable) AddMessage(page);
             BackFace.Add(page, Radius);
@@ -182,6 +175,19 @@ namespace AccountingImmersiveAnalytics.UI.Panels
                 if (slot.Texture != null) UnityEngine.Object.Destroy(slot.Texture);
                 slot.Texture = null;
             }
+        }
+
+        public static RawImage AddPaper(RectTransform page)
+        {
+            RectTransform paper = LayoutTools.EnsureChild(page, "Paper");
+            LayoutTools.Stretch(paper);
+            RawImage picture = LayoutTools.Ensure<RawImage>(paper.gameObject);
+            picture.color = Style.Card;
+            picture.uvRect = new Rect(0f, 1f, 1f, -1f);
+            picture.raycastTarget = false;
+            if (Panel.FrontMaterial != null) picture.material = Panel.FrontMaterial;
+            picture.enabled = false;
+            return picture;
         }
     }
 }

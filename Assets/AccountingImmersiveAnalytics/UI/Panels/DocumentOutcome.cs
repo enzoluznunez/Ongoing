@@ -1,9 +1,6 @@
 using System.Collections.Generic;
 using AccountingImmersiveAnalytics.Documents;
 using AccountingImmersiveAnalytics.UI.Charts.View;
-using OneText.UGUI;
-using UnityEngine;
-using UnityEngine.UI;
 
 namespace AccountingImmersiveAnalytics.UI.Panels
 {

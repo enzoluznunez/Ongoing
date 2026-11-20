@@ -2548,8 +2548,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ecc5646751da48d689a0b0462face157, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GeminiClient
-  enableWebSearch: 1
-  initPolicy: 1
+  _webSearch: 1
+  _startPolicy: 1
 --- !u!4 &704980504
 Transform:
   m_ObjectHideFlags: 0
@@ -7978,7 +7978,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Watch
   _hand: {fileID: 1048234294}
-  geminiClient: {fileID: 704980503}
+  _assistantSwitch: {fileID: 704980503}
   yOffsetFromHand: 0.025
   smoothing:
     posMinCutoff: 1
@@ -8216,7 +8216,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Study.Runtime::DocumentsPanelUI
   zOffsetFromCamera: 0.45
-  grabCollider: {fileID: 1193850193}
+  _grabCollider: {fileID: 1193850193}
 --- !u!1 &1684049541
 GameObject:
   m_ObjectHideFlags: 0

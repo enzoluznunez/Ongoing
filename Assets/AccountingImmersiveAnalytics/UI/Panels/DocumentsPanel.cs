@@ -465,14 +465,7 @@ namespace AccountingImmersiveAnalytics.UI.Panels
             card.color = Style.Card;
             card.raycastTarget = false;
 
-            RectTransform paper = LayoutTools.EnsureChild(sheet, "Paper");
-            LayoutTools.Stretch(paper);
-            RawImage picture = LayoutTools.Ensure<RawImage>(paper.gameObject);
-            picture.color = Style.Card;
-            picture.uvRect = new Rect(0f, 1f, 1f, -1f);
-            picture.raycastTarget = false;
-            if (Panel.FrontMaterial != null) picture.material = Panel.FrontMaterial;
-            picture.enabled = false;
+            RawImage picture = DocumentColumn.AddPaper(sheet);
             BackFace.Add(sheet, Style.LargeRadius);
             return new Sheet { Root = root, Card = card, Picture = picture, Width = width };
         }

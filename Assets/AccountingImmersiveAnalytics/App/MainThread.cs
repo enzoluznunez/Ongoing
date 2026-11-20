@@ -8,12 +8,12 @@ namespace AccountingImmersiveAnalytics.App
     public class MainThread : MonoBehaviour
     {
 
-        private static readonly ConcurrentQueue<Action> queue = new ConcurrentQueue<Action>();
+        private static readonly ConcurrentQueue<Action> _queue = new ConcurrentQueue<Action>();
 
         public static Task Run(Action action)
         {
             var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-            queue.Enqueue(() =>
+            _queue.Enqueue(() =>
             {
                 try
                 {
@@ -30,7 +30,7 @@ namespace AccountingImmersiveAnalytics.App
 
         private void Update()
         {
-            while (queue.TryDequeue(out var action)) action();
+            while (_queue.TryDequeue(out var action)) action();
         }
     }
 }

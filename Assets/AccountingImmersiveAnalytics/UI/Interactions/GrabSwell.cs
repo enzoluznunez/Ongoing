@@ -1,4 +1,3 @@
-using System.Collections;
 using AccountingImmersiveAnalytics.UI.Helpers;
 using UnityEngine;
 

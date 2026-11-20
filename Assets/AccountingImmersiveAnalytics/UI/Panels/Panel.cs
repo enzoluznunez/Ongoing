@@ -17,7 +17,7 @@ namespace AccountingImmersiveAnalytics.UI.Panels
     {
         public float zOffsetFromCamera = 0.45f;
 
-        [SerializeField] private Collider grabCollider;
+        [SerializeField] private Collider _grabCollider;
 
         private Transform _grabPivot;
 
@@ -280,9 +280,9 @@ namespace AccountingImmersiveAnalytics.UI.Panels
 
         private void ApplyGrabCollider()
         {
-            if (grabCollider == null) return;
+            if (_grabCollider == null) return;
             bool on = _grabWanted && GrabArmed;
-            if (grabCollider.enabled != on) grabCollider.enabled = on;
+            if (_grabCollider.enabled != on) _grabCollider.enabled = on;
         }
 
         private RectTransform[] _grabRects;
@@ -386,7 +386,7 @@ namespace AccountingImmersiveAnalytics.UI.Panels
 
             if (!_grabBoundsDirty || !IsVisible) return;
 
-            if (_grabRects == null || !(grabCollider is BoxCollider))
+            if (_grabRects == null || !(_grabCollider is BoxCollider))
             {
                 _grabBoundsDirty = false;
                 return;
@@ -397,7 +397,7 @@ namespace AccountingImmersiveAnalytics.UI.Panels
 
         protected bool RefreshGrabBounds(params RectTransform[] rects)
         {
-            BoxCollider box = grabCollider as BoxCollider;
+            BoxCollider box = _grabCollider as BoxCollider;
             if (box == null) return false;
 
             Transform space = box.transform;

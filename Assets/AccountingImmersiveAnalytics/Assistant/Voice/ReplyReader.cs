@@ -160,7 +160,7 @@ namespace AccountingImmersiveAnalytics.Assistant.Voice
             if (!VoiceSession.ConsumeShutdownRequest()) return;
             _ = MainThread.Run(() =>
             {
-                Menu menu = Scene.Assistant;
+                Menu menu = Scene.Menu;
                 if (menu != null) menu.SetAssistantActive(false, AssistantCause.Assistant);
             });
         }

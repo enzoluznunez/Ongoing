@@ -10,7 +10,6 @@ using AccountingImmersiveAnalytics.UI.Interactions;
 using Oculus.Interaction;
 using Oculus.Interaction.Input;
 using UnityEngine;
-using UnityEngine.Serialization;
 using UnityEngine.UI;
 
 namespace AccountingImmersiveAnalytics.UI.Panels
@@ -22,7 +21,7 @@ namespace AccountingImmersiveAnalytics.UI.Panels
         [SerializeField, Interface(typeof(IHand))]
         private UnityEngine.Object _hand;
 
-        [SerializeField, FormerlySerializedAs("geminiClient")] private AssistantSwitch _assistantSwitch;
+        [SerializeField] private AssistantSwitch _assistantSwitch;
 
         public float yOffsetFromHand = Style.HandOffset;
 

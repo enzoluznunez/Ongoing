@@ -150,7 +150,7 @@ namespace AccountingImmersiveAnalytics.Hands
             if (_entry == null || _markInfo == null) return;
             if (_explanation.HasValue)
             {
-                TellAda();
+                TellAssistant();
                 return;
             }
 
@@ -161,14 +161,14 @@ namespace AccountingImmersiveAnalytics.Hands
                 if (_entry != entry || _markInfo != mark) return;
                 _explanation = result;
                 Render();
-                if (result.HasValue) TellAda();
+                if (result.HasValue) TellAssistant();
             });
             Render();
         }
 
-        private void TellAda()
+        private void TellAssistant()
         {
-            Menu assistant = Scene.Assistant;
+            Menu assistant = Scene.Menu;
             if (assistant != null && assistant.IsAssistantActive) ActivityFeed.Point(Describe());
         }
 

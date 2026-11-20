@@ -81,13 +81,8 @@ namespace AccountingImmersiveAnalytics.Text
         public static string Get(string original, string source = Language.English, string context = null)
         {
             string target = Target;
-            if (!string.IsNullOrEmpty(original) && HasLetters(original)) Lookups++;
-            if (!NeedsTranslation(original, source, target)) return original;
-            if (Cache.TryGetValue(target, out Dictionary<string, string> known) &&
-                known.TryGetValue(original, out string translated))
-                return translated;
+            if (Lookup(original, source, target, out string translated)) return translated;
 
-            Misses++;
             EnsureFolder();
             if (!Asking.Contains((target, original)))
             {
@@ -99,14 +94,17 @@ namespace AccountingImmersiveAnalytics.Text
 
         public static string Peek(string original, string source)
         {
-            string target = Target;
+            Lookup(original, source, Target, out string translated);
+            return translated;
+        }
+
+        private static bool Lookup(string original, string source, string target, out string translated)
+        {
             if (!string.IsNullOrEmpty(original) && HasLetters(original)) Lookups++;
-            if (!NeedsTranslation(original, source, target)) return original;
-            if (Cache.TryGetValue(target, out Dictionary<string, string> known) &&
-                known.TryGetValue(original, out string translated))
-                return translated;
+            if (TryCached(original, source, target, out translated)) return true;
             Misses++;
-            return original;
+            translated = original;
+            return false;
         }
 
         public static bool TryCached(string original, string source, string target, out string translated)
