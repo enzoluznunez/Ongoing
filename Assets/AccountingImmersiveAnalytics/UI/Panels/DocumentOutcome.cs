@@ -1,8 +1,6 @@
 using System.Collections.Generic;
-using System.Threading.Tasks;
 using AccountingImmersiveAnalytics.Documents;
 using AccountingImmersiveAnalytics.UI.Charts.View;
-using OneText;
 using OneText.UGUI;
 using UnityEngine;
 using UnityEngine.UI;

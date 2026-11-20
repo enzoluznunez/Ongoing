@@ -12,18 +12,6 @@ namespace AccountingImmersiveAnalytics.Documents
 {
     public static class PdfDocumentReader
     {
-        public static string TitleOf(byte[] bytes)
-        {
-            try
-            {
-                using (PdfDocument pdf = PdfDocument.Open(bytes)) return pdf.Information?.Title;
-            }
-            catch
-            {
-                return null;
-            }
-        }
-
         public static (string Title, double Width, double Height)? Peek(byte[] bytes)
         {
             try

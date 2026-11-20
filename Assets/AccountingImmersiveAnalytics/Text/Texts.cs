@@ -85,7 +85,7 @@ namespace AccountingImmersiveAnalytics.Text
             string text = binding.Compose();
             bool waiting = Translator.Misses != misses || (Loading.Holding && Translator.Lookups != lookups);
 
-            TranslationSurface surface = binding.Label.TryGetComponent(out LoadsAlone _) ? null : binding.Label.GetComponentInParent<TranslationSurface>(true);
+            TranslationSurface surface = binding.Label.GetComponentInParent<TranslationSurface>(true);
             if (surface != binding.Surface)
             {
                 if (binding.Surface != null) binding.Surface.SetWaiting(binding.Label, false);

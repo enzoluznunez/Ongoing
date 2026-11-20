@@ -180,8 +180,6 @@ namespace AccountingImmersiveAnalytics.UI.Panels
 
         public RectTransform ShowLeftCard(string name, float width) => ShowSideCard(ref _leftCard, ref _leftCardWidth, name, width);
 
-        public void HideLeftCard() => HideSideCard(_leftCard);
-
         private RectTransform ShowSideCard(ref RectTransform slot, ref float slotWidth, string name, float width)
         {
             RectTransform canvas = CanvasRect;

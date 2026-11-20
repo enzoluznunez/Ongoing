@@ -3,7 +3,6 @@ using System.Linq;
 using AccountingImmersiveAnalytics.Assistant.Live;
 using AccountingImmersiveAnalytics.Assistant.Tools;
 using AccountingImmersiveAnalytics.Documents;
-using AccountingImmersiveAnalytics.UI.Helpers;
 
 namespace AccountingImmersiveAnalytics.Assistant
 {

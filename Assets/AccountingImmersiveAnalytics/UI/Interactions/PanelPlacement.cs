@@ -2,7 +2,6 @@ using System;
 using System.Collections;
 using AccountingImmersiveAnalytics.App;
 using AccountingImmersiveAnalytics.UI.Helpers;
-using Oculus.Interaction;
 using UnityEngine;
 
 namespace AccountingImmersiveAnalytics.UI.Interactions

@@ -1,8 +1,6 @@
 using System;
-using System.Collections.Generic;
 using System.Text;
 using System.Threading.Tasks;
-using AccountingImmersiveAnalytics.Assistant.Live;
 using Newtonsoft.Json.Linq;
 using UnityEngine;
 using UnityEngine.Networking;

@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using AccountingImmersiveAnalytics.App;
 using AccountingImmersiveAnalytics.UI.Charts.Spec;
@@ -32,7 +31,7 @@ namespace AccountingImmersiveAnalytics.UI.Charts.View
         private readonly List<ButtonFactory.Handle> _buttons = new List<ButtonFactory.Handle>();
         private PanelCard _panel;
         private ToolType _open = ToolType.None;
-        private ChartManager _charts;
+        private readonly ChartManager _charts;
         private ToolManager _tools;
 
         public ChartCard Card { get; private set; }

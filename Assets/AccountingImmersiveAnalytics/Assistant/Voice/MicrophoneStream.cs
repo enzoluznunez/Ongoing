@@ -45,7 +45,6 @@ namespace AccountingImmersiveAnalytics.Assistant.Voice
             var callbacks = new PermissionCallbacks();
             callbacks.PermissionGranted += _ => answer.TrySetResult(true);
             callbacks.PermissionDenied += _ => answer.TrySetResult(false);
-            callbacks.PermissionDeniedAndDontAskAgain += _ => answer.TrySetResult(false);
             Permission.RequestUserPermission(Permission.Microphone, callbacks);
 #else
             answer.SetResult(true);

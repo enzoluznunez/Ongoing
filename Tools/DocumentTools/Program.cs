@@ -23,7 +23,8 @@ public static class Program
         }
         if (args.Length >= 2 && args[0] == "read")
         {
-            DocumentFile file = PdfDocumentReader.Read(File.ReadAllBytes(args[1]), new DocumentEntry { Id = "test", Title = PdfDocumentReader.TitleOf(File.ReadAllBytes(args[1])) ?? Path.GetFileNameWithoutExtension(args[1]) });
+            byte[] bytes = File.ReadAllBytes(args[1]);
+            DocumentFile file = PdfDocumentReader.Read(bytes, new DocumentEntry { Id = "test", Title = PdfDocumentReader.Peek(bytes)?.Title ?? Path.GetFileNameWithoutExtension(args[1]) });
             Console.WriteLine($"title: {file.Title} | pages: {file.Pages.Count} | passages: {file.Passages.Count} | minutes: {file.Minutes}");
             foreach (DocumentPassage passage in file.Passages) Console.WriteLine($"p{passage.Page + 1} top {passage.Top:0.00}: {passage.Text}");
             foreach (PdfTable table in file.Tables)

@@ -441,14 +441,6 @@ namespace AccountingImmersiveAnalytics.UI.Panels
             _anchorRotation = Quaternion.Slerp(_anchorRotation, twist, t);
         }
 
-        [ContextMenu("Log Wrist Anchor")]
-        private void LogWristAnchor()
-        {
-            Debug.Log($"[Menu] anchorOffset {_anchorOffset.ToString("F4")} " +
-                      $"anchorRotation {_anchorRotation.eulerAngles.ToString("F2")} " +
-                      $"(calibrated={_calibrated})");
-        }
-
         private bool TryFingerPose(Pose wrist, out Vector3 position, out Quaternion rotation)
         {
             position = Vector3.zero;

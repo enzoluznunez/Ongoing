@@ -6,7 +6,6 @@ using AccountingImmersiveAnalytics.UI.Charts;
 using AccountingImmersiveAnalytics.UI.Charts.Tools;
 using AccountingImmersiveAnalytics.UI.Charts.TwoD.Layout;
 using AccountingImmersiveAnalytics.UI.Charts.TwoD.View;
-using AccountingImmersiveAnalytics.UI.Charts.View;
 using static AccountingImmersiveAnalytics.Assistant.Tools.ToolResult;
 using static AccountingImmersiveAnalytics.Assistant.Tools.ToolTargets;
 

@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using AccountingImmersiveAnalytics.Text;
 using AccountingImmersiveAnalytics.UI.Charts.TwoD.Layout;
 using AccountingImmersiveAnalytics.UI.Charts.TwoD.View;
-using AccountingImmersiveAnalytics.UI.Charts.View;
 using AccountingImmersiveAnalytics.UI.Helpers;
 using UnityEngine;
 

@@ -8,7 +8,6 @@ using AccountingImmersiveAnalytics.UI.Charts.TwoD.Types;
 using AccountingImmersiveAnalytics.UI.Charts.View;
 using AccountingImmersiveAnalytics.UI.Helpers;
 using UnityEngine;
-using UnityEngine.UI;
 
 namespace AccountingImmersiveAnalytics.UI.Charts.TwoD.View
 {

@@ -118,7 +118,6 @@ namespace AccountingImmersiveAnalytics.UI.Charts.TwoD.Layout
 
             float yRight = left - Style.SmallPad;
             float centred = Style.Ascent(Style.SmallText) * 0.5f;
-            int lastY = yLabels.Count - 1;
             for (int i = 0; i < yLabels.Count; i++)
             {
                 if (y.IsCategory)
