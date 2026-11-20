@@ -9,7 +9,7 @@ namespace AccountingImmersiveAnalytics.UI.Interactions
 {
     public sealed class SnapScroll : ScrollRect
     {
-        private const float SnapSeconds = 0.18f;
+        private const float SnapSeconds = Animate.Medium;
         private const float EndSlack = 0.5f;
 
         public readonly List<float> Stops = new List<float>();
@@ -103,7 +103,7 @@ namespace AccountingImmersiveAnalytics.UI.Interactions
 
         private IEnumerator Glide(float from, float to)
         {
-            yield return Style.Tween(SnapSeconds, k => Set(Mathf.Lerp(from, to, k)));
+            yield return Animate.Tween(SnapSeconds, k => Set(Mathf.Lerp(from, to, k)));
             _snap = null;
         }
 

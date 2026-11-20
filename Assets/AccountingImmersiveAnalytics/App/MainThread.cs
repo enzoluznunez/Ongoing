@@ -5,25 +5,31 @@ using UnityEngine;
 
 namespace AccountingImmersiveAnalytics.App
 {
-    public class MainThread : MonoBehaviour {
+    public class MainThread : MonoBehaviour
+    {
 
         private static readonly ConcurrentQueue<Action> queue = new ConcurrentQueue<Action>();
 
-        public static Task Run(Action action) {
+        public static Task Run(Action action)
+        {
             var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-            queue.Enqueue(() => {
-                try {
+            queue.Enqueue(() =>
+            {
+                try
+                {
                     action();
                     tcs.SetResult(true);
                 }
-                catch (Exception e) {
+                catch (Exception e)
+                {
                     tcs.SetException(e);
                 }
             });
             return tcs.Task;
         }
 
-        private void Update() {
+        private void Update()
+        {
             while (queue.TryDequeue(out var action)) action();
         }
     }

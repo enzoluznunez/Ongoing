@@ -10,8 +10,8 @@ namespace AccountingImmersiveAnalytics.UI.Interactions
     public sealed class RangeSlider : MonoBehaviour, IPointerDownHandler, IDragHandler, IPointerUpHandler,
         IInitializePotentialDragHandler
     {
-        public const float TrackHeight = 12f;
-        public const float HandleSize = 28f;
+        public const float TrackHeight = Style.TrackHeight;
+        public const float HandleSize = Style.IconSize;
 
         private RectTransform _area;
         private RectTransform _fill;

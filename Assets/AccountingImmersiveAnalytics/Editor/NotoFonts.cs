@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
-using AccountingImmersiveAnalytics.Text;
 using OneText;
 using OneText.Editor;
 using UnityEditor;

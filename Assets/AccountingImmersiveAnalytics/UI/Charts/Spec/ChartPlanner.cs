@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using AccountingImmersiveAnalytics.Assistant;
+using AccountingImmersiveAnalytics.Assistant.FlashLite;
 using AccountingImmersiveAnalytics.UI.Charts.Data;
 using AccountingImmersiveAnalytics.UI.Charts.Scales;
 using Newtonsoft.Json.Linq;
@@ -35,6 +35,81 @@ namespace AccountingImmersiveAnalytics.UI.Charts.Spec
                 if (planned.Count > 0) Debug.Log($"[ChartPlanner] Flash-Lite gave no usable plan for '{title}'; using {planned.Count} built-in charts.");
             }
             return planned;
+        }
+
+        public static async Task<ChartSpec> PlanTable(string title, CsvTable table, string caption)
+        {
+            ChartKind? named = NamedKind(caption, out bool horizontal);
+            List<ChartSpec> planned = await Ask(title, table, caption);
+            ChartSpec pick = planned?.FirstOrDefault(spec => named == null || spec.Kind == named.Value);
+            if (pick == null && named != null) pick = Shape(named.Value, horizontal, table, CaptionTitle(caption) ?? title);
+            if (pick == null) pick = planned?.FirstOrDefault() ?? Guess(table).FirstOrDefault();
+            if (pick != null && named == ChartKind.Bar && pick.Kind == ChartKind.Bar)
+            {
+                pick.Horizontal = horizontal;
+                Fits(pick, table);
+            }
+            return pick;
+        }
+
+        private static readonly (string words, ChartKind kind, bool horizontal)[] Names =
+        {
+            ("horizontal bar", ChartKind.Bar, true), ("vertical bar", ChartKind.Bar, false), ("column chart", ChartKind.Bar, false),
+            ("bar chart", ChartKind.Bar, false), ("donut", ChartKind.Pie, false), ("doughnut", ChartKind.Pie, false), ("pie chart", ChartKind.Pie, false),
+            ("box plot", ChartKind.BoxPlot, false), ("boxplot", ChartKind.BoxPlot, false), ("heatmap", ChartKind.Heatmap, false),
+            ("heat map", ChartKind.Heatmap, false), ("treemap", ChartKind.Treemap, false), ("tree map", ChartKind.Treemap, false),
+            ("histogram", ChartKind.Histogram, false), ("bubble", ChartKind.Bubble, false), ("scatter", ChartKind.Scatter, false),
+            ("line chart", ChartKind.Line, false), ("line graph", ChartKind.Line, false)
+        };
+
+        private static ChartKind? NamedKind(string caption, out bool horizontal)
+        {
+            horizontal = false;
+            if (string.IsNullOrWhiteSpace(caption)) return null;
+            string text = caption.ToLowerInvariant();
+            foreach ((string words, ChartKind kind, bool across) in Names)
+            {
+                if (!text.Contains(words)) continue;
+                horizontal = across;
+                return kind;
+            }
+            return null;
+        }
+
+        private static string CaptionTitle(string caption)
+        {
+            if (string.IsNullOrWhiteSpace(caption)) return null;
+            string text = caption.Trim();
+            if (text.StartsWith("Table", StringComparison.OrdinalIgnoreCase))
+            {
+                int stop = text.IndexOf(". ", StringComparison.Ordinal);
+                if (stop > 0) text = text.Substring(stop + 2);
+            }
+            int end = text.IndexOf(". ", StringComparison.Ordinal);
+            if (end > 0) text = text.Substring(0, end);
+            text = text.TrimEnd('.').Trim();
+            return text.Length > 0 ? text : null;
+        }
+
+        private static ChartSpec Shape(ChartKind kind, bool horizontal, CsvTable table, string title)
+        {
+            ChartSpec spec = New(kind, title);
+            spec.Horizontal = horizontal;
+            var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (RoleRule rule in ChartKinds.RulesFor(kind))
+            {
+                bool number = rule.Type == FieldType.Number;
+                CsvField field = table.Fields.FirstOrDefault(f => !used.Contains(f.Name) && f.IsNumber == number &&
+                    (rule.Required || number || f.Categories.Count <= MostGroups && f.Categories.Count < table.RowCount));
+                if (field == null)
+                {
+                    if (rule.Required) return null;
+                    continue;
+                }
+                spec.Fields[rule.Role] = field.Name;
+                used.Add(field.Name);
+            }
+            return Fits(spec, table) == null ? spec : null;
         }
 
         public static string Fits(ChartSpec spec, CsvTable table)
@@ -69,9 +144,9 @@ namespace AccountingImmersiveAnalytics.UI.Charts.Spec
             return true;
         }
 
-        private static async Task<List<ChartSpec>> Ask(string title, CsvTable table)
+        private static async Task<List<ChartSpec>> Ask(string title, CsvTable table, string caption = null)
         {
-            JObject answer = await FlashLite.Ask(Instructions, Prompt(title, table), Schema, PlanSeconds);
+            JObject answer = await FlashLiteClient.AskOnce(Instructions, Prompt(title, table, caption), Schema, PlanSeconds);
             if (!(answer?["charts"] is JArray charts)) return null;
             var specs = new List<ChartSpec>();
             foreach (JToken chart in charts)
@@ -256,10 +331,13 @@ namespace AccountingImmersiveAnalytics.UI.Charts.Spec
             "title: a short chart title in plain English. insight: one sentence on what the chart shows. " +
             "The ...Title fields are short axis or key titles in plain English with units in brackets, such as \"Revenue ($)\"; leave empty to use the column name.";
 
-        private static string Prompt(string title, CsvTable table)
+        private static string Prompt(string title, CsvTable table, string caption)
         {
             var text = new StringBuilder(4096);
             text.Append("File: ").Append(title).Append('\n');
+            if (!string.IsNullOrWhiteSpace(caption))
+                text.Append("\nThis is one table from a PDF document. Its caption reads: \"").Append(caption.Trim()).Append("\"\n")
+                    .Append("Make exactly one chart for it, of the kind the caption names if it names one, and take the chart title from the caption.\n");
             text.Append("\nColumns (").Append(table.RowCount).Append(" rows):\n");
             foreach (CsvField field in table.Fields)
             {

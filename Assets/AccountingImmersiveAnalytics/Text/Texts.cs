@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using AccountingImmersiveAnalytics.Assistant.Session;
 using AccountingImmersiveAnalytics.UI.Helpers;
 using OneText;
 using OneText.UGUI;

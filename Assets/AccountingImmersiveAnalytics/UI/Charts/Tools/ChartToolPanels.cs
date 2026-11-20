@@ -1,12 +1,13 @@
 using System;
 using System.Collections.Generic;
-using AccountingImmersiveAnalytics.Assistant.Session;
+using AccountingImmersiveAnalytics.Assistant.Context;
 using AccountingImmersiveAnalytics.Text;
 using AccountingImmersiveAnalytics.UI.Charts.Data;
-using AccountingImmersiveAnalytics.UI.Charts.Elements;
-using AccountingImmersiveAnalytics.UI.Charts.Layout;
-using AccountingImmersiveAnalytics.UI.Charts.Marks;
 using AccountingImmersiveAnalytics.UI.Charts.Spec;
+using AccountingImmersiveAnalytics.UI.Charts.TwoD.Elements;
+using AccountingImmersiveAnalytics.UI.Charts.TwoD.Layout;
+using AccountingImmersiveAnalytics.UI.Charts.TwoD.Marks;
+using AccountingImmersiveAnalytics.UI.Charts.TwoD.View;
 using AccountingImmersiveAnalytics.UI.Charts.View;
 using AccountingImmersiveAnalytics.UI.Helpers;
 using AccountingImmersiveAnalytics.UI.Interactions;
@@ -59,7 +60,7 @@ namespace AccountingImmersiveAnalytics.UI.Charts.Tools
             SortOrder now = entry.Shaping.Sort;
             card.Wide(() => Data(field), () => Strings.Get("sort." + now.ToString().ToLowerInvariant()), true, false, true, () =>
             {
-                if (StateChannel.UserDriven) AgentTurn.UserTookControl();
+                if (ActivityFeed.UserDriven) AssistantTurn.UserTookControl();
                 SortOrder next = SortCycle[(Array.IndexOf(SortCycle, entry.Shaping.Sort) + 1) % SortCycle.Length];
                 ChartShaping shaping = entry.Shaping.Copy();
                 shaping.Sort = next;
@@ -118,7 +119,7 @@ namespace AccountingImmersiveAnalytics.UI.Charts.Tools
                 slider.Released += (a, b) =>
                 {
                     if (before == null) return;
-                    if (StateChannel.UserDriven) AgentTurn.UserTookControl();
+                    if (ActivityFeed.UserDriven) AssistantTurn.UserTookControl();
                     bool full = a <= field.Min && b >= field.Max;
                     string label = full ? $"Showed all {field.Name}" : $"Kept {field.Name} from {Scales.AxisFormat.Value(a)} to {Scales.AxisFormat.Value(b)}";
                     charts.Commit(entry, before, EditKind.Filter, $"filtered \"{entry.Title}\" by '{field.Name}'", label);
@@ -131,16 +132,20 @@ namespace AccountingImmersiveAnalytics.UI.Charts.Tools
                 string names = string.Join(", ", entry.LeftOut);
                 card.Line(() => Strings.Format("filter.leftOut", Data(names)));
             }
-            count = card.Line(() => "");
-            ShowCount(count, entry);
+            count = card.Line(CountText(entry));
         }
 
         private static void ShowCount(OneTextLabel label, ChartEntry entry)
         {
             if (label == null) return;
+            Texts.Bind(label, CountText(entry));
+        }
+
+        private static Func<string> CountText(ChartEntry entry)
+        {
             int kept = entry.Shaping.KeptCount(entry.Table);
             int total = entry.Table.RowCount;
-            Texts.Bind(label, () => Strings.Format("filter.showing", kept, total));
+            return () => Strings.Format("filter.showing", kept, total);
         }
 
         private static bool Whole(CsvField field)
@@ -165,7 +170,7 @@ namespace AccountingImmersiveAnalytics.UI.Charts.Tools
                 next.Hidden[field.Name] = hidden = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             bool hide = !hidden.Contains(category);
             if (hide && hidden.Count >= field.Categories.Count - 1) return;
-            if (StateChannel.UserDriven) AgentTurn.UserTookControl();
+            if (ActivityFeed.UserDriven) AssistantTurn.UserTookControl();
             if (hide) hidden.Add(category);
             else hidden.Remove(category);
             if (hidden.Count == 0) next.Hidden.Remove(field.Name);
@@ -179,7 +184,7 @@ namespace AccountingImmersiveAnalytics.UI.Charts.Tools
             bool fits = TrendFitter.Fits(entry.Spec, entry.Table, entry.Shaping, now);
             card.Wide(() => Strings.Get("trend.name"), () => Strings.Get("trend." + now), true, !fits, true, () =>
             {
-                if (StateChannel.UserDriven) AgentTurn.UserTookControl();
+                if (ActivityFeed.UserDriven) AssistantTurn.UserTookControl();
                 TrendKind next = TrendFitter.Order[(Array.IndexOf(TrendFitter.Order, entry.Shaping.Trend) + 1) % TrendFitter.Order.Length];
                 charts.SetTrend(entry, next);
             });
@@ -300,7 +305,7 @@ namespace AccountingImmersiveAnalytics.UI.Charts.Tools
             card.EndList("edits", "edit", i => $"{edits[i].what ?? Edit.KindName(edits[i].kind)} ({(edits[i].byAssistant ? "Assistant" : "You")})");
             card.Wide(null, () => Strings.Get("edits.undo"), false, false, edits.Count > 0, () =>
             {
-                if (StateChannel.UserDriven) AgentTurn.UserTookControl();
+                if (ActivityFeed.UserDriven) AssistantTurn.UserTookControl();
                 charts.UndoNewest(entry);
             }, PanelCard.ListGap);
         }

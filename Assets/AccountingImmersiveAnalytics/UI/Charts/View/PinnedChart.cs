@@ -1,9 +1,10 @@
 using System;
 using System.Collections.Generic;
 using AccountingImmersiveAnalytics.App;
-using AccountingImmersiveAnalytics.UI.Charts.Elements;
 using AccountingImmersiveAnalytics.UI.Charts.Spec;
 using AccountingImmersiveAnalytics.UI.Charts.Tools;
+using AccountingImmersiveAnalytics.UI.Charts.TwoD.Elements;
+using AccountingImmersiveAnalytics.UI.Charts.TwoD.View;
 using AccountingImmersiveAnalytics.UI.Helpers;
 using AccountingImmersiveAnalytics.UI.Interactions;
 using AccountingImmersiveAnalytics.UI.Panels;
@@ -55,7 +56,7 @@ namespace AccountingImmersiveAnalytics.UI.Charts.View
             _canvasRect.SetParent(_holder, false);
             _canvas = go.AddComponent<Canvas>();
             _canvas.renderMode = RenderMode.WorldSpace;
-            _canvas.sortingOrder = Style.SortPanels + 1;
+            _canvas.sortingOrder = Style.SortPinned;
             go.AddComponent<GraphicRaycaster>();
             AddPokeInteraction(_canvasRect, layer).InjectAllPointableCanvas(_canvas);
             go.SetActive(true);
@@ -174,7 +175,11 @@ namespace AccountingImmersiveAnalytics.UI.Charts.View
                 if (_panel != null) _panel.Root.gameObject.SetActive(false);
                 return;
             }
-            if (_panel == null) _panel = new PanelCard(_canvasRect, "Tool Panel", Card.Width);
+            if (_panel == null)
+            {
+                _panel = new PanelCard(_canvasRect, "Tool Panel", Card.Width);
+                _panel.Resized += Layout;
+            }
             _panel.Root.gameObject.SetActive(true);
             _panel.Begin(Card.Width);
             ChartToolPanels.Build(_panel, _open, Card.Entry, Card, _charts);
@@ -225,6 +230,7 @@ namespace AccountingImmersiveAnalytics.UI.Charts.View
             card.anchorMin = card.anchorMax = card.pivot = new Vector2(0f, 1f);
             DesignRect.Place(card, 0f, 0f, w, h);
             LayoutTools.FitPokeBounds(_canvasRect);
+            _grab.FitGrip(card);
         }
 
         public void Clear()

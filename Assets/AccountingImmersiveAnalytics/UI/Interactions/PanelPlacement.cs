@@ -44,7 +44,7 @@ namespace AccountingImmersiveAnalytics.UI.Interactions
             return Vector3.Angle(-face, toViewer) > 90f + FlipMargin;
         }
 
-        public const float FlipSeconds = 0.35f;
+        public const float FlipSeconds = Animate.Slow;
 
         public static IEnumerator Flip(Transform t, Vector3 pivot, Func<bool> stop)
         {

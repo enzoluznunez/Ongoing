@@ -1,5 +1,5 @@
 using System.Collections;
-using AccountingImmersiveAnalytics.Assistant.Session;
+using AccountingImmersiveAnalytics.Assistant.Context;
 using AccountingImmersiveAnalytics.UI.Panels;
 using UnityEngine;
 
@@ -15,7 +15,7 @@ namespace AccountingImmersiveAnalytics.App
 
         public static void Show(MonoBehaviour host, string message)
         {
-            StateChannel.Record(message);
+            ActivityFeed.Record(message);
 
             if (Time.frameCount == _lastToastFrame) return;
             _lastToastFrame = Time.frameCount;

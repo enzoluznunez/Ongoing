@@ -1,8 +1,8 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using AccountingImmersiveAnalytics.App;
-using AccountingImmersiveAnalytics.Assistant;
-using AccountingImmersiveAnalytics.Assistant.Session;
+using AccountingImmersiveAnalytics.Assistant.Context;
+using AccountingImmersiveAnalytics.Assistant.FlashLite;
 using AccountingImmersiveAnalytics.Data;
 using AccountingImmersiveAnalytics.Documents;
 using AccountingImmersiveAnalytics.Text;
@@ -34,8 +34,10 @@ namespace AccountingImmersiveAnalytics.UI.Panels
         private sealed class Sheet
         {
             public RectTransform Root;
+            public Image Card;
             public RawImage Picture;
             public Texture2D Texture;
+            public float Width;
             public bool Loading;
             public bool Failed;
         }
@@ -53,6 +55,7 @@ namespace AccountingImmersiveAnalytics.UI.Panels
         private RectTransform _content;
         private OneTextLabel _meta;
         private OneTextLabel _status;
+        private GameObject _summaryCard;
         private GameObject _summaryBox;
         private OneTextLabel _summaryText;
         private bool _summaryWriting;
@@ -63,9 +66,15 @@ namespace AccountingImmersiveAnalytics.UI.Panels
         private DocumentEntry _csv;
         private PdfPages _renderer;
         private DocumentEntry _opening;
+        private DocumentEntry _shown;
+        private DocumentColumn _library;
         private int _ticket;
 
+        private const string LibraryName = "DocumentColumn";
+
         public DocumentFile Page => _page;
+
+        public DocumentEntry Shown => _shown;
 
 
 
@@ -79,7 +88,7 @@ namespace AccountingImmersiveAnalytics.UI.Panels
             BuildMessage();
             BuildColumn();
             _ = DocumentLibrary.Load();
-            ShowEmpty();
+            ShowCleared("loading", true);
             if (_canvas != null) StartHidden();
         }
 
@@ -93,16 +102,50 @@ namespace AccountingImmersiveAnalytics.UI.Panels
         private async Task OpenFirst()
         {
             await DocumentLibrary.Load();
-            if (this == null || _page != null || _opening != null || _csv != null) return;
+            if (this == null) return;
+            BuildLibrary();
+            if (_page != null || _opening != null || _csv != null) return;
             IReadOnlyList<DocumentEntry> all = DocumentLibrary.All;
             if (all.Count > 0) await Open(all[0], false);
-            else ShowEmpty();
+            else ShowCleared("documents.select");
         }
 
         protected override void OnDestroy()
         {
             base.OnDestroy();
             ForgetPages();
+            _library?.Dispose();
+        }
+
+        private void BuildLibrary()
+        {
+            IReadOnlyList<DocumentEntry> all = DocumentLibrary.All;
+            if (_library != null || all.Count == 0) return;
+            RectTransform root = ShowLeftCard(LibraryName, DocumentColumn.WidthFor(all));
+            if (root == null) return;
+            _library = new DocumentColumn(root, all, Press);
+            _library.SetOpen(_shown);
+        }
+
+        private void Press(DocumentEntry entry)
+        {
+            if (entry == null) return;
+            if (entry == _shown) CloseDocument();
+            else _ = Open(entry);
+        }
+
+        private void MarkShown(DocumentEntry entry)
+        {
+            _shown = entry;
+            _library?.SetOpen(entry);
+        }
+
+        public void CloseDocument()
+        {
+            Clear();
+            Scene.Charts?.CloseColumn();
+            ShowMessage("documents.select");
+            ActivityFeed.RecordState("documentsPanel", "the Documents panel has no document open and asks the user to select one from the documents column on its left");
         }
 
         private void FindBodyFills()
@@ -144,10 +187,12 @@ namespace AccountingImmersiveAnalytics.UI.Panels
         private void BuildSummary()
         {
             RectTransform card = LayoutTools.EnsureChild(_content, "Summary");
+            _summaryCard = card.gameObject;
             Image fill = LayoutTools.Ensure<Image>(card.gameObject);
             RoundedSprite.Apply(fill, Style.LargeRadius);
             fill.color = Style.Card;
             fill.raycastTarget = false;
+            BackFace.Add(card, Style.LargeRadius);
             VerticalLayoutGroup layout = LayoutTools.Ensure<VerticalLayoutGroup>(card.gameObject);
             int pad = (int)Style.LargePad;
             layout.padding = new RectOffset(pad, pad, pad, pad);
@@ -174,7 +219,7 @@ namespace AccountingImmersiveAnalytics.UI.Panels
         private static OneTextLabel Text(Transform parent, string name, float size)
         {
             OneTextLabel label = LabelFactory.Make(parent, name, Style.Ink, LabelAnchor.TopStart, TextOverflow.Overflow, wrap: true);
-            label.FontSize = size;
+            Style.ApplyText(label, size, bold: false);
             return label;
         }
 
@@ -199,20 +244,17 @@ namespace AccountingImmersiveAnalytics.UI.Panels
         private void BindMessage()
         {
             string key = _messageKey;
-            if (_messageDots)
-            {
-                int dots = Style.Dots;
-                _shownDots = dots;
-                Texts.Bind(_message, () => Style.Counting(Strings.Get(key)));
-            }
-            else Texts.Bind(_message, () => Strings.Get(key));
+            if (_messageDots) _shownDots = LoadingDots.Count;
+            LoadingDots.Bind(_message, () => Strings.Get(key), _messageDots);
         }
 
         private async Task<DocumentOutcome> OpenCsv(DocumentEntry entry, DocumentOutcome outcome)
         {
-            ShowMessage("documents.notShown");
-            StateChannel.RecordState("documentsPanel",
-                $"the Documents panel has \"{entry.Title}\" open; it is a CSV file, so the panel says it could not be displayed and its charts stand in the column beside it");
+            int ticket = _ticket;
+            ShowBlankPage();
+            WriteSummary(() => PageSummary.WriteTable(entry), ticket);
+            ActivityFeed.RecordState("documentsPanel",
+                $"the Documents panel has \"{entry.Title}\" open; it is a CSV file, so the panel shows a blank page saying it cannot be displayed, with a short summary above it, and its charts stand in the column beside it");
             UI.Charts.ChartManager charts = Scene.Charts;
             if (charts == null)
             {
@@ -226,7 +268,7 @@ namespace AccountingImmersiveAnalytics.UI.Panels
             {
                 ShowMessage("documents.failed");
                 charts.CloseColumn();
-                StateChannel.RecordState("documentsPanel",
+                ActivityFeed.RecordState("documentsPanel",
                     $"the Documents panel has \"{entry.Title}\" open; it is a CSV file with blank or unreadable cells, so the panel says it could not be loaded and no charts were made");
             }
             return outcome;
@@ -235,8 +277,9 @@ namespace AccountingImmersiveAnalytics.UI.Panels
         public async Task<DocumentOutcome> Open(DocumentEntry entry, bool reveal = true)
         {
             var outcome = new DocumentOutcome();
-            if (reveal) ShowPanel();
+            if (reveal && !CanvasShown) ShowPanel();
             Clear();
+            MarkShown(entry);
             int ticket = ++_ticket;
             SetTitle(() => Numbers.Text(entry.Title));
             if (entry.IsCsv)
@@ -245,7 +288,7 @@ namespace AccountingImmersiveAnalytics.UI.Panels
                 return await OpenCsv(entry, outcome);
             }
             _opening = entry;
-            ShowMessage("documents.loading", true);
+            ShowMessage("loading", true);
             Scene.Charts?.CloseColumn();
 
             byte[] bytes = await StreamingFiles.ReadBytes(entry.File);
@@ -270,7 +313,7 @@ namespace AccountingImmersiveAnalytics.UI.Panels
             }
             if (problem == null)
             {
-                shownKey = "documents.notShown";
+                shownKey = "documents.display";
                 if (!PdfPages.Supported) problem = "PDF pages can only be drawn on the headset, not in the Unity editor.";
                 else
                 {
@@ -297,15 +340,34 @@ namespace AccountingImmersiveAnalytics.UI.Panels
             if (page == null || renderer == null)
             {
                 renderer?.Dispose();
-                ShowMessage(shownKey);
                 outcome.Failure = $"\"{entry.Title}\" could not be shown: {problem ?? "The reason is unknown."}";
+                if (page == null)
+                {
+                    ShowMessage(shownKey);
+                    return outcome;
+                }
+                ShowBlankPage();
+                SetMeta(page);
+                if (page.HasText) WriteSummary(() => PageSummary.Write(page), ticket);
+                await OpenCharts(entry, page, outcome, ticket);
                 return outcome;
             }
 
             outcome.Page = page;
             ShowPages(page, renderer);
-            WriteSummary(page, ticket);
+            if (page.HasText) WriteSummary(() => PageSummary.Write(page), ticket);
+            await OpenCharts(entry, page, outcome, ticket);
             return outcome;
+        }
+
+        private async Task OpenCharts(DocumentEntry entry, DocumentFile page, DocumentOutcome outcome, int ticket)
+        {
+            UI.Charts.ChartManager charts = Scene.Charts;
+            if (charts == null || page.Tables.Count == 0) return;
+            var (made, failure) = await charts.OpenTables(entry, page.Tables);
+            if (this == null || ticket != _ticket) return;
+            outcome.Charts = made;
+            outcome.ChartFailure = failure;
         }
 
         private void Clear()
@@ -314,15 +376,47 @@ namespace AccountingImmersiveAnalytics.UI.Panels
             _page = null;
             _opening = null;
             ForgetPages();
+            MarkShown(null);
             SetBodySize(LetterWidth, LetterBody);
             SetTitle(() => "");
+            SetMeta(null);
             SetSummary(false, null);
         }
 
-        private void ShowEmpty()
+        private void ShowCleared(string key, bool dots = false)
         {
             Clear();
-            ShowMessage("documents.empty");
+            ShowMessage(key, dots);
+        }
+
+        private void ShowBlankPage()
+        {
+            Sheet sheet = MakeSheet(0, LetterWidth, LetterBody);
+            OneTextLabel label = LabelFactory.Make(sheet.Card.transform, "Message", Style.Ink, LabelAnchor.Center, TextOverflow.Overflow, bold: true, wrap: true);
+            label.raycastTarget = false;
+            LayoutTools.Stretch(label.rectTransform, Style.LargePad);
+            Texts.Bind(label, () => Strings.Get("documents.display"));
+            _sheets.Add(sheet);
+            SetBodySize(LetterWidth, LetterBody);
+            Show(View.Pages);
+            Settle(true);
+        }
+
+        private void SetMeta(DocumentFile page)
+        {
+            bool shown = page != null;
+            _meta.gameObject.SetActive(shown);
+            if (shown) Texts.Bind(_meta, () => MetaLine(page));
+            RefreshSummaryCard();
+        }
+
+        private void RefreshSummaryCard()
+        {
+            if (_summaryCard == null) return;
+            bool shown = _meta.gameObject.activeSelf || _summaryWriting || _summaryBox.activeSelf;
+            if (_summaryCard.activeSelf == shown) return;
+            _summaryCard.SetActive(shown);
+            QueueSettle();
         }
 
         private void ShowPages(DocumentFile page, PdfPages renderer)
@@ -339,10 +433,10 @@ namespace AccountingImmersiveAnalytics.UI.Panels
                 _sheets.Add(MakeSheet(i, width, height));
             }
             SetBodySize(Mathf.Max(LetterWidth, Mathf.Ceil(widest)), Mathf.Max(LetterBody, Mathf.Ceil(tallest)));
-            Texts.Bind(_meta, () => MetaLine(page));
+            SetMeta(page);
             Show(View.Pages);
             Settle(true);
-            StateChannel.RecordState("documentsPanel", $"the Documents panel shows \"{page.Title}\"");
+            ActivityFeed.RecordState("documentsPanel", $"the Documents panel shows \"{page.Title}\"");
         }
 
         private void SetBodySize(float width, float height)
@@ -370,7 +464,6 @@ namespace AccountingImmersiveAnalytics.UI.Panels
             RoundedSprite.Apply(card, Style.LargeRadius);
             card.color = Style.Card;
             card.raycastTarget = false;
-            LayoutTools.Ensure<Mask>(sheet.gameObject).showMaskGraphic = true;
 
             RectTransform paper = LayoutTools.EnsureChild(sheet, "Paper");
             LayoutTools.Stretch(paper);
@@ -379,7 +472,9 @@ namespace AccountingImmersiveAnalytics.UI.Panels
             picture.uvRect = new Rect(0f, 1f, 1f, -1f);
             picture.raycastTarget = false;
             if (Panel.FrontMaterial != null) picture.material = Panel.FrontMaterial;
-            return new Sheet { Root = root, Picture = picture };
+            picture.enabled = false;
+            BackFace.Add(sheet, Style.LargeRadius);
+            return new Sheet { Root = root, Card = card, Picture = picture, Width = width };
         }
 
         private void ForgetPages()
@@ -403,8 +498,9 @@ namespace AccountingImmersiveAnalytics.UI.Panels
             return string.Join(" · ", meta);
         }
 
-        private void LateUpdate()
+        protected override void LateUpdate()
         {
+            base.LateUpdate();
             if (!IsVisible || _renderer == null || Time.frameCount % VisibilityEveryFrames != 0) return;
             float view = BodyHeight;
             float y = _content.anchoredPosition.y;
@@ -457,13 +553,27 @@ namespace AccountingImmersiveAnalytics.UI.Panels
                 sheet.Failed = true;
                 return;
             }
-            sheet.Texture = PdfPages.MakeTexture(drawn);
+            try
+            {
+                sheet.Texture = PdfPages.MakeTexture(drawn, Style.LargeRadius * drawn.Width / Mathf.Max(1f, sheet.Width));
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning($"[DocumentsPanel] Page {index + 1} could not be shown: {e.Message}");
+                PdfPages.Discard(drawn);
+                sheet.Failed = true;
+                return;
+            }
             sheet.Picture.texture = sheet.Texture;
+            sheet.Picture.enabled = true;
+            sheet.Card.enabled = false;
         }
 
         private static void Unload(Sheet sheet)
         {
             sheet.Picture.texture = null;
+            sheet.Picture.enabled = false;
+            sheet.Card.enabled = true;
             Destroy(sheet.Texture);
             sheet.Texture = null;
         }
@@ -494,11 +604,18 @@ namespace AccountingImmersiveAnalytics.UI.Panels
             return roots;
         }
 
-        private async void WriteSummary(DocumentFile page, int ticket)
+        private async void WriteSummary(System.Func<Task<PageSummary>> write, int ticket)
         {
-            if (!page.HasText) return;
             SetSummary(true, null);
-            PageSummary summary = await PageSummary.Write(page);
+            PageSummary summary = null;
+            try
+            {
+                summary = await write();
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning($"[DocumentsPanel] The summary could not be written: {e.Message}");
+            }
             if (this == null || ticket != _ticket) return;
             SetSummary(false, summary?.Summary);
         }
@@ -511,23 +628,24 @@ namespace AccountingImmersiveAnalytics.UI.Panels
             _summaryBox.SetActive(!writing && !string.IsNullOrEmpty(summary));
             if (!string.IsNullOrEmpty(summary)) Texts.Bind(_summaryText, () => Numbers.Text(summary));
             if (writing) ShowWriting();
+            RefreshSummaryCard();
             Settle(false);
         }
 
         private void ShowWriting()
         {
-            int dots = Style.Dots;
+            int dots = LoadingDots.Count;
             if (dots == _shownDots) return;
             _shownDots = dots;
-            string word = FlashLite.Reached ? "loading" : "assistant.connecting";
-            Texts.Bind(_status, () => Style.Counting(Strings.Get(word)));
+            string word = FlashLiteClient.Reached ? "loading" : "assistant.connecting";
+            LoadingDots.Bind(_status, () => Strings.Get(word), counting: true);
         }
 
         private void Update()
         {
             if (!IsVisible) return;
             if (_summaryWriting) ShowWriting();
-            if (_messageDots && Style.Dots != _shownDots) BindMessage();
+            if (_messageDots && LoadingDots.Count != _shownDots) BindMessage();
         }
 
         private void Settle(bool toTop)
@@ -549,7 +667,7 @@ namespace AccountingImmersiveAnalytics.UI.Panels
             ShowCanvas();
             Scene.Charts?.SetPanelShown(true);
             RefreshPanel();
-            StateChannel.RecordState("documentsPanel", _page != null
+            ActivityFeed.RecordState("documentsPanel", _page != null
                 ? $"the Documents panel is open on \"{_page.Title}\""
                 : "the Documents panel is open with no document");
         }
@@ -559,7 +677,7 @@ namespace AccountingImmersiveAnalytics.UI.Panels
             if (_canvas == null) return;
             HideCanvas();
             Scene.Charts?.SetPanelShown(false);
-            StateChannel.RecordState("documentsPanel", "the Documents panel is closed");
+            ActivityFeed.RecordState("documentsPanel", "the Documents panel is closed");
         }
     }
 }

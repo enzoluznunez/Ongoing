@@ -7,8 +7,11 @@ public enum Run { Regular, Bold, Italic, Code, Strike }
 
 public sealed class SampleWriter
 {
-    private const double Width = 595;
-    private const double Height = 842;
+    public const double A4Width = 595, A4Height = 842;
+    public const double LetterWidth = 612, LetterHeight = 792;
+
+    private readonly double Width;
+    private readonly double Height;
     private const double Margin = 60;
     private const double Body = 11;
     private const double Leading = 1.45;
@@ -23,8 +26,14 @@ public sealed class SampleWriter
 
     public static string Fonts;
 
-    public SampleWriter(string title, string author)
+    public SampleWriter(string title, string author) : this(title, author, A4Width, A4Height)
     {
+    }
+
+    public SampleWriter(string title, string author, double width, double height)
+    {
+        Width = width;
+        Height = height;
         _builder.DocumentInformation.Title = title;
         _builder.DocumentInformation.Author = author;
         _regular = _builder.AddTrueTypeFont(System.IO.File.ReadAllBytes(System.IO.Path.Combine(Fonts, "NotoSans-Regular.ttf")));
@@ -55,6 +64,20 @@ public sealed class SampleWriter
         if (string.IsNullOrEmpty(text)) return 0;
         var letters = _page.MeasureText(text, size, new PdfPoint(0, 0), font);
         return letters.Count == 0 ? 0 : letters[letters.Count - 1].EndBaseLine.X - letters[0].StartBaseLine.X;
+    }
+
+    public void PageBreak() => NewPage();
+
+    public void Caption(string text)
+    {
+        Lines(new List<(string, Run)> { (text, Run.Italic) }, Body - 1.5, 0);
+        _y -= Body * 0.8;
+    }
+
+    private static bool IsNumber(string cell)
+    {
+        string bare = cell.Replace("$", "").Replace(",", "").Replace("%", "").Replace("+", "").Replace("−", "-");
+        return double.TryParse(bare, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out _);
     }
 
     public void Title(string text)
@@ -135,7 +158,12 @@ public sealed class SampleWriter
             }
             _page.DrawLine(new PdfPoint(Margin, top - rowHeight), new PdfPoint(Margin + width, top - rowHeight), 0.5);
             for (int c = 0; c < rows[r].Length; c++)
-                _page.AddText(rows[r][c], size, new PdfPoint(Margin + c * cell + 6, top - rowHeight + size * 0.65), r == 0 ? _bold : _regular);
+            {
+                bool right = r == 0 ? rows.Length > 1 && IsNumber(rows[1][c]) : IsNumber(rows[r][c]);
+                PdfDocumentBuilder.AddedFont font = r == 0 ? _bold : _regular;
+                double x = right ? Margin + (c + 1) * cell - 6 - Measure(rows[r][c], size, font) : Margin + c * cell + 6;
+                _page.AddText(rows[r][c], size, new PdfPoint(x, top - rowHeight + size * 0.65), font);
+            }
         }
         _page.DrawLine(new PdfPoint(Margin, _y), new PdfPoint(Margin + width, _y), 0.5);
         _y -= rowHeight * rows.Length + Body;

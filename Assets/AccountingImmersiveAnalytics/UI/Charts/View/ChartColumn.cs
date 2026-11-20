@@ -1,7 +1,8 @@
 using System;
 using System.Collections.Generic;
-using AccountingImmersiveAnalytics.UI.Charts.Elements;
-using AccountingImmersiveAnalytics.UI.Charts.Marks;
+using AccountingImmersiveAnalytics.UI.Charts.TwoD.Elements;
+using AccountingImmersiveAnalytics.UI.Charts.TwoD.Marks;
+using AccountingImmersiveAnalytics.UI.Charts.TwoD.View;
 using AccountingImmersiveAnalytics.UI.Helpers;
 using AccountingImmersiveAnalytics.UI.Interactions;
 using UnityEngine;
@@ -11,7 +12,7 @@ namespace AccountingImmersiveAnalytics.UI.Charts.View
 {
     public sealed class ChartColumn
     {
-        private const float StatusHeight = 120f;
+        private const float StatusHeight = Style.ButtonSize * 2f + Style.MediumPad;
 
         public static float Width => ChartStyle.CardWidth * ChartStyle.PreviewScale;
 
@@ -19,7 +20,7 @@ namespace AccountingImmersiveAnalytics.UI.Charts.View
         {
             public RectTransform Root;
             public ChartCard Card;
-            public MarkSurface Outline;
+            public Image Outline;
         }
 
         private readonly RectTransform _root;
@@ -82,8 +83,7 @@ namespace AccountingImmersiveAnalytics.UI.Charts.View
             button.targetGraphic = area;
             button.onClick.AddListener(() => press(entry));
 
-            MarkSurface outline = DesignRect.Surface(root, "Outline", Width, card.Height * ChartStyle.PreviewScale);
-            LayoutTools.Ensure<LayoutElement>(outline.gameObject).ignoreLayout = true;
+            Image outline = CardOutline.Make(root);
 
             var slot = new Slot { Root = root, Card = card, Outline = outline };
             card.Resized += _ => Fit(slot);
@@ -114,14 +114,8 @@ namespace AccountingImmersiveAnalytics.UI.Charts.View
             float height = slot.Card.Height * ChartStyle.PreviewScale;
             RectTransform rt = DesignRect.Place((RectTransform)slot.Outline.transform, 0f, 0f, Width, height);
             rt.SetAsLastSibling();
-            slot.Outline.Clear();
-            if (_pinned != null && slot.Card.Entry == _pinned)
-            {
-                float inset = Style.Stroke * 0.5f;
-                slot.Outline.Box(new Rect(inset, inset, Width - Style.Stroke, height - Style.Stroke), Style.Ink,
-                    Style.LargeRadius * ChartStyle.PreviewScale - inset, Style.Stroke);
-            }
-            slot.Outline.Commit();
+            CardOutline.Draw(slot.Outline, Width, height, Style.LargeRadius * ChartStyle.PreviewScale);
+            slot.Outline.enabled = _pinned != null && slot.Card.Entry == _pinned;
         }
 
         public void ShowStatus(string message)

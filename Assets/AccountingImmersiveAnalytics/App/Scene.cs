@@ -5,7 +5,8 @@ using UnityEngine;
 
 namespace AccountingImmersiveAnalytics.App
 {
-    public static class Scene {
+    public static class Scene
+    {
 
         private static ToolManager toolManager;
         private static Menu menu;
@@ -19,14 +20,17 @@ namespace AccountingImmersiveAnalytics.App
         public static Tooltip Tooltip => Resolve(ref tooltip);
         public static DocumentsPanel Documents => Resolve(ref documentsPanel);
 
-        public static string ChartLabel {
-            get {
+        public static string ChartLabel
+        {
+            get
+            {
                 ChartManager charts = Charts;
                 return charts != null && charts.Active != null ? charts.Active.Title : "";
             }
         }
 
-        private static T Resolve<T>(ref T cached) where T : Object {
+        private static T Resolve<T>(ref T cached) where T : Object
+        {
             if (cached == null) cached = Object.FindAnyObjectByType<T>();
             return cached;
         }

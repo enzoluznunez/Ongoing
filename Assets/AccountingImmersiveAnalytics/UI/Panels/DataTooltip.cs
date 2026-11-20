@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using AccountingImmersiveAnalytics.Text;
-using AccountingImmersiveAnalytics.UI.Charts.Layout;
+using AccountingImmersiveAnalytics.UI.Charts.TwoD.Layout;
+using AccountingImmersiveAnalytics.UI.Charts.TwoD.View;
 using AccountingImmersiveAnalytics.UI.Charts.View;
 using AccountingImmersiveAnalytics.UI.Helpers;
 using UnityEngine;
@@ -9,8 +10,6 @@ namespace AccountingImmersiveAnalytics.UI.Panels
 {
     public sealed class DataTooltip
     {
-        public const float Width = 360f;
-        private const float Lift = 0.001f;
 
         private readonly RectTransform _root;
         private readonly Canvas _canvas;
@@ -23,13 +22,24 @@ namespace AccountingImmersiveAnalytics.UI.Panels
             _canvas = LayoutTools.Ensure<Canvas>(_root.gameObject);
             _canvas.renderMode = RenderMode.WorldSpace;
             _canvas.sortingOrder = Style.SortNotices;
-            _card = new PanelCard(_root, "Card", Width);
+            _card = new PanelCard(_root, "Card", Style.DataTooltipWidth);
             _card.Root.GetComponent<UnityEngine.UI.Image>().raycastTarget = false;
             TranslationSurface.Add(_card.Root, 0f, Style.LargeRadius);
+            _card.Resized += OnCardResized;
             _canvas.enabled = false;
         }
 
-        public void Show(MarkInfo detail, IReadOnlyList<string> lines, string status, ChartCard beside)
+        private ChartCard _placedOn;
+        private MarkInfo _placedMark;
+        private float _placedButton;
+
+        private void OnCardResized()
+        {
+            _root.sizeDelta = new Vector2(_card.Width, _card.Height);
+            if (_placedOn != null) Place(_placedOn, _placedMark, _placedButton);
+        }
+
+        public void Show(MarkInfo detail, IReadOnlyList<string> lines, string waitingKey, ChartCard beside)
         {
             List<KeyValuePair<string, string>> rows = detail.Rows;
             float width = Mathf.Min(WidthFor(rows), MostWidth(beside));
@@ -44,7 +54,7 @@ namespace AccountingImmersiveAnalytics.UI.Panels
                     _card.Ai(() => Numbers.Text(line), PanelCard.AiGap);
                 }
             }
-            if (!string.IsNullOrEmpty(status)) _card.Line(() => status);
+            if (!string.IsNullOrEmpty(waitingKey)) _card.CountingLine(() => Strings.Get(waitingKey));
             _card.End();
             _root.sizeDelta = new Vector2(width, _card.Height);
             DesignPlace(_card.Root);
@@ -53,11 +63,11 @@ namespace AccountingImmersiveAnalytics.UI.Panels
 
         private static float WidthFor(List<KeyValuePair<string, string>> rows)
         {
-            float half = Width * 0.5f;
+            float half = Style.DataTooltipWidth * 0.5f;
             foreach (var row in rows)
             {
-                float name = Mathf.Ceil(Charts.Elements.ChartText.Width(Numbers.Text(row.Key), Style.MediumText));
-                float value = Mathf.Ceil(Charts.Elements.ChartText.Width(Numbers.Text(row.Value), Style.MediumText));
+                float name = Mathf.Ceil(Charts.TwoD.Elements.ChartText.Width(Numbers.Text(row.Key), Style.MediumText));
+                float value = Mathf.Ceil(Charts.TwoD.Elements.ChartText.Width(Numbers.Text(row.Value), Style.MediumText));
                 half = Mathf.Max(half, name + PanelCard.Inset + Style.MediumPad, value + PanelCard.Inset);
             }
             return half * 2f;
@@ -68,7 +78,7 @@ namespace AccountingImmersiveAnalytics.UI.Panels
             if (card == null) return Charts.ChartStyle.CardWidth;
             Transform space = card.transform.parent != null ? card.transform.parent : card.transform;
             float units = Mathf.Max(1e-6f, space.lossyScale.x);
-            return Mathf.Max(Width, card.Width * card.transform.lossyScale.x / units);
+            return Mathf.Max(Style.DataTooltipWidth, card.Width * card.transform.lossyScale.x / units);
         }
 
         private static void DesignPlace(RectTransform rt)
@@ -80,6 +90,9 @@ namespace AccountingImmersiveAnalytics.UI.Panels
         public void Place(ChartCard card, MarkInfo mark, float buttonSize)
         {
             if (card == null || mark == null) return;
+            _placedOn = card;
+            _placedMark = mark;
+            _placedButton = buttonSize;
             Transform space = card.transform.parent != null ? card.transform.parent : card.transform;
             float units = space.lossyScale.x;
             float design = card.transform.lossyScale.x;
@@ -88,7 +101,7 @@ namespace AccountingImmersiveAnalytics.UI.Panels
             float top = Mathf.Clamp(MarkTop(mark) * design, 0f, cardHeight);
             if (top + tipHeight > cardHeight) top = Mathf.Max(0f, cardHeight - tipHeight);
             Vector3 right = card.transform.right, up = card.transform.up, forward = card.transform.forward;
-            Vector3 corner = card.TopRight + right * beside - up * top - forward * Lift;
+            Vector3 corner = card.TopRight + right * beside - up * top - forward * Style.Layer;
             _root.SetPositionAndRotation(corner, card.transform.rotation);
             _root.localScale = Vector3.one * units / Mathf.Max(1e-6f, _root.parent != null ? _root.parent.lossyScale.x : 1f);
         }

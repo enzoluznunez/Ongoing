@@ -1,7 +1,8 @@
 using System.Collections.Generic;
 using AccountingImmersiveAnalytics.App;
-using AccountingImmersiveAnalytics.UI.Charts.View;
 using AccountingImmersiveAnalytics.UI.Charts.Tools;
+using AccountingImmersiveAnalytics.UI.Charts.TwoD.View;
+using AccountingImmersiveAnalytics.UI.Charts.View;
 using AccountingImmersiveAnalytics.UI.Interactions;
 using AccountingImmersiveAnalytics.UI.Panels;
 using Oculus.Interaction;

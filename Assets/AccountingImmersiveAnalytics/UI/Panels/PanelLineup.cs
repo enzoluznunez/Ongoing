@@ -9,8 +9,8 @@ namespace AccountingImmersiveAnalytics.UI.Panels
 {
     public sealed class PanelLineup : MonoBehaviour
     {
-        public const float Gap = 0.03f;
-        public const float SlideSeconds = 0.3f;
+        public const float Gap = Style.LineupGap;
+        public const float SlideSeconds = Animate.Slow;
 
         private static PanelLineup _instance;
         private static readonly List<Panel> _docked = new List<Panel>();
@@ -38,6 +38,7 @@ namespace AccountingImmersiveAnalytics.UI.Panels
 
         public static void Open(Panel panel, Action reveal)
         {
+            UndockMoved();
             Finish();
             _docked.Remove(panel);
             _docked.Insert(0, panel);
@@ -47,6 +48,7 @@ namespace AccountingImmersiveAnalytics.UI.Panels
 
         public static void Close(Panel panel)
         {
+            UndockMoved();
             Finish();
             if (!_docked.Remove(panel)) return;
             Arrange(null, null, false);
@@ -54,8 +56,9 @@ namespace AccountingImmersiveAnalytics.UI.Panels
 
         public static void Resize(Panel panel)
         {
+            UndockMoved();
             Finish();
-            if (IsDocked(panel)) Arrange(null, null, true);
+            if (IsDocked(panel)) Arrange(null, null, true, panel);
         }
 
         public static void Undock(Panel panel)
@@ -73,6 +76,13 @@ namespace AccountingImmersiveAnalytics.UI.Panels
                 Undock(panel);
         }
 
+        private static void UndockMoved()
+        {
+            if (_slide != null) return;
+            for (int i = _docked.Count - 1; i >= 0; i--)
+                if (_docked[i] != null) UndockIfMoved(_docked[i]);
+        }
+
         private static void FaceUser()
         {
             Transform cam = CameraRig.MainTransform;
@@ -81,7 +91,7 @@ namespace AccountingImmersiveAnalytics.UI.Panels
             _forward = CameraRig.FlatForward;
         }
 
-        private static void Arrange(Panel arriving, Action after, bool slide)
+        private static void Arrange(Panel arriving, Action after, bool slide, Panel held = null)
         {
             _targets.Clear();
             if (CameraRig.MainTransform == null)
@@ -114,6 +124,8 @@ namespace AccountingImmersiveAnalytics.UI.Panels
                 angle += halves[i];
             }
 
+            if (held != null) Hold(held);
+
             for (int i = 0; i < _docked.Count; i++) _docked[i].LineupChanged();
 
             if (arriving != null && _targets.TryGetValue(arriving, out Pose arrival)) Place(arriving, arrival);
@@ -126,6 +138,21 @@ namespace AccountingImmersiveAnalytics.UI.Panels
             }
 
             _slide = _instance.StartCoroutine(Slide(arriving));
+        }
+
+        private static void Hold(Panel held)
+        {
+            if (!_targets.TryGetValue(held, out Pose goal)) return;
+            Transform t = held.transform;
+            Vector3 now = CameraRig.Flatten(t.position - _head, _forward);
+            Vector3 then = CameraRig.Flatten(goal.position - _head, _forward);
+            Quaternion turn = Quaternion.AngleAxis(Vector3.SignedAngle(then, now, Vector3.up), Vector3.up);
+            var turned = new Dictionary<Panel, Pose>();
+            foreach (KeyValuePair<Panel, Pose> target in _targets)
+                turned[target.Key] = new Pose(_head + turn * (target.Value.position - _head), turn * target.Value.rotation);
+            turned[held] = new Pose(t.position, t.rotation);
+            _targets.Clear();
+            foreach (KeyValuePair<Panel, Pose> target in turned) _targets[target.Key] = target.Value;
         }
 
         private static bool NeedsSlide(Panel arriving)
@@ -146,7 +173,7 @@ namespace AccountingImmersiveAnalytics.UI.Panels
             foreach (Panel panel in _targets.Keys)
                 if (panel != null && panel != arriving) from[panel] = new Pose(panel.transform.position, panel.transform.rotation);
 
-            yield return Style.Tween(SlideSeconds, t =>
+            yield return Animate.Tween(SlideSeconds, t =>
             {
                 foreach (KeyValuePair<Panel, Pose> start in from)
                 {

@@ -1,7 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
 using AccountingImmersiveAnalytics.App;
-using AccountingImmersiveAnalytics.Text;
 using AccountingImmersiveAnalytics.UI.Helpers;
 using AccountingImmersiveAnalytics.UI.Interactions;
 using Oculus.Interaction;
@@ -377,7 +376,7 @@ namespace AccountingImmersiveAnalytics.UI.Panels
             LayoutTools.FitPokeBounds(canvas);
         }
 
-        private void LateUpdate()
+        protected virtual void LateUpdate()
         {
             FitPokes();
             PanelLineup.UndockIfMoved(this);

@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using AccountingImmersiveAnalytics.Assistant.Live;
 using AccountingImmersiveAnalytics.UI.Panels;
 using UnityEngine;
 using UnityEngine.UI;
@@ -12,6 +11,7 @@ namespace AccountingImmersiveAnalytics.UI.Helpers
         private const float ReferencePixelsPerUnit = 100f;
 
         private static readonly Dictionary<int, Sprite> _sprites = new Dictionary<int, Sprite>();
+        private static readonly Dictionary<(int, int), Sprite> _rings = new Dictionary<(int, int), Sprite>();
 
         public static Sprite Get(float radiusUnits)
         {
@@ -56,6 +56,68 @@ namespace AccountingImmersiveAnalytics.UI.Helpers
             return sprite;
         }
 
+        public static Sprite GetRing(float radiusUnits, float strokeUnits)
+        {
+            int r = Mathf.Max(2, Mathf.RoundToInt(radiusUnits * TexelsPerUnit));
+            int s = Mathf.Clamp(Mathf.RoundToInt(strokeUnits * TexelsPerUnit), 1, r - 1);
+            if (_rings.TryGetValue((r, s), out Sprite cached) && cached != null) return cached;
+
+            int size = r * 2 + 4;
+
+            Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, 1, false)
+            {
+                filterMode = FilterMode.Bilinear,
+                wrapMode = TextureWrapMode.Clamp
+            };
+
+            Color32[] pixels = new Color32[size * size];
+
+            for (int y = 0; y < size; y++)
+            {
+                float py = y + 0.5f;
+                float dy = py < r ? r - py : (py > size - r ? py - (size - r) : -1f);
+                bool innerRow = y >= s && y < size - s;
+
+                for (int x = 0; x < size; x++)
+                {
+                    float px = x + 0.5f;
+                    float dx = px < r ? r - px : (px > size - r ? px - (size - r) : -1f);
+                    bool innerColumn = x >= s && x < size - s;
+
+                    float frame = 1f, inner = innerRow && innerColumn ? 1f : 0f;
+                    if (dx > 0f && dy > 0f)
+                    {
+                        float dist = Mathf.Sqrt(dx * dx + dy * dy);
+                        frame = Coverage(dist, r + 0.5f) / 255f;
+                        inner = innerRow && innerColumn ? Coverage(dist, r - s + 0.5f) / 255f : 0f;
+                    }
+                    float alpha = frame * (1f - inner);
+                    pixels[y * size + x] = new Color32(255, 255, 255, (byte)Mathf.RoundToInt(255f * alpha));
+                }
+            }
+
+            tex.SetPixels32(pixels);
+            tex.Apply(false, true);
+
+            Vector4 border = new Vector4(r, r, r, r);
+            Sprite sprite = Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f),
+                ReferencePixelsPerUnit * TexelsPerUnit, 0, SpriteMeshType.FullRect, border);
+
+            _rings[(r, s)] = sprite;
+            return sprite;
+        }
+
+        public static void ApplyRing(Image image, float radiusUnits, float strokeUnits)
+        {
+            if (image == null) return;
+
+            image.sprite = GetRing(radiusUnits, strokeUnits);
+            image.type = Image.Type.Sliced;
+            image.fillCenter = true;
+            image.pixelsPerUnitMultiplier = 1f;
+            Panel.ApplyFront(image);
+        }
+
         public static void Apply(Image image, float radiusUnits, bool back = false)
         {
             if (image == null) return;
@@ -89,6 +151,14 @@ namespace AccountingImmersiveAnalytics.UI.Helpers
                 if (stale != null) Object.Destroy(stale);
             }
             _sprites.Clear();
+            foreach (KeyValuePair<(int, int), Sprite> kv in _rings)
+            {
+                if (kv.Value == null) continue;
+                Texture2D stale = kv.Value.texture;
+                Object.Destroy(kv.Value);
+                if (stale != null) Object.Destroy(stale);
+            }
+            _rings.Clear();
         }
     }
 }

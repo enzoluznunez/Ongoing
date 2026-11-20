@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 using System.Text;
-using AccountingImmersiveAnalytics.Assistant.Session;
+using AccountingImmersiveAnalytics.Assistant.Context;
 using AccountingImmersiveAnalytics.UI.Charts;
 using AccountingImmersiveAnalytics.UI.Charts.Tools;
 using UnityEngine;
@@ -25,7 +25,7 @@ namespace AccountingImmersiveAnalytics.App
 
         private ToolType _tool = ToolType.None;
         private string _chart;
-        private bool _agent;
+        private bool _assistant;
 
         private float _summaryStart;
         private int _frames, _hitches;
@@ -107,8 +107,8 @@ namespace AccountingImmersiveAnalytics.App
             }
 
 
-            bool agent = StateChannel.InAgentCall;
-            if (agent != _agent) { _agent = agent; Note(agent ? "assistant call started" : "assistant call ended"); }
+            bool assistant = ActivityFeed.InAssistantCall;
+            if (assistant != _assistant) { _assistant = assistant; Note(assistant ? "assistant call started" : "assistant call ended"); }
         }
 
         private void LogHitch(float ms, bool collected)
@@ -123,7 +123,7 @@ namespace AccountingImmersiveAnalytics.App
             _line.Append(" | tool ").Append(_tool);
             ChartManager charts = Scene.Charts;
             if (charts != null && charts.Pinned != null) _line.Append(", chart pinned");
-            if (_agent) _line.Append(", assistant working");
+            if (_assistant) _line.Append(", assistant working");
 
             float now = Time.unscaledTime;
             bool any = false;

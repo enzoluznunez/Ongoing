@@ -1,10 +1,11 @@
 using System.Collections.Generic;
 using AccountingImmersiveAnalytics.App;
-using AccountingImmersiveAnalytics.Assistant;
-using AccountingImmersiveAnalytics.Assistant.Session;
+using AccountingImmersiveAnalytics.Assistant.Context;
+using AccountingImmersiveAnalytics.Assistant.FlashLite;
 using AccountingImmersiveAnalytics.Text;
 using AccountingImmersiveAnalytics.UI.Charts;
-using AccountingImmersiveAnalytics.UI.Charts.Layout;
+using AccountingImmersiveAnalytics.UI.Charts.TwoD.Layout;
+using AccountingImmersiveAnalytics.UI.Charts.TwoD.View;
 using AccountingImmersiveAnalytics.UI.Charts.View;
 using AccountingImmersiveAnalytics.UI.Helpers;
 using AccountingImmersiveAnalytics.UI.Panels;
@@ -14,7 +15,6 @@ namespace AccountingImmersiveAnalytics.Hands
 {
     public sealed class DataInspector
     {
-        private const float DwellSeconds = 0.25f;
         private const float GraceSeconds = 0.3f;
 
         private readonly DataTooltip _tooltip;
@@ -25,8 +25,6 @@ namespace AccountingImmersiveAnalytics.Hands
         private ChartCard _view;
         private MarkInfo _markInfo;
         private int _mark = -1;
-        private int _pending = -1;
-        private float _pendingSince;
         private float _lostAt = -1f;
         private ChartEntry _entry;
         private MarkInfo _detail;
@@ -75,16 +73,8 @@ namespace AccountingImmersiveAnalytics.Hands
 
             if (hit.Card != _view) Clear();
 
-            if (hit.Mark.Id != _pending)
-            {
-                _pending = hit.Mark.Id;
-                _pendingSince = Time.unscaledTime;
-            }
-
             bool pinched = _owner.PinchedMark;
-            bool first = _mark < 0;
-            bool settled = Time.unscaledTime - _pendingSince >= DwellSeconds;
-            if (_pending != _mark && (first || pinched || settled)) Show(hit.Card, hit.Mark);
+            if (hit.Mark.Id != _mark) Show(hit.Card, hit.Mark);
             if (pinched && _mark >= 0) Explain();
             if (_mark >= 0) TickPulse();
         }
@@ -103,7 +93,6 @@ namespace AccountingImmersiveAnalytics.Hands
 
         private void Lost()
         {
-            _pending = -1;
             if (_mark < 0) return;
 
             bool stale = HandRay.ToolSelected || _view == null || !_view.Shown || _view.Mark(_mark) != _markInfo;
@@ -131,18 +120,17 @@ namespace AccountingImmersiveAnalytics.Hands
             view.Highlight(mark);
 
             _detail = mark;
-            _explanation = TooltipWriter.TryCached(_entry, mark, out Explanation cached) ? cached : (Explanation?)null;
+            _explanation = MarkExplainer.TryCached(_entry, mark, out Explanation cached) ? cached : (Explanation?)null;
             Render();
         }
 
-        private bool Waiting => _explanation == null && _entry != null && TooltipWriter.IsWriting(_entry, _markInfo);
+        private bool Waiting => _explanation == null && _entry != null && MarkExplainer.IsWriting(_entry, _markInfo);
 
         private void Render()
         {
-            string status = null;
-            if (Waiting) status = Strings.Get(TooltipWriter.Reached ? "loading" : "assistant.connecting") + new string('.', Style.Dots);
-            _shownDots = Waiting ? Style.Dots : -1;
-            _tooltip.Show(_detail, _explanation?.Lines, status, _view);
+            string waiting = Waiting ? (MarkExplainer.Reached ? "loading" : "assistant.connecting") : null;
+            _shownDots = Waiting ? LoadingDots.Count : -1;
+            _tooltip.Show(_detail, _explanation?.Lines, waiting, _view);
             ChartManager charts = Scene.Charts;
             _tooltip.Place(_view, _markInfo, charts != null ? charts.PinnedButtonSize : Style.ButtonSize);
         }
@@ -154,7 +142,7 @@ namespace AccountingImmersiveAnalytics.Hands
 
         private void TickPulse()
         {
-            if (Waiting && Style.Dots != _shownDots) Render();
+            if (Waiting && LoadingDots.Count != _shownDots) Render();
         }
 
         private void Explain()
@@ -168,7 +156,7 @@ namespace AccountingImmersiveAnalytics.Hands
 
             ChartEntry entry = _entry;
             MarkInfo mark = _markInfo;
-            TooltipWriter.Request(entry, mark, _detail, result =>
+            MarkExplainer.Request(entry, mark, _detail, result =>
             {
                 if (_entry != entry || _markInfo != mark) return;
                 _explanation = result;
@@ -181,7 +169,7 @@ namespace AccountingImmersiveAnalytics.Hands
         private void TellAda()
         {
             Menu assistant = Scene.Assistant;
-            if (assistant != null && assistant.IsGeminiActive) StateChannel.Point(Describe());
+            if (assistant != null && assistant.IsAssistantActive) ActivityFeed.Point(Describe());
         }
 
         public void Clear()
@@ -193,7 +181,6 @@ namespace AccountingImmersiveAnalytics.Hands
             _entry = null;
             _explanation = null;
             _mark = -1;
-            _pending = -1;
             _lostAt = -1f;
         }
     }

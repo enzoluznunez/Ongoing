@@ -1,5 +1,4 @@
-using AccountingImmersiveAnalytics.Assistant;
-using AccountingImmersiveAnalytics.Assistant.Live;
+using AccountingImmersiveAnalytics.Assistant.FlashLite;
 using Newtonsoft.Json.Linq;
 using UnityEngine;
 
@@ -7,8 +6,8 @@ namespace AccountingImmersiveAnalytics.Text
 {
     public static class LanguageDetector
     {
-        private const int FewestWords = 2;
-        private const int FewestUnspacedLetters = 4;
+        private const int FewestWords = 5;
+        private const int FewestUnspacedLetters = 10;
         private const float FewestConfidence = 0.8f;
         private const int TimeoutSeconds = 8;
 
@@ -19,8 +18,8 @@ namespace AccountingImmersiveAnalytics.Text
             if (!LongEnough(transcript)) return;
             int ticket = ++_ticket;
 
-            JObject answer = await FlashLite.Ask(Instructions, transcript,
-                FlashLite.Schema(("language", "STRING"), ("confidence", "NUMBER")), TimeoutSeconds);
+            JObject answer = await FlashLiteClient.Ask(Instructions, transcript,
+                FlashLiteClient.Schema(("language", "STRING"), ("confidence", "NUMBER")), TimeoutSeconds);
             if (ticket != _ticket) return;
             if (answer == null)
             {
@@ -28,8 +27,18 @@ namespace AccountingImmersiveAnalytics.Text
                 return;
             }
 
-            string code = Language.Normalize((string)answer["language"]);
-            float confidence = (float?)answer["confidence"] ?? 0f;
+            string code;
+            float confidence;
+            try
+            {
+                code = Language.Normalize((string)answer["language"]);
+                confidence = (float?)answer["confidence"] ?? 0f;
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogWarning($"[LanguageDetector] Could not read the answer ({e.Message}); staying in {Language.CurrentName}.");
+                return;
+            }
             if (code == Language.Unknown || confidence < FewestConfidence)
             {
                 Debug.Log($"[LanguageDetector] Not sure enough ({answer["language"]}, {confidence:F2}); staying in {Language.CurrentName}.");

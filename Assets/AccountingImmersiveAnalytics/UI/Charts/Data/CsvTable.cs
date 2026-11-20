@@ -24,9 +24,10 @@ namespace AccountingImmersiveAnalytics.UI.Charts.Data
             return line > 0 && head.Substring(0, line).Contains(",") && head.IndexOf('\n', line + 1) > 0;
         }
 
-        public static CsvTable Parse(string text)
+        public static CsvTable Parse(string text) => FromRows(SplitRows(text));
+
+        public static CsvTable FromRows(List<List<string>> rows)
         {
-            List<List<string>> rows = SplitRows(text);
             if (rows.Count < 2) throw new FormatException("The file has no data rows.");
             List<string> header = rows[0];
             for (int r = 1; r < rows.Count; r++)

@@ -1,13 +1,21 @@
 using AccountingImmersiveAnalytics.UI.Charts.Tools;
 using AccountingImmersiveAnalytics.UI.Interactions;
 using Oculus.Interaction;
+using Oculus.Interaction.Grab;
+using Oculus.Interaction.GrabAPI;
+using Oculus.Interaction.HandGrab;
+using Oculus.Interaction.Input;
 using UnityEngine;
 
 namespace AccountingImmersiveAnalytics.UI.Charts.View
 {
     public sealed class ChartGrab : MonoBehaviour
     {
+        private const float GripDepth = 0.03f;
+
         private Grabbable _grabbable;
+        private HandGrabInteractable _handGrab;
+        private BoxCollider _gripBox;
         private OneGrabTranslateTransformer _slide;
         private TwoGrabTurn _turn;
         private TwoGrabScale _scale;
@@ -28,11 +36,44 @@ namespace AccountingImmersiveAnalytics.UI.Charts.View
             grab._slide = holder.AddComponent<OneGrabTranslateTransformer>();
             grab._turn = holder.AddComponent<TwoGrabTurn>();
             grab._scale = holder.AddComponent<TwoGrabScale>();
+            grab.BuildGrip();
             grab.Apply();
             return grab;
         }
 
         public void SetExempt(RectTransform exempt) => _exempt = exempt;
+
+        private void BuildGrip()
+        {
+            var grip = new GameObject("Grip");
+            grip.layer = gameObject.layer;
+            grip.transform.SetParent(transform, false);
+
+            Rigidbody body = grip.AddComponent<Rigidbody>();
+            body.isKinematic = true;
+            body.useGravity = false;
+            _gripBox = grip.AddComponent<BoxCollider>();
+
+            GrabbingRule pinch = new GrabbingRule(HandFingerFlags.Thumb | HandFingerFlags.Index, GrabbingRule.DefaultPinchRule);
+            _handGrab = grip.AddComponent<HandGrabInteractable>();
+            _handGrab.InjectAllHandGrabInteractable(GrabTypeFlags.Pinch | GrabTypeFlags.Palm, body, pinch, GrabbingRule.DefaultPalmRule);
+            _handGrab.InjectOptionalPointableElement(_grabbable);
+        }
+
+        public void FitGrip(RectTransform area)
+        {
+            if (area == null || _gripBox == null) return;
+            var corners = new Vector3[4];
+            area.GetWorldCorners(corners);
+            Transform grip = _gripBox.transform;
+            grip.SetPositionAndRotation((corners[0] + corners[2]) * 0.5f, area.rotation);
+            Vector3 scale = grip.lossyScale;
+            float width = Vector3.Distance(corners[0], corners[3]);
+            float height = Vector3.Distance(corners[0], corners[1]);
+            _gripBox.center = Vector3.zero;
+            _gripBox.size = new Vector3(width / Mathf.Max(1e-6f, scale.x), height / Mathf.Max(1e-6f, scale.y),
+                GripDepth / Mathf.Max(1e-6f, scale.z));
+        }
 
         public bool IsExempt(Vector3 point) =>
             _exempt != null && _exempt.rect.Contains(_exempt.InverseTransformPoint(point));
@@ -54,6 +95,8 @@ namespace AccountingImmersiveAnalytics.UI.Charts.View
             _grabbable.InjectOptionalTwoGrabTransformer(two);
             one?.Initialize(_grabbable);
             two?.Initialize(_grabbable);
+            if (_handGrab != null) _handGrab.enabled = Armed;
+            if (_gripBox != null) _gripBox.enabled = Armed;
         }
 
         private void LateUpdate()

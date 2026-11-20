@@ -24,6 +24,8 @@ namespace AccountingImmersiveAnalytics.UI.Panels
         private Vector3 _canvasHome;
         private RectTransform _rightCard;
         private float _rightCardWidth;
+        private RectTransform _leftCard;
+        private float _leftCardWidth;
 
         protected RectTransform Body { get; private set; }
 
@@ -169,34 +171,50 @@ namespace AccountingImmersiveAnalytics.UI.Panels
         private float RightCardTrail =>
             _rightCard != null && _rightCard.gameObject.activeSelf ? Style.SmallPad + _rightCardWidth : 0f;
 
-        public RectTransform ShowRightCard(string name, float width)
+        private float LeftCardTrail =>
+            _leftCard != null && _leftCard.gameObject.activeSelf ? _leftCardWidth + Style.SmallPad : 0f;
+
+        public RectTransform ShowRightCard(string name, float width) => ShowSideCard(ref _rightCard, ref _rightCardWidth, name, width);
+
+        public void HideRightCard() => HideSideCard(_rightCard);
+
+        public RectTransform ShowLeftCard(string name, float width) => ShowSideCard(ref _leftCard, ref _leftCardWidth, name, width);
+
+        public void HideLeftCard() => HideSideCard(_leftCard);
+
+        private RectTransform ShowSideCard(ref RectTransform slot, ref float slotWidth, string name, float width)
         {
             RectTransform canvas = CanvasRect;
             if (canvas == null) return null;
             RectTransform card = LayoutTools.EnsureChild(canvas, name);
             card.gameObject.layer = canvas.gameObject.layer;
             if (_grabSurface != null) card.SetSiblingIndex(_grabSurface.transform.GetSiblingIndex());
-            bool changed = _rightCard != card || !card.gameObject.activeSelf || !Mathf.Approximately(_rightCardWidth, width);
-            _rightCard = card;
-            _rightCardWidth = width;
+            bool changed = slot != card || !card.gameObject.activeSelf || !Mathf.Approximately(slotWidth, width);
+            slot = card;
+            slotWidth = width;
             card.gameObject.SetActive(true);
             if (!changed) return card;
-            LayoutCards();
-            QueueSettle();
-            PanelLineup.Resize(this);
+            Relayout();
             return card;
         }
 
-        public void HideRightCard()
+        private void HideSideCard(RectTransform card)
         {
-            if (_rightCard == null || !_rightCard.gameObject.activeSelf) return;
-            _rightCard.gameObject.SetActive(false);
+            if (card == null || !card.gameObject.activeSelf) return;
+            card.gameObject.SetActive(false);
+            Relayout();
+        }
+
+        private void Relayout()
+        {
             LayoutCards();
             QueueSettle();
             PanelLineup.Resize(this);
         }
 
-        protected override float SlotUnits => PanelWidth + RightCardTrail;
+        protected override float SlotLeadUnits => LeftCardTrail;
+
+        protected override float SlotUnits => LeftCardTrail + PanelWidth + RightCardTrail;
 
         protected override void ResolveDeferredLayout() => LayoutCards();
 
@@ -240,9 +258,16 @@ namespace AccountingImmersiveAnalytics.UI.Panels
             RectTransform canvas = CanvasRect;
             if (canvas == null) return;
 
-            float width = PanelWidth;
-            PinTopLeft(_primary, Vector2.zero);
+            float lead = LeftCardTrail;
+            float width = lead + PanelWidth;
+            PinTopLeft(_primary, new Vector2(lead, 0f));
             if (_primary != null) _primary.sizeDelta = new Vector2(PanelWidth, PanelHeight);
+
+            if (lead > 0f)
+            {
+                PinTopLeft(_leftCard, Vector2.zero);
+                _leftCard.sizeDelta = new Vector2(_leftCardWidth, PanelHeight);
+            }
 
             if (RightCardTrail > 0f)
             {
@@ -252,7 +277,7 @@ namespace AccountingImmersiveAnalytics.UI.Panels
             }
 
             canvas.sizeDelta = new Vector2(width, PanelHeight);
-            canvas.localPosition = _canvasHome;
+            canvas.localPosition = _canvasHome - canvas.localRotation * new Vector3(lead * canvas.localScale.x, 0f, 0f);
             InvalidateGrabBounds();
         }
     }

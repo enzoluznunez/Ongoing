@@ -7,8 +7,7 @@ namespace AccountingImmersiveAnalytics.Text
     public static class Loading
     {
         private const string Key = "loading";
-        private const int MostDots = Style.MostDots;
-        private const float HeldSeconds = MostDots * Style.DotSeconds;
+        private const float HeldSeconds = LoadingDots.Most * LoadingDots.TickSeconds;
 
         private static string _word;
         private static string _language = Language.English;
@@ -44,18 +43,15 @@ namespace AccountingImmersiveAnalytics.Text
         public static (string text, string language) Steady()
         {
             string word = Word();
-            int dots = Dots;
+            int dots = LoadingDots.Count;
             if (dots != _steadyDots || !ReferenceEquals(word, _steadyWord))
             {
                 _steadyWord = word;
                 _steadyDots = dots;
-                string hidden = dots < MostDots ? $"<alpha=#00>{new string('.', MostDots - dots)}" : "";
-                _steadyText = $"<noparse>{word}{new string('.', dots)}</noparse>" + hidden;
+                _steadyText = LoadingDots.Steady(word, dots);
             }
             return (_steadyText, _language);
         }
-
-        private static int Dots => Style.Dots;
 
         private static string Word() => _word ?? Original;
 

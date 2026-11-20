@@ -13,6 +13,7 @@ namespace AccountingImmersiveAnalytics.UI.Panels
     {
         public DocumentFile Page;
         public string Failure;
+        public string ChartFailure;
         public IReadOnlyList<ChartEntry> Charts;
     }
 }

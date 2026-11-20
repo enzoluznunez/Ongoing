@@ -1,7 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using AccountingImmersiveAnalytics.Assistant.Session;
+using AccountingImmersiveAnalytics.Assistant.Context;
 using AccountingImmersiveAnalytics.UI.Charts;
 using AccountingImmersiveAnalytics.UI.Helpers;
 using UnityEngine;
@@ -89,7 +89,7 @@ namespace AccountingImmersiveAnalytics.UI.Interactions
             if (motion._auto) motion.StopAuto($"the user took hold of the {motion.Name} list, so its auto-scroll stopped");
         }
 
-        public void GoTo(int index)
+        public void JumpTo(int index)
         {
             if (_auto) StopAuto(null);
             Canvas.ForceUpdateCanvases();
@@ -114,7 +114,7 @@ namespace AccountingImmersiveAnalytics.UI.Interactions
         public void StopAuto(string why)
         {
             _auto = false;
-            if (!string.IsNullOrEmpty(why)) StateChannel.Record(why);
+            if (!string.IsNullOrEmpty(why)) ActivityFeed.Record(why);
         }
 
         public int Current
@@ -147,7 +147,7 @@ namespace AccountingImmersiveAnalytics.UI.Interactions
 
         private IEnumerator Glide(float from, float to, float seconds)
         {
-            yield return Style.Tween(seconds, k => Offset = Mathf.Lerp(from, to, k));
+            yield return Animate.Tween(seconds, k => Offset = Mathf.Lerp(from, to, k));
             _glide = null;
         }
 

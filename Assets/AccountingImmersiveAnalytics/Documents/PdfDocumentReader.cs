@@ -24,6 +24,23 @@ namespace AccountingImmersiveAnalytics.Documents
             }
         }
 
+        public static (string Title, double Width, double Height)? Peek(byte[] bytes)
+        {
+            try
+            {
+                using (PdfDocument pdf = PdfDocument.Open(bytes))
+                {
+                    if (pdf.NumberOfPages < 1) return null;
+                    Page first = pdf.GetPage(1);
+                    return (pdf.Information?.Title, first.Width, first.Height);
+                }
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
         public static DocumentFile Read(byte[] bytes, DocumentEntry entry)
         {
             var file = new DocumentFile { Entry = entry, Title = entry.Title };
@@ -34,6 +51,7 @@ namespace AccountingImmersiveAnalytics.Documents
                     int index = file.Pages.Count;
                     file.Pages.Add(new DocumentPage { Width = page.Width, Height = page.Height });
                     foreach (DocumentPassage passage in Passages(page, index)) file.Passages.Add(passage);
+                    file.Tables.AddRange(PdfTables.Find(page, index));
                 }
             }
             file.Finish();

@@ -4,8 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using AccountingImmersiveAnalytics.App;
-using AccountingImmersiveAnalytics.Assistant;
-using AccountingImmersiveAnalytics.Assistant.Live;
+using AccountingImmersiveAnalytics.Assistant.FlashLite;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using UnityEngine;
@@ -159,9 +158,9 @@ namespace AccountingImmersiveAnalytics.Text
 
         private static async Task Request(string target, string source, string context, List<string> batch)
         {
-            JObject answer = await FlashLite.Ask(Instructions(target, source, context, batch.Count),
+            JObject answer = await FlashLiteClient.Ask(Instructions(target, source, context, batch.Count),
                 new JArray(batch).ToString(Formatting.None),
-                FlashLite.Schema(("translations", "STRING_LIST")), TimeoutSeconds);
+                FlashLiteClient.Schema(("translations", "STRING_LIST")), TimeoutSeconds);
             foreach (string original in batch) Asking.Remove((target, original));
 
             List<string> translations = (answer?["translations"] as JArray)?.Select(token => (string)token).ToList();

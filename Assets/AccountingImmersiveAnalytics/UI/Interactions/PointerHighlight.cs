@@ -9,7 +9,7 @@ namespace AccountingImmersiveAnalytics.UI.Interactions
     public class PointerHighlight : MonoBehaviour,
         IPointerEnterHandler, IPointerExitHandler, IPointerDownHandler, IPointerUpHandler
     {
-        private const float LiftDuration = 0.08f;
+        private const float LiftDuration = Animate.Fast;
 
         public Graphic target;
         public Color restColor;

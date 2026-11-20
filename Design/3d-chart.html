@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>3D Chart Design</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* VOICE work: a design review sheet for new chart kinds, plain and exact
+   IDEA the app's own chart card, folded into a corner and standing in the grey of passthrough
+   PICTURE the 3D chart drawn large and turnable, then its three fixed views
+   COLOUR white page, black ink, passthrough grey ground; chart colours are the app's palette and ramp
+   TYPE Noto Sans 400/600, the app's own face
+   LAYOUT chart column left, 3D chart right with its controls; views as full-width rows; phone stacks */
+:root{color-scheme:light dark;--bg:light-dark(#ffffff,#121314);--ink:light-dark(#0b0b0b,#f1f1f1);--muted:light-dark(#5d6166,#a4a9ae);--room:light-dark(#a9aeb3,#3a3f45);--rule:light-dark(#dcdcdc,#2b2e32)}
+:root[data-theme=light]{color-scheme:light}
+:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.55 'Noto Sans',system-ui,sans-serif;overflow-x:clip}
+.band{padding-block:clamp(24px,3.5vw,48px);padding-inline:max(5vw,16px)}
+.wrap{max-width:1240px;margin:0 auto}
+h1{font-size:clamp(32px,4.4vw,46px);line-height:1.05;letter-spacing:-.02em;font-weight:600;margin:0 0 12px;text-wrap:balance}
+h2{font-size:26px;line-height:1.15;letter-spacing:-.01em;font-weight:600;margin:0 0 6px}
+h3{font-size:20px;font-weight:600;margin:0 0 6px}
+p{margin:0 0 10px;max-width:68ch}
+.lede{font-size:17px}
+.note{color:var(--muted);font-size:14px}
+.top{display:grid;gap:20px;margin-top:20px}
+.room{background:var(--room);border-radius:24px;position:relative}
+.column{display:flex;flex-direction:column;align-items:center;gap:10px;padding:24px 20px}
+.column svg{display:block;width:100%;max-width:360.5px;height:auto}
+.stand{cursor:pointer;border-radius:16px}
+.stand:focus-visible{outline:3px solid var(--ink);outline-offset:4px}
+.fig{position:relative;min-height:340px}
+.fig>svg{position:absolute;inset:0;width:100%;height:100%;display:block}
+.main{min-height:560px;touch-action:none;cursor:grab}
+.main:active{cursor:grabbing}
+svg text{fill:#000;font-family:'Noto Sans',system-ui,sans-serif}
+.cap{margin-top:12px}
+.bar{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}
+.kinds{margin:0 0 12px}
+.btn{min-height:44px;padding:0 16px;border:2px solid var(--ink);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit;font-weight:600;cursor:pointer}
+.btn[aria-pressed=true]{background:var(--ink);color:var(--bg)}
+.btn:focus-visible{outline:3px solid var(--muted);outline-offset:2px}
+.controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr));gap:14px 24px;align-items:end}
+.controls label{display:block;font-weight:600;font-size:15px}
+.controls output{font-weight:400;color:var(--muted);float:right;font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;height:44px;accent-color:var(--ink);margin:0}
+.key{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:14px;margin-top:10px}
+.key span{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.key i{width:14px;height:14px;border-radius:2px;display:inline-block}
+.key i.ramp{width:120px;height:10px}
+.key i.rule{width:24px;height:2px;border-radius:0;background:#000;outline:2px solid #fff}
+.views{display:grid;gap:36px;margin-top:20px}
+.view{display:grid;gap:20px;border-top:2px solid var(--ink);padding-top:18px}
+.view .fig{min-height:440px}
+.view ul{margin:8px 0 0;padding-left:20px}
+.view li{margin-bottom:4px}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:15px}
+th,td{text-align:left;vertical-align:top;padding:9px 12px 9px 0;border-bottom:1px solid var(--rule)}
+th{font-weight:600;border-bottom:2px solid var(--ink)}
+td:first-child{font-weight:600;white-space:nowrap}
+.qs{columns:2 320px;column-gap:40px;margin:12px 0 0;padding-left:20px}
+.qs li{break-inside:avoid;margin-bottom:10px}
+@media(min-width:900px){.top{grid-template-columns:400px minmax(0,1fr)}.view{grid-template-columns:minmax(0,2fr) minmax(0,1fr)}}
+@media(max-width:600px){.main{min-height:400px}.view .fig{min-height:320px}table{font-size:13px}th,td{padding:6px 8px 6px 0}}
+</style>
+</head>
+<body>
+<header class="band">
+<div class="wrap">
+<h1>3D chart design</h1>
+<p class="lede">A stand-in card for the chart column, and three 3D chart kinds built on one chart card folded into a corner, with a 16 curve wherever two sides meet. Drag the chart to turn it; nothing else on it moves. The controls change every drawing on this page.</p>
+<p class="note" id="source"></p>
+
+<div class="top">
+<section>
+<div class="room column" aria-label="Chart column at preview size">
+<svg id="heat" viewBox="0 0 721 481" role="img" aria-label="2D heatmap card at half size"></svg>
+<svg id="stand" class="stand" viewBox="0 0 360.5 240.5" role="button" tabindex="0" aria-pressed="false" aria-label="3D chart stand-in card"></svg>
+</div>
+<div class="cap">
+<h3>Chart column stand-in</h3>
+<p>A 3D chart can't be drawn as a flat preview, so its slot gets a blank card the size of a 2D preview (360.5 × 240.5, radius 16) saying <strong>Cannot display</strong> at 16 / 600, the same as the Documents column's blank page. The 2D card above it is there for scale. Press the stand-in: it pins the 3D chart and takes the black outline.</p>
+</div>
+</section>
+
+<section>
+<div class="bar kinds" id="kind" aria-label="Chart kind">
+<button class="btn" data-k="scatter">Scatter</button>
+<button class="btn" data-k="surface">Surface</button>
+<button class="btn" data-k="bar">Bars</button>
+</div>
+<div class="room fig main"><svg id="main" role="img" aria-label="3D chart"></svg></div>
+<div class="bar" id="presets">
+<button class="btn" data-p="facing" aria-pressed="true">Facing you</button>
+<button class="btn" data-p="front" aria-pressed="false">Front</button>
+<button class="btn" data-p="side" aria-pressed="false">Side</button>
+<button class="btn" data-p="top" aria-pressed="false">Bird's eye</button>
+<button class="btn" data-p="behind" aria-pressed="false">From behind</button>
+</div>
+<div class="controls">
+<div data-for="bar"><label for="share">Bar width <output id="share-o"></output></label><input id="share" type="range" min="40" max="90" step="5"></div>
+<div data-for="scatter"><label for="dot">Dot radius <output id="dot-o"></output></label><input id="dot" type="range" min="5" max="20" step="1"></div>
+<div data-for="surface"><label for="mesh">Mesh cells <output id="mesh-o"></output></label><input id="mesh" type="range" min="6" max="24" step="2"></div>
+<div><label for="size">Plot size <output id="size-o"></output></label><input id="size" type="range" min="320" max="600" step="20"></div>
+<div><label for="alpha">Mark opacity <output id="alpha-o"></output></label><input id="alpha" type="range" min="20" max="100" step="5"></div>
+<div><label for="shade">Mark shading <output id="shade-o"></output></label><input id="shade" type="range" min="0" max="30" step="2"></div>
+<div><label for="card">Card shading <output id="card-o"></output></label><input id="card" type="range" min="0" max="30" step="2"></div>
+</div>
+<div class="bar">
+<span data-for="bar" class="bar" style="margin:0" id="by"><button class="btn" data-by="q">Colour by quarter</button><button class="btn" data-by="d">Colour by department</button></span>
+<button class="btn" data-for="scatter" id="drops">Drop lines and shadows</button>
+<button class="btn" id="reset">Reset</button>
+</div>
+<div class="key" id="key-main"></div>
+</section>
+</div>
+</div>
+</header>
+
+<section class="band" style="padding-top:0">
+<div class="wrap">
+<h2>Three fixed views, each one its own drawing</h2>
+<p>Each view looks straight at one side, with no perspective, at one shared scale so sizes compare directly. Labels are printed on the card, so a side seen edge-on takes its labels with it.</p>
+<div class="views">
+<article class="view"><div class="room fig"><svg id="v-top" role="img" aria-label="Bird's eye view"></svg></div><div><h3>Bird's eye</h3><div id="vt-top"></div><div class="key" data-key></div></div></article>
+<article class="view"><div class="room fig"><svg id="v-side" role="img" aria-label="Side view"></svg></div><div><h3>Side</h3><div id="vt-side"></div><div class="key" data-key></div></div></article>
+<article class="view"><div class="room fig"><svg id="v-front" role="img" aria-label="Front view"></svg></div><div><h3>Front</h3><div id="vt-front"></div><div class="key" data-key></div></div></article>
+</div>
+</div>
+</section>
+
+<section class="band" style="padding-top:0">
+<div class="wrap">
+<h2>Design values</h2>
+<p>These follow the chart kind and controls above, and use the 2D chart constants wherever a 2D rule carries over.</p>
+<div class="scroll"><table><thead><tr><th>Part</th><th>Value</th><th>From the 2D rules</th></tr></thead><tbody id="spec"></tbody></table></div>
+<h2 style="margin-top:32px">To decide before code</h2>
+<ul class="qs">
+<li><strong>Axis ranges.</strong> Every number axis uses the 2D rule: 5 ticks on steps of 1, 2, 2.5 or 5. That can leave room: staff hours run from 2k to 10k for shops between 3.9k and 7.6k.</li>
+<li><strong>Drop lines and shadows.</strong> New for the scatter, with nothing like them in 2D. Each dot gets a line down to the floor and a soft shadow there, so you can read where it sits on the floor grid.</li>
+<li><strong>Surface colour.</strong> The surface uses the 2D heatmap ramp, which repeats its height. A single colour with shading alone is the other option.</li>
+<li><strong>Break-even line.</strong> A black line, 2 wide, where profit is 0. It's the one annotation drawn on a mark; 2D charts have none yet.</li>
+<li><strong>Surface data.</strong> No sample PDF has a what-if table yet. One would need adding, with a caption the planner can read, such as "Shown best as a surface".</li>
+<li><strong>Title around the corner.</strong> Centred on both walls' combined width, curve included, so it leans toward the longer wall. Straight on, only the part on the wall you face can be read.</li>
+<li><strong>Value axis twice.</strong> Each wall carries the vertical axis on its outward edge, so the back wall's sits on the right. One could be dropped.</li>
+<li><strong>Edge-on labels.</strong> In the straight front and side views the floor's labels disappear. Facing you, every label can be read.</li>
+<li><strong>Card shading.</strong> A fixed light, turning with the chart, shades the card so the curves show. At 0 the card is pure white and the curves disappear.</li>
+</ul>
+</div>
+</section>
+
+<script>
+{
+const $=s=>document.querySelector(s);
+const PAL=['#4e9de0','#f28e2b','#4fc4c4','#edc948','#ff9da7','#59c26b','#b07aa1','#e15759','#9c755f','#bab0ac'];
+const RAMP=['#e6f0fa','#cfe4f7','#8fc0eb','#4e9de0','#1f5f9c','#0b2f52'];
+const DEF={kind:'scatter',share:60,dot:10,mesh:16,drops:true,size:480,alpha:75,shade:12,card:10,by:'q'};
+let S={...DEF};
+let PW=480,PD=480;
+const PAD=30,GAP=10,TK=12,AX=16,TT=32,TROW=40,TBELOW=20,CARD_R=16,BEND=16,PLOT_R=8,LINE=2;
+const add=(a,b)=>[a[0]+b[0],a[1]+b[1],a[2]+b[2]],sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]],mul=(a,k)=>[a[0]*k,a[1]*k,a[2]*k];
+const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2],cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+const norm=a=>mul(a,1/Math.hypot(a[0],a[1],a[2]));
+const LIGHT=norm([0.45,1,0.7]);
+const rgb=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16));
+const mix=(h,to,t)=>{const a=rgb(h),b=rgb(to);return '#'+a.map((x,i)=>Math.round(x+(b[i]-x)*Math.max(0,Math.min(1,t))).toString(16).padStart(2,'0')).join('')};
+const rampAt=t=>{const s=Math.max(0,Math.min(1,t))*(RAMP.length-1),i=Math.min(RAMP.length-2,Math.floor(s));return mix(RAMP[i],RAMP[i+1],s-i)};
+const clip=s=>s.length>10?s.slice(0,10)+'…':s;
+const wOf=(s,size)=>s.length*size*0.56;
+const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+let pen=null;try{pen=document.createElement('canvas').getContext('2d')}catch(e){}
+const ADV={};
+const advance=(str,size,weight)=>{const key=weight+'|'+size+'|'+str;if(!(key in ADV)){if(!pen)return wOf(str,size);pen.font=`${weight} ${size}px "Noto Sans", system-ui, sans-serif`;ADV[key]=pen.measureText(str).width}return ADV[key]};
+
+function plain(v,step){
+let d=0;const s=Math.abs(step);
+while(d<6&&s>0&&Math.abs(s*10**d-Math.round(s*10**d))>1e-6)d++;
+let t=Math.abs(v).toFixed(d);if(d>0)t=t.replace(/\.?0+$/,'');
+const [i,f]=t.split('.');const g=i.length>=4?i.replace(/\B(?=(\d{3})+(?!\d))/g,','):i;
+return (v<0&&Number(t)!==0?'-':'')+g+(f?'.'+f:'');
+}
+const fmt=(v,step)=>{const a=Math.abs(v);if(a>=1e6)return plain(v/1e6,step/1e6)+'M';if(a>=1e3)return plain(v/1e3,step/1e3)+'k';return plain(v,step)};
+const mkAxis=(low,high,step)=>({type:'num',low,high,step,ticks:[0,1,2,3,4].map(i=>low+step*i),frac:v=>(v-low)/(high-low),label:v=>fmt(Math.abs(v)<1e-9?0:v,step)});
+function numAxis(min,max,zero){
+if(zero){min=Math.min(min,0);max=Math.max(max,0)}
+const raw=(max-min)/4;let mag=10**Math.floor(Math.log10(raw));
+for(let k=0;k<40;k++){for(const s of [1,2,2.5,5,10]){const step=s*mag;if(step<raw*0.999)continue;const low=Math.floor(min/step+1e-9)*step;if(low+step*4+step*1e-9>=max)return mkAxis(low,low+step*4,step)}mag*=10}
+return mkAxis(min,max,(max-min)/4);
+}
+const catAxis=names=>({type:'cat',names});
+const ext=a=>[Math.min(...a),Math.max(...a)];
+
+const MONTHLY=[86400,82100,95300,99800,104600,108900,103200,101700,106400,112300,117800,130100];
+const REVENUE=MONTHLY.reduce((a,b)=>a+b,0);
+const SHOPS=[['Maple Street',15.2,7600,71200],['Riverside',12.1,6400,58900],['Old Town',11.4,6100,55300],['Hillcrest',9.6,5300,46800],['Harbor',10.3,5700,50100],
+['University',8.8,5200,63400],['Westgate',8.1,4600,38200],['Lakeview',7.6,4400,35900],['Northfield',8.9,4900,41700],['Station Square',8.0,3900,52600]];
+const WEIGHTS=SHOPS.reduce((a,s)=>a+s[1],0);
+const SALES=SHOPS.map(s=>Math.round(s[1]/WEIGHTS*REVENUE/100)*100);
+SALES[0]+=REVENUE-SALES.reduce((a,b)=>a+b,0);
+const BUDGET={depts:['Baking','Front counter','Delivery','Marketing','Administration'],qs:['Q1','Q2','Q3','Q4'],
+v:[[2.1,3.4,-1.2,6.8],[-0.8,1.5,0.4,4.2],[5.6,7.9,11.3,9.4],[-6.5,-3.1,2.7,-8.2],[0.3,-1.4,-0.6,1.1]]};
+const COST=1.5,FIXED=18000,P0=2,P1=6,U0=0,U1=20000;
+const PROFIT=(p,u)=>u*(p-COST)-FIXED;
+const PMIN=PROFIT(P0,U0),PMAX=PROFIT(P1,U1);
+
+const CHARTS={
+scatter:{title:'Staff hours, sales and customers by shop',source:'Data: Table 2 of 04 Shop Performance 2025, the made-up Maple Street Bakery sample; sales are worked out the way the sample writer does.',
+x:{title:'Staff hours',axis:numAxis(...ext(SHOPS.map(s=>s[2])))},y:{title:'Sales ($)',axis:numAxis(...ext(SALES))},z:{title:'Customers',axis:numAxis(...ext(SHOPS.map(s=>s[3])))}},
+surface:{title:'Monthly profit by price and loaves sold',source:`Data: a made-up what-if for the sample bakery: $${COST.toFixed(2)} to bake each loaf and $${FIXED.toLocaleString('en-US')} a month in fixed costs, so profit = loaves × (price − ${COST.toFixed(2)}) − ${FIXED.toLocaleString('en-US')}. No sample PDF has it yet.`,
+x:{title:'Price per loaf ($)',axis:numAxis(P0,P1)},y:{title:'Profit ($)',axis:numAxis(PMIN,PMAX)},z:{title:'Loaves sold per month',axis:numAxis(U0,U1)}},
+bar:{title:'Variance by department and quarter',source:'Data: Table 1 of 05 Budget vs Actual 2025, the made-up Maple Street Bakery sample.',
+x:{title:'Department',axis:catAxis(BUDGET.depts)},y:{title:'Variance (%)',axis:numAxis(...ext(BUDGET.v.flat()),true)},z:{title:'Quarter',axis:catAxis(BUDGET.qs)}}};
+
+function geo(){
+PW=PD=S.size;
+const K=CHARTS[S.kind],PH=S.size,xA=K.x.axis,zA=K.z.axis,yA=K.y.axis;
+const xOf=v=>xA.type==='cat'?-PW/2+PW/xA.names.length*(v+.5):-PW/2+xA.frac(v)*PW;
+const zOf=v=>zA.type==='cat'?PD/2-PD/zA.names.length*(v+.5):PD/2-zA.frac(v)*PD;
+const yOf=v=>yA.frac(v)*PH;
+const ticks=(A,of)=>A.type==='cat'?A.names.map((n,i)=>({p:of(i),t:clip(n)})):A.ticks.map(v=>({p:of(v),t:A.label(v)}));
+const grid=(A,of,len)=>A.type==='cat'?A.names.slice(1).map((_,i)=>-len/2+len/A.names.length*(i+1)):A.ticks.slice(1,-1).map(of);
+const xT=ticks(xA,xOf),zT=ticks(zA,zOf),yT=ticks(yA,yOf);
+const xG=grid(xA,xOf,PW),zG=grid(zA,zOf,PD),yG=yA.ticks.slice(1,-1).map(yOf);
+const widest=Math.max(TK,...yT.map(t=>wOf(t.t,TK)),...zT.map(t=>wOf(t.t,TK)));
+const M=Math.ceil(PAD+AX+PAD+widest+GAP);
+const zB=-PD/2-PAD,xL=-PW/2-PAD,yF=-PAD,top=PH+TBELOW+TROW+PAD,x1=PW/2+M,z1=PD/2+M;
+return {K,PH,xA,zA,yA,xOf,zOf,yOf,xT,zT,yT,xG,zG,yG,M,zB,xL,yF,top,x1,z1};
+}
+
+function rr(u0,v0,u1,v1,R,n=6){
+const c=[[u1-R[0],v1-R[0],0,R[0]],[u0+R[1],v1-R[1],90,R[1]],[u0+R[2],v0+R[2],180,R[2]],[u1-R[3],v0+R[3],270,R[3]]];
+const out=[];
+for(const [cx,cy,a0,r] of c){if(!r){out.push([cx,cy]);continue}for(let i=0;i<=n;i++){const a=(a0+90*i/n)*Math.PI/180;out.push([cx+r*Math.cos(a),cy+r*Math.sin(a)])}}
+return out;
+}
+
+function bends(g){
+const {xL,yF,zB,top,x1,z1}=g,R=BEND,N=6,c=[xL+R,yF+R,zB+R],out=[],q=Math.PI/2;
+const quad=(pts,n)=>out.push({pts,n});
+for(let k=0;k<N;k++){
+const a=k/N*q,b=(k+1)/N*q,m=(a+b)/2;
+const bf=(x,t)=>[x,c[1]-R*Math.cos(t),c[2]-R*Math.sin(t)];
+quad([bf(c[0],a),bf(x1,a),bf(x1,b),bf(c[0],b)],[0,Math.cos(m),Math.sin(m)]);
+const lf=(z,t)=>[c[0]-R*Math.sin(t),c[1]-R*Math.cos(t),z];
+quad([lf(c[2],a),lf(z1,a),lf(z1,b),lf(c[2],b)],[Math.sin(m),Math.cos(m),0]);
+const bl=(y,t)=>[c[0]-R*Math.sin(t),y,c[2]-R*Math.cos(t)];
+quad([bl(c[1],a),bl(top,a),bl(top,b),bl(c[1],b)],[Math.sin(m),0,Math.cos(m)]);
+}
+const d=(al,be)=>[-Math.sin(al)*Math.sin(be),-Math.cos(al),-Math.sin(al)*Math.cos(be)];
+const at=(al,be)=>add(c,mul(d(al,be),R));
+for(let i=0;i<N;i++)for(let j=0;j<N;j++){
+const a0=i/N*q,a1=(i+1)/N*q,b0=j/N*q,b1=(j+1)/N*q;
+quad([at(a0,b0),at(a1,b0),at(a1,b1),at(a0,b1)],mul(d((a0+a1)/2,(b0+b1)/2),-1));
+}
+return out;
+}
+
+function cards(g){
+const {K,PH,xA,zA,xT,zT,yT,xG,zG,yG,M,zB,xL,yF,top,x1,z1}=g;
+const back={n:[0,0,1],map:(u,v)=>[u,v,zB],a:[1,0,0],b:[0,1,0],rect:[xL+BEND,yF+BEND,x1,top],R:[CARD_R,0,0,0],plot:null,
+grid:xA.type==='num'?xG.map(x=>[[x,0],[x,PH]]):[],
+text:[...yT.map(t=>[PW/2+GAP,t.p,t.t,TK,400,'start',0]),[PW/2+M-PAD-AX/2,PH/2,K.y.title,AX,600,'middle',1]]};
+const left={n:[1,0,0],map:(u,v)=>[xL,v,-u],a:[0,0,-1],b:[0,1,0],rect:[-z1,yF+BEND,-(zB+BEND),top],R:[0,CARD_R,0,0],plot:null,
+grid:zA.type==='num'?zG.map(z=>[[-z,0],[-z,PH]]):[],
+text:[...yT.map(t=>[-PD/2-GAP,t.p,t.t,TK,400,'end',0]),[-z1+PAD+AX/2,PH/2,K.y.title,AX,600,'middle',1]]};
+const floor={n:[0,1,0],map:(u,v)=>[u,yF,-v],a:[1,0,0],b:[0,0,-1],rect:[xL+BEND,-z1,x1,-(zB+BEND)],R:[0,0,0,CARD_R],plot:[-PW/2,-PD/2,PW/2,PD/2],
+grid:[...xG.map(x=>[[x,-PD/2],[x,PD/2]]),...zG.map(z=>[[-PW/2,-z],[PW/2,-z]])],
+text:[...xT.map(t=>[t.p,-PD/2-GAP-TK/2,t.t,TK,400,'middle',0]),[0,-z1+PAD+AX/2,K.x.title,AX,600,'middle',0],
+...zT.map(t=>[PW/2+GAP,-t.p,t.t,TK,400,'start',0]),[PW/2+M-PAD-AX/2,0,K.z.title,AX,600,'middle',1]]};
+return [back,left,floor];
+}
+
+function camera(c,g){
+const y=c.yaw*Math.PI/180,p=c.pitch*Math.PI/180;
+const dir=[Math.sin(y)*Math.cos(p),Math.sin(p),Math.cos(y)*Math.cos(p)];
+const T=[0,g.PH/2,0],E=add(T,mul(dir,c.dist)),f=mul(dir,-1);
+const r=norm(cross(f,[0,1,0])),u=cross(r,f);
+const proj=q=>{const d=sub(q,E);const X=dot(d,r),Y=dot(d,u),Z=dot(d,f);const k=c.ortho?1:c.dist/Z;return [X*k,-Y*k,Z,k]};
+const vis=(n,ctr)=>c.ortho?dot(n,dir)>1e-3:dot(n,sub(E,ctr))>1e-3;
+return {proj,vis};
+}
+
+function scene(c){
+const g=geo(),C=camera(c,g),P=[],{PH,xOf,yOf,zOf,yF}=g,alpha=S.alpha/100,sh=S.shade/100;
+const poly=(pts,fill,o={})=>{const q=pts.map(C.proj);P.push({t:'p',q,fill,...o,k:q.reduce((s,x)=>s+x[3],0)/q.length})};
+const line=(a,b,o={})=>{const q=[C.proj(a),C.proj(b)];P.push({t:'l',q,stroke:'#000000',sw:LINE,...o,k:(q[0][3]+q[1][3])/2})};
+const tint=n=>mix('#ffffff','#000000',S.card/100*(1-Math.max(0,dot(n,LIGHT))));
+const drawMarks=cd=>{
+const m=([u,v])=>cd.map(u,v);
+if(cd.plot)poly(rr(...cd.plot,[PLOT_R,PLOT_R,PLOT_R,PLOT_R]).map(m),'none',{stroke:'#000000',sw:LINE});
+for(const [a,b] of cd.grid)line(m(a),m(b));
+for(const [u,v,str,size,weight,anchor,up] of cd.text){
+const tx=up?cd.b:cd.a,ty=up?mul(cd.a,-1):cd.b,at=cd.map(u,v);
+const p0=C.proj(at),px=C.proj(add(at,mul(tx,10))),py=C.proj(add(at,mul(ty,10)));
+P.push({t:'x',q:p0,ex:[(px[0]-p0[0])/10,(px[1]-p0[1])/10],ey:[-(py[0]-p0[0])/10,-(py[1]-p0[1])/10],str,size,weight,anchor});
+}
+};
+const cs=cards(g),centre=cd=>{const r=cd.rect;return cd.map((r[0]+r[2])/2,(r[1]+r[3])/2)};
+const facing=cs.map(cd=>C.vis(cd.n,centre(cd)));
+const surfaces=[...cs.map(cd=>({pts:rr(...cd.rect,cd.R).map(([u,v])=>cd.map(u,v)),n:cd.n})),...bends(g)];
+const away=[];
+for(const sf of surfaces){const ctr=mul(sf.pts.reduce(add,[0,0,0]),1/sf.pts.length);if(C.vis(sf.n,ctr))poly(sf.pts,tint(sf.n),{seam:true});else away.push(sf)}
+cs.forEach((cd,i)=>{if(facing[i])drawMarks(cd)});
+
+const R=BEND,cx=g.xL+R,cz=g.zB+R,leftLen=g.z1-cz,arc=Math.PI*R/2,backLen=g.x1-cx,total=leftLen+arc+backLen;
+const along=s=>{
+if(s<leftLen)return {p:[g.xL,0,g.z1-s],t:[0,0,-1],n:[1,0,0]};
+if(s<leftLen+arc){const a=Math.PI/2-(s-leftLen)/R;return {p:[cx-R*Math.sin(a),0,cz-R*Math.cos(a)],t:[Math.cos(a),0,-Math.sin(a)],n:[Math.sin(a),0,Math.cos(a)]}}
+return {p:[cx+(s-leftLen-arc),0,g.zB],t:[1,0,0],n:[0,0,1]};
+};
+const sL=g.z1-PD/2,sR=leftLen+arc+(PW/2-cx),BR=PLOT_R;
+const cuts=[...Array(9)].map((_,k)=>leftLen+arc*k/8);
+const edge=(a,b,y)=>{const lo=Math.min(a,b),hi=Math.max(a,b),mid=cuts.filter(v=>v>lo&&v<hi);if(a>b)mid.reverse();return [a,...mid,b].map(v=>[v,y])};
+const corner=(cs,cy,a0)=>[...Array(7)].map((_,i)=>{const a=(a0+90*i/6)*Math.PI/180;return [cs+BR*Math.cos(a),cy+BR*Math.sin(a)]});
+const on=([v,y])=>{const a=along(v);return {p:[a.p[0],y,a.p[2]],n:a.n}};
+const run=(pts,closed)=>{for(let i=0;i<pts.length-(closed?0:1);i++){const a=pts[i],b=pts[(i+1)%pts.length],A=on(a),B=on(b),mid=on([(a[0]+b[0])/2,(a[1]+b[1])/2]);if(C.vis(mid.n,mid.p))line(A.p,B.p,{cap:true})}};
+run([...edge(sL+BR,sR-BR,0),...corner(sR-BR,BR,270),...corner(sR-BR,PH-BR,0),...edge(sR-BR,sL+BR,PH),...corner(sL+BR,PH-BR,90),...corner(sL+BR,BR,180)],true);
+for(const y of g.yG)run(edge(sL,sR,y),false);
+const title=g.K.title,ty=PH+TBELOW+TROW/2,start=total/2-advance(title,TT,600)/2;
+for(let i=0;i<title.length;i++){
+const ch=title[i];if(ch===' ')continue;
+const x0=advance(title.slice(0,i),TT,600),x1=advance(title.slice(0,i+1),TT,600);
+const at=along(start+(x0+x1)/2),pt=[at.p[0],ty,at.p[2]];
+if(!C.vis(at.n,pt))continue;
+const p0=C.proj(pt),px=C.proj(add(pt,mul(at.t,10))),py=C.proj(add(pt,[0,10,0]));
+P.push({t:'x',q:p0,ex:[(px[0]-p0[0])/10,(px[1]-p0[1])/10],ey:[-(py[0]-p0[0])/10,-(py[1]-p0[1])/10],str:ch,size:TT,weight:600,anchor:'middle'});
+}
+
+const items=[],depth=p=>C.proj(p)[2];
+if(S.kind==='bar'){
+const n=BUDGET.depts.length,m=BUDGET.qs.length,h=Math.min(PW/n,PD/m)*S.share/200,base=yOf(Math.max(g.yA.low,Math.min(g.yA.high,0)));
+BUDGET.v.forEach((row,i)=>row.forEach((v,j)=>{
+if(!v)return;
+const bx=xOf(i),bz=zOf(j),y0=Math.min(base,yOf(v)),y1=Math.max(base,yOf(v)),col=S.by==='q'?PAL[j]:PAL[i];
+items.push({z:depth([bx,(y0+y1)/2,bz]),draw:()=>{
+const X0=bx-h,X1=bx+h,Z0=bz-h,Z1=bz+h;
+const faces=[
+[[0,1,0],[[X0,y1,Z0],[X1,y1,Z0],[X1,y1,Z1],[X0,y1,Z1]],mix(col,'#ffffff',sh*1.5)],
+[[0,-1,0],[[X0,y0,Z0],[X1,y0,Z0],[X1,y0,Z1],[X0,y0,Z1]],mix(col,'#000000',sh*1.5)],
+[[0,0,1],[[X0,y0,Z1],[X1,y0,Z1],[X1,y1,Z1],[X0,y1,Z1]],col],
+[[0,0,-1],[[X0,y0,Z0],[X1,y0,Z0],[X1,y1,Z0],[X0,y1,Z0]],col],
+[[1,0,0],[[X1,y0,Z0],[X1,y0,Z1],[X1,y1,Z1],[X1,y1,Z0]],mix(col,'#000000',sh)],
+[[-1,0,0],[[X0,y0,Z0],[X0,y0,Z1],[X0,y1,Z1],[X0,y1,Z0]],mix(col,'#000000',sh)]];
+const fs=faces.map(([n,pts,fill])=>({pts,fill,v:C.vis(n,mul(pts.reduce(add,[0,0,0]),.25))}));
+if(alpha<1)for(const fc of fs)if(!fc.v)poly(fc.pts,fc.fill,{alpha});
+for(const fc of fs)if(fc.v)poly(fc.pts,fc.fill,{seam:alpha>=1,alpha});
+}});
+}));
+}
+if(S.kind==='scatter'){
+const r=S.dot;
+SHOPS.forEach((s,i)=>{
+const p=[xOf(s[2]),yOf(SALES[i]),zOf(s[3])],col=PAL[i],foot=[p[0],yF,p[2]];
+if(S.drops&&facing[2])poly([...Array(24)].map((_,k)=>{const a=k/24*2*Math.PI;return [p[0]+r*Math.cos(a),yF+0.5,p[2]+r*Math.sin(a)]}),'#000000',{alpha:0.15});
+items.push({z:depth(p),draw:()=>{
+if(S.drops)line(foot,p,{stroke:col,alpha});
+const q=C.proj(p);P.push({t:'c',q,r,fill:col,alpha,k:q[3]});
+}});
+});
+}
+if(S.kind==='surface'){
+const N=S.mesh,at=(i,j)=>{const pr=P0+(P1-P0)*i/N,u=U0+(U1-U0)*j/N;return {p:[xOf(pr),yOf(PROFIT(pr,u)),zOf(u)],v:PROFIT(pr,u)}};
+for(let i=0;i<N;i++)for(let j=0;j<N;j++){
+const a=at(i,j),b=at(i+1,j),c2=at(i+1,j+1),d=at(i,j+1),pts=[a.p,b.p,c2.p,d.p];
+const n=norm(cross(sub(b.p,a.p),sub(d.p,a.p))),lum=Math.abs(dot(n,LIGHT));
+const fill=mix(rampAt(((a.v+b.v+c2.v+d.v)/4-PMIN)/(PMAX-PMIN)),'#000000',sh*1.5*(1-lum));
+items.push({z:depth(mul(pts.reduce(add,[0,0,0]),.25)),draw:()=>poly(pts,fill,{alpha,stroke:'#ffffff',sw:1})});
+}
+}
+items.sort((a,b)=>b.z-a.z).forEach(it=>it.draw());
+if(S.kind==='surface'){
+const u0=FIXED/(P1-COST),steps=48;let prev=null;
+for(let k=0;k<=steps;k++){const u=u0+(U1-u0)*k/steps,pt=[xOf(COST+FIXED/u),yOf(0),zOf(u)];if(prev)line(prev,pt);prev=pt}
+}
+for(const sf of away)poly(sf.pts,'#000000',{seam:true});
+return P;
+}
+
+function bbox(P){
+let b=[1e9,1e9,-1e9,-1e9];
+const grow=(x,y)=>{b[0]=Math.min(b[0],x);b[1]=Math.min(b[1],y);b[2]=Math.max(b[2],x);b[3]=Math.max(b[3],y)};
+for(const p of P){if(p.t==='p')p.q.forEach(q=>grow(q[0],q[1]));else if(p.t==='c'){grow(p.q[0]-p.r*p.k,p.q[1]-p.r*p.k);grow(p.q[0]+p.r*p.k,p.q[1]+p.r*p.k)}}
+return b;
+}
+
+function draw(svg,P,s,ox,oy){
+const X=q=>(q[0]*s+ox).toFixed(1),Y=q=>(q[1]*s+oy).toFixed(1),f=n=>(n*s).toFixed(4);
+const grads=new Set(),sh=S.shade/100;
+const body=P.map(p=>{
+const op=p.alpha!=null&&p.alpha<1;
+if(p.t==='p'){const d='M'+p.q.map(q=>X(q)+' '+Y(q)).join('L')+'Z';
+const st=p.stroke?`stroke="${p.stroke}" stroke-width="${Math.max(1,p.sw*p.k*s).toFixed(2)}" stroke-linejoin="round"${op?` stroke-opacity="${p.alpha}"`:''}`:p.seam?`stroke="${p.fill}" stroke-width=".6" stroke-linejoin="round"`:'';
+return `<path d="${d}" fill="${p.fill}"${op?` fill-opacity="${p.alpha}"`:''} ${st}/>`}
+if(p.t==='l')return `<line x1="${X(p.q[0])}" y1="${Y(p.q[0])}" x2="${X(p.q[1])}" y2="${Y(p.q[1])}" stroke="${p.stroke}" stroke-width="${Math.max(1,p.sw*p.k*s).toFixed(2)}"${p.cap?' stroke-linecap="round"':''}${op?` stroke-opacity="${p.alpha}"`:''}/>`;
+if(p.t==='c'){let fill=p.fill;if(sh>0){grads.add(p.fill);fill=`url(#${svg.id}-${p.fill.slice(1)})`}
+return `<circle cx="${X(p.q)}" cy="${Y(p.q)}" r="${Math.max(1,p.r*p.k*s).toFixed(2)}" fill="${fill}"${op?` fill-opacity="${p.alpha}"`:''}/>`}
+return `<text transform="matrix(${f(p.ex[0])} ${f(p.ex[1])} ${f(p.ey[0])} ${f(p.ey[1])} ${X(p.q)} ${Y(p.q)})" font-size="${p.size}" font-weight="${p.weight}" text-anchor="${p.anchor}" dominant-baseline="central">${esc(p.str)}</text>`;
+}).join('');
+const defs=[...grads].map(c=>`<radialGradient id="${svg.id}-${c.slice(1)}" cx="38%" cy="34%" r="70%"><stop offset="0" stop-color="${mix(c,'#ffffff',sh*2)}"/><stop offset=".55" stop-color="${c}"/><stop offset="1" stop-color="${mix(c,'#000000',sh*1.5)}"/></radialGradient>`).join('');
+svg.innerHTML=(defs?`<defs>${defs}</defs>`:'')+body;
+}
+
+const main=$('#main');
+const PRESETS={facing:[45,22],front:[0,0],side:[90,0],top:[0,89.9],behind:[225,22]};
+let cam={yaw:45,pitch:22,ortho:false,dist:1600};
+function drawMain(){
+const W=main.clientWidth,H=main.clientHeight;if(!W||!H)return;
+let mx=1,my=1;
+for(const [yaw,pitch] of Object.values(PRESETS)){const b=bbox(scene({...cam,yaw,pitch}));mx=Math.max(mx,-b[0],b[2]);my=Math.max(my,-b[1],b[3])}
+const m=16;
+draw(main,scene(cam),Math.min((W/2-m)/mx,(H/2-m)/my),W/2,H/2);
+}
+const VIEWS=[{id:'top',yaw:0,pitch:89.99},{id:'side',yaw:90,pitch:0},{id:'front',yaw:0,pitch:0}];
+function drawViews(){
+const items=VIEWS.map(v=>{const svg=$('#v-'+v.id);const P=scene({...v,ortho:true,dist:3000});return {svg,P,b:bbox(P),W:svg.clientWidth,H:svg.clientHeight}});
+if(items.some(o=>!o.W||!o.H))return;
+const m=24,s=Math.min(...items.map(o=>Math.min((o.W-2*m)/(o.b[2]-o.b[0]),(o.H-2*m)/(o.b[3]-o.b[1]))));
+items.forEach(o=>draw(o.svg,o.P,s,o.W/2-s*(o.b[0]+o.b[2])/2,o.H/2-s*(o.b[1]+o.b[3])/2));
+}
+
+function drawHeat(){
+const vals=BUDGET.v.flat(),lo=Math.min(...vals),hi=Math.max(...vals);
+const L=160,R=691,T=90,B=383,cw=(R-L)/4,ch=(B-T)/5;
+let h=`<defs><clipPath id="pb"><rect x="${L}" y="${T}" width="${R-L}" height="${B-T}" rx="8"/></clipPath></defs><rect width="721" height="481" rx="32" fill="#fff"/>`;
+h+=`<text x="360.5" y="50" font-size="32" font-weight="600" text-anchor="middle" dominant-baseline="central">${CHARTS.bar.title}</text><g clip-path="url(#pb)">`;
+BUDGET.v.forEach((row,i)=>row.forEach((v,j)=>{h+=`<rect x="${L+j*cw+(j?1:0)}" y="${T+i*ch+(i?1:0)}" width="${cw-(j?1:0)-(j<3?1:0)}" height="${ch-(i?1:0)-(i<4?1:0)}" fill="${rampAt((v-lo)/(hi-lo))}"/>`}));
+h+=`</g><rect x="${L}" y="${T}" width="${R-L}" height="${B-T}" rx="8" fill="none" stroke="#000" stroke-width="2"/>`;
+BUDGET.depts.forEach((n,i)=>h+=`<text x="${L-10}" y="${T+(i+.5)*ch}" font-size="12" text-anchor="end" dominant-baseline="central">${esc(clip(n))}</text>`);
+BUDGET.qs.forEach((n,j)=>h+=`<text x="${L+(j+.5)*cw}" y="${B+10+6}" font-size="12" text-anchor="middle" dominant-baseline="central">${n}</text>`);
+h+=`<text x="${(L+R)/2}" y="${481-30-8}" font-size="16" font-weight="600" text-anchor="middle" dominant-baseline="central">Quarter</text>`;
+h+=`<text x="38" y="${(T+B)/2}" font-size="16" font-weight="600" text-anchor="middle" dominant-baseline="central" transform="rotate(-90 38 ${(T+B)/2})">Department</text>`;
+$('#heat').innerHTML=h;
+}
+
+const stand=$('#stand');
+function drawStand(){
+const on=stand.getAttribute('aria-pressed')==='true';
+stand.innerHTML=`<rect width="360.5" height="240.5" rx="16" fill="#fff"/><text x="180.25" y="120.25" font-size="16" font-weight="600" text-anchor="middle" dominant-baseline="central">Cannot display</text>`+(on?`<rect x="1" y="1" width="358.5" height="238.5" rx="15" fill="none" stroke="#000" stroke-width="2"/>`:'');
+}
+const toggleStand=()=>{stand.setAttribute('aria-pressed',stand.getAttribute('aria-pressed')==='true'?'false':'true');drawStand()};
+stand.addEventListener('click',toggleStand);
+stand.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();toggleStand()}});
+
+function drawKeys(){
+const a=S.alpha/100;let html;
+if(S.kind==='surface'){
+const y=CHARTS.surface.y.axis,grad=RAMP.join(',');
+html=`<span><i class="ramp" style="background:linear-gradient(90deg,${grad});opacity:${a}"></i>Profit, ${esc(fmt(PMIN,1000))} to ${esc(fmt(PMAX,1000))}</span><span><i class="rule"></i>Break-even: profit 0</span>`;
+}else{
+const names=S.kind==='scatter'?SHOPS.map(s=>s[0]):S.by==='q'?BUDGET.qs:BUDGET.depts;
+html=names.map((n,i)=>`<span><i style="background:${PAL[i]};opacity:${a};${S.kind==='scatter'?'border-radius:50%':''}"></i>${esc(n)}</span>`).join('');
+}
+$('#key-main').innerHTML=html;
+document.querySelectorAll('[data-key]').forEach(k=>k.innerHTML=html);
+}
+
+function drawViewText(){
+const K=CHARTS[S.kind],x=K.x.title,y=K.y.title,z=K.z.title;
+$('#vt-top').innerHTML=`<p>Looking straight down at the floor: ${esc(x)} across, ${esc(z)} going back. It reads like a 2D chart of those two.</p><ul><li>Shows: the floor, its grid and both of its axes.</li><li>Edge-on: both walls, so ${esc(y)} and the title can't be read.</li></ul>`;
+$('#vt-side').innerHTML=`<p>Looking straight at the left wall: ${esc(z)} across, ${esc(y)} up, with the axis on the wall's outward edge, on the left as in a 2D card.</p><ul><li>Shows: the left wall, its grid, ${esc(y)}, and the start of the title.</li><li>Edge-on: the floor, so the ${esc(z)} labels can't be read.</li></ul>`;
+$('#vt-front').innerHTML=`<p>Looking straight at the back wall: ${esc(x)} across, ${esc(y)} up, with the axis on the wall's outward edge, on the right.</p><ul><li>Shows: the back wall, its grid, ${esc(y)}, and the end of the title.</li><li>Edge-on: the floor, so the ${esc(x)} labels can't be read.</li></ul>`;
+}
+
+function drawSpec(){
+const g=geo(),K=g.K,[back,left,floor]=cards(g),size=r=>`${(r[2]-r[0]).toFixed(0)} × ${(r[3]-r[1]).toFixed(0)}`;
+const range=A=>A.type==='cat'?`${A.names.length} categories`:`${A.label(A.low)} to ${A.label(A.high)}, step ${fmt(A.step,A.step)}`;
+const rows=[
+['Stand-in card','360.5 × 240.5, radius 16, white; “Cannot display” 16 / 600, centred, 30 in from the edges','Documents column blank page; half the 721 × 481 card'],
+['Axes',`Across: ${K.x.title}, ${range(K.x.axis)}. Up: ${K.y.title}, ${range(K.y.axis)}. Back: ${K.z.title}, ${range(K.z.axis)}`,'NumberAxis: 5 ticks, steps 1, 2, 2.5, 5'],
+['Sides',`Flat parts: back wall ${size(back.rect)}, left wall ${size(left.rect)}, floor ${size(floor.rect)}; white; each rounds its outward corner, radius ${CARD_R}`,'Card radius'],
+['Bends',`Every join is a ${BEND} curve, with a rounded corner where all three meet. The floor sits ${PAD} below the walls’ plot boxes`,'New: one folded card'],
+['Card shading',`Up to ${S.card}% darker as a surface turns from a fixed light above, right and in front; the light turns with the chart`,'New: 2D cards are flat white'],
+['Back',`Solid black (Style.Ink), flat with no shading, curves and rounded corners included; no plot boxes, gridlines or labels`,'BackFace on every panel and card'],
+['Data area',`A cube, ${S.size} × ${S.size} × ${S.size}: ${PW} across, ${PD} deep and ${g.PH} tall, so the floor and both walls are square`,'New: 2D plot boxes take the card’s shape'],
+['Plot boxes',`Walls: one plot box, ${g.PH} tall, that wraps from the left wall around the corner curve onto the back wall, ${Math.round(PD+PW+2*(PAD-BEND)+Math.PI*BEND/2)} long, rounded only at its two outer ends; its gridlines run unbroken around the corner. Floor: ${PW} × ${PD}, inset ${PAD} from the curves. Outline ${LINE}, radius ${PLOT_R}`,'Plot box radius 8, outline 2'],
+['Gridlines',`Black, ${LINE} wide, at the 3 inner ticks of every number axis, on each plot box that axis crosses. A category axis gets a line between its slots on the floor`,'Gridlines between the 5 ticks'],
+['Label edges',`${g.M} from plot box to card edge on every labelled side: tick values ${GAP} from the plot box, axis titles ${PAD} from the card edge`,'Ticks to plot 10, outer spacing 30'],
+['Where labels sit',`Printed flat on the card: ${K.y.title} on each wall’s outward edge, ${K.x.title} along the floor’s front, ${K.z.title} along its right`,'Same placement as a 2D card'],
+['Title row',`Across both walls: ${PAD} from the top, ${TROW} tall, plot box ${TBELOW} below it; centred on the walls’ combined width, curve included`,'Title centred across the card'],
+['Text','Ticks 12, axis titles 16 / 600, title 32 / 600; tick labels at most 10 characters','Same sizes'],
+['Mark opacity',`${S.alpha}%; far faces drawn first so solid marks read as clear`,'Same as 2D dots (75%)'],
+['Mark shading',`${S.shade}%: lighter toward the light, darker away`,'New: 2D marks are flat']];
+if(S.kind==='bar')rows.push(['Slot and bar',`Slots ${(PW/5).toFixed(0)} × ${(PD/4).toFixed(0)}; bars ${(Math.min(PW/5,PD/4)*S.share/100).toFixed(1)} square (${S.share}% of the slot), from 0 to their value`,'Bars fill 60% of their slot'],['Colour',`By ${S.by==='q'?'quarter':'department'}, ChartStyle palette`,'Group colours']);
+if(S.kind==='scatter')rows.push(['Dots',`Spheres, radius ${S.dot}, one per shop, one palette colour each`,'2D dots: radius 5'],['Drop lines',S.drops?`On: a line in the dot’s colour, ${LINE} wide, down to the floor, and a shadow there at 15% black`:'Off','New']);
+if(S.kind==='surface')rows.push(['Mesh',`${S.mesh} × ${S.mesh} cells, white lines 1 wide between them`,'2 white gap between touching marks'],['Colour','ChartStyle ramp, from lowest to highest profit','Heatmap ramp'],['Break-even line',`Black, ${LINE} wide, where profit is 0`,'New']);
+rows.push(['Starting pose','Turned 45° so both walls face you, seen from 22° above','New']);
+$('#spec').innerHTML=rows.map(r=>`<tr>${r.map(c=>`<td>${esc(c)}</td>`).join('')}</tr>`).join('');
+}
+
+const SLIDERS={share:'%',dot:' mm',mesh:'',size:' mm',alpha:'%',shade:'%',card:'%'};
+function syncControls(){
+for(const id in SLIDERS){$('#'+id).value=S[id];$('#'+id+'-o').textContent=S[id]+SLIDERS[id]}
+document.querySelectorAll('#by [data-by]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.by===S.by)));
+document.querySelectorAll('#kind [data-k]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.k===S.kind)));
+document.querySelectorAll('[data-for]').forEach(el=>el.hidden=el.dataset.for!==S.kind);
+$('#drops').setAttribute('aria-pressed',String(S.drops));
+$('#source').textContent=CHARTS[S.kind].source;
+main.setAttribute('aria-label','3D '+S.kind+' chart: '+CHARTS[S.kind].title);
+}
+function all(){syncControls();drawKeys();drawViewText();drawSpec();drawMain();drawViews()}
+
+for(const id in SLIDERS)$('#'+id).addEventListener('input',e=>{S[id]=+e.target.value;all()});
+document.querySelectorAll('#by [data-by]').forEach(b=>b.addEventListener('click',()=>{S.by=b.dataset.by;all()}));
+document.querySelectorAll('#kind [data-k]').forEach(b=>b.addEventListener('click',()=>{S.kind=b.dataset.k;all()}));
+$('#drops').addEventListener('click',()=>{S.drops=!S.drops;all()});
+$('#reset').addEventListener('click',()=>{S={...DEF,kind:S.kind};all();go('facing')});
+
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+let anim=0;
+function setPreset(name){document.querySelectorAll('#presets .btn').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.p===name)))}
+function go(name){
+setPreset(name);cancelAnimationFrame(anim);
+const [ty,tp]=PRESETS[name],y0=cam.yaw,p0=cam.pitch;
+const dy=((ty-y0)%360+540)%360-180;
+if(reduce){cam.yaw=y0+dy;cam.pitch=tp;drawMain();return}
+const t0=performance.now();
+const step=now=>{const t=Math.min(1,(now-t0)/650),e=t<.5?2*t*t:1-((-2*t+2)**2)/2;cam.yaw=y0+dy*e;cam.pitch=p0+(tp-p0)*e;drawMain();if(t<1)anim=requestAnimationFrame(step)};
+anim=requestAnimationFrame(step);
+}
+document.querySelectorAll('#presets .btn').forEach(b=>b.addEventListener('click',()=>go(b.dataset.p)));
+
+let drag=null;
+main.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY};main.setPointerCapture(e.pointerId);cancelAnimationFrame(anim)});
+main.addEventListener('pointermove',e=>{
+if(!drag)return;
+cam.yaw-=(e.clientX-drag.x)*0.4;cam.pitch=Math.max(-10,Math.min(89.9,cam.pitch+(e.clientY-drag.y)*0.3));
+drag={x:e.clientX,y:e.clientY};setPreset('');
+cancelAnimationFrame(anim);anim=requestAnimationFrame(drawMain);
+});
+const end=()=>{drag=null};
+main.addEventListener('pointerup',end);main.addEventListener('pointercancel',end);
+
+drawHeat();drawStand();all();
+const ro=new ResizeObserver(()=>{drawMain();drawViews()});
+[main,...VIEWS.map(v=>$('#v-'+v.id))].forEach(el=>ro.observe(el));
+document.fonts&&document.fonts.ready.then(()=>{drawMain();drawViews()});
+}
+</script>
+</body>
+</html>

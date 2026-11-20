@@ -1,7 +1,8 @@
 using System;
 using AccountingImmersiveAnalytics.App;
-using AccountingImmersiveAnalytics.Assistant.Session;
-using AccountingImmersiveAnalytics.Assistant.Tools;
+using AccountingImmersiveAnalytics.Assistant.Context;
+using AccountingImmersiveAnalytics.UI.Charts.TwoD.View;
+using AccountingImmersiveAnalytics.UI.Charts.View;
 using UnityEngine;
 
 namespace AccountingImmersiveAnalytics.UI.Charts.Tools
@@ -28,11 +29,11 @@ namespace AccountingImmersiveAnalytics.UI.Charts.Tools
         public static bool Offered(ToolType tool)
         {
             ChartManager charts = ChartManager.Instance;
-            View.ChartEntry entry = charts != null ? charts.Active : null;
+            ChartEntry entry = charts != null ? charts.Active : null;
             return entry == null || Offered(tool, entry.Spec, charts.PinnedCard);
         }
 
-        public static bool Offered(ToolType tool, Spec.ChartSpec spec, View.ChartCard card)
+        public static bool Offered(ToolType tool, Spec.ChartSpec spec, ChartCard card)
         {
             switch (tool)
             {
@@ -54,7 +55,7 @@ namespace AccountingImmersiveAnalytics.UI.Charts.Tools
 
         private void Select(ToolType next)
         {
-            if (StateChannel.UserDriven) AgentTurn.UserTookControl();
+            if (ActivityFeed.UserDriven) AssistantTurn.UserTookControl();
             if (next == SelectedTool) return;
 
             SelectedTool = next;
@@ -62,7 +63,7 @@ namespace AccountingImmersiveAnalytics.UI.Charts.Tools
             ReportSelection();
         }
 
-        private void ReportSelection() => StateChannel.RecordState("tool",
+        private void ReportSelection() => ActivityFeed.RecordState("tool",
             SelectedTool == ToolType.None ? "no tool is selected" : $"the {SelectedTool} tool is selected");
 
 
@@ -81,7 +82,7 @@ namespace AccountingImmersiveAnalytics.UI.Charts.Tools
                 return false;
             }
 
-            StateChannel.Record($"undid the {kindName} edit");
+            ActivityFeed.Record($"undid the {kindName} edit");
             return true;
         }
     }

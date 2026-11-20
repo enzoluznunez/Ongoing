@@ -1,6 +1,6 @@
 using System;
 using System.Collections.Generic;
-using AccountingImmersiveAnalytics.Assistant.Session;
+using AccountingImmersiveAnalytics.Assistant.Context;
 using AccountingImmersiveAnalytics.UI.Charts.Spec;
 using UnityEngine;
 
@@ -29,7 +29,7 @@ namespace AccountingImmersiveAnalytics.UI.Charts
         public ChartShaping before;
         public int pinnedBefore = -1;
         public string what;
-        public bool byAssistant = StateChannel.InAgentCall;
+        public bool byAssistant = ActivityFeed.InAssistantCall;
 
         public static string KindName(EditKind kind) =>
             kind == EditKind.Rotate ? "turn" : kind == EditKind.Scale ? "resize" : kind.ToString().ToLowerInvariant();

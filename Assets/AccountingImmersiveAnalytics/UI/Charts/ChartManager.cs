@@ -1,13 +1,15 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
-using AccountingImmersiveAnalytics.Assistant.Session;
+using AccountingImmersiveAnalytics.Assistant.Context;
 using AccountingImmersiveAnalytics.Data;
 using AccountingImmersiveAnalytics.Documents;
 using AccountingImmersiveAnalytics.UI.Charts.Data;
 using AccountingImmersiveAnalytics.UI.Charts.Spec;
 using AccountingImmersiveAnalytics.UI.Charts.Tools;
+using AccountingImmersiveAnalytics.UI.Charts.TwoD.View;
 using AccountingImmersiveAnalytics.UI.Charts.View;
 using AccountingImmersiveAnalytics.UI.Helpers;
 using AccountingImmersiveAnalytics.UI.Panels;
@@ -153,6 +155,60 @@ namespace AccountingImmersiveAnalytics.UI.Charts
             }
         }
 
+        public async Task<(IReadOnlyList<ChartEntry> charts, string failure)> OpenTables(DocumentEntry document, IReadOnlyList<PdfTable> tables)
+        {
+            int ticket = ++_ticket;
+            if (tables == null || tables.Count == 0)
+            {
+                CloseColumn();
+                return (null, null);
+            }
+            if (!EnsureColumn()) return (null, "The Documents panel was not found, so there is nowhere to show the charts.");
+            _column.Clear();
+            _shown.Clear();
+
+            if (_byFile.TryGetValue(document.File, out List<ChartEntry> known))
+            {
+                ShowEntries(known);
+                return (_shown, null);
+            }
+
+            var read = new List<(PdfTable source, CsvTable table)>();
+            foreach (PdfTable source in tables)
+            {
+                try
+                {
+                    read.Add((source, CsvTable.FromRows(source.Rows)));
+                }
+                catch (Exception e)
+                {
+                    Debug.LogWarning($"[ChartManager] A table on page {source.Page + 1} of \"{document.Title}\" could not be read: {e.Message}");
+                }
+            }
+
+            ChartSpec[] specs = await Task.WhenAll(read.Select(r => ChartPlanner.PlanTable(document.Title, r.table, r.source.Caption)));
+            if (this == null || ticket != _ticket) return (null, "Another file was opened before this one finished.");
+
+            var made = new List<ChartEntry>();
+            for (int i = 0; i < specs.Length; i++)
+            {
+                if (specs[i] == null) continue;
+                var entry = new ChartEntry { Id = _nextId++, File = document.File, Source = document.Title, Spec = specs[i], Table = read[i].table };
+                _entries.Add(entry);
+                made.Add(entry);
+            }
+            if (made.Count == 0)
+            {
+                string reason = $"No chart fits the tables in \"{document.Title}\".";
+                SetStatus(reason);
+                Debug.LogWarning($"[ChartManager] {reason}");
+                return (null, reason);
+            }
+            _byFile[document.File] = made;
+            ShowEntries(made);
+            return (_shown, null);
+        }
+
         private void ShowEntries(List<ChartEntry> entries)
         {
             SetStatus(null);
@@ -164,7 +220,7 @@ namespace AccountingImmersiveAnalytics.UI.Charts
             _column.SetPinned(_pinnedEntry);
             var titles = new List<string>();
             foreach (ChartEntry entry in entries) titles.Add($"\"{entry.Title}\" ({entry.Spec.Describe()})");
-            StateChannel.RecordState("charts", $"the chart column beside the Documents panel shows {titles.Count} charts: {string.Join(", ", titles)}");
+            ActivityFeed.RecordState("charts", $"the chart column beside the Documents panel shows {titles.Count} charts: {string.Join(", ", titles)}");
         }
 
         private void SetStatus(string message)
@@ -200,7 +256,7 @@ namespace AccountingImmersiveAnalytics.UI.Charts
 
         public void TogglePin(ChartEntry entry)
         {
-            if (StateChannel.UserDriven) AgentTurn.UserTookControl();
+            if (ActivityFeed.UserDriven) AssistantTurn.UserTookControl();
             Pin(_pinnedEntry == entry ? null : entry);
         }
 
@@ -226,10 +282,10 @@ namespace AccountingImmersiveAnalytics.UI.Charts
             }
             _column?.SetPinned(_pinnedEntry);
             if (record) _edits.PushPin(before);
-            StateChannel.Record(_pinnedEntry != null
+            ActivityFeed.Record(_pinnedEntry != null
                 ? $"pinned the chart \"{_pinnedEntry.Title}\" in front of the Documents panel"
                 : "unpinned the chart");
-            StateChannel.RecordState("pinned", _pinnedEntry != null
+            ActivityFeed.RecordState("pinned", _pinnedEntry != null
                 ? $"the chart \"{_pinnedEntry.Title}\" is pinned in front of the Documents panel"
                 : "no chart is pinned");
             return true;
@@ -255,7 +311,7 @@ namespace AccountingImmersiveAnalytics.UI.Charts
             ChartShaping before = entry.Shaping.Copy();
             Apply(entry, next);
             _edits.PushShape(kind, entry.Id, before, label);
-            StateChannel.Record(what);
+            ActivityFeed.Record(what);
             return true;
         }
 
@@ -271,7 +327,7 @@ namespace AccountingImmersiveAnalytics.UI.Charts
         {
             if (entry == null || before == null || entry.Shaping.SameAs(before)) return false;
             _edits.PushShape(kind, entry.Id, before.Copy(), label);
-            StateChannel.Record(what);
+            ActivityFeed.Record(what);
             Apply(entry, entry.Shaping);
             return true;
         }
@@ -296,7 +352,7 @@ namespace AccountingImmersiveAnalytics.UI.Charts
             bool applied = Undo(edit);
             _edits.DropAt(index);
             if (!applied) return false;
-            StateChannel.Record($"undid the {Edit.KindName(edit.kind)} edit on \"{entry.Title}\"");
+            ActivityFeed.Record($"undid the {Edit.KindName(edit.kind)} edit on \"{entry.Title}\"");
             return true;
         }
 
@@ -399,7 +455,7 @@ namespace AccountingImmersiveAnalytics.UI.Charts
             chart.localPosition = pos;
             chart.localRotation = rot;
             chart.localScale = scale;
-            if (StateChannel.InAgentCall) AnimateFrom(chart, fromPos, fromRot, fromScale);
+            if (ActivityFeed.InAssistantCall) AnimateFrom(chart, fromPos, fromRot, fromScale);
         }
 
         public void AnimateFrom(Transform chart, Vector3 prePos, Quaternion preRot, Vector3 preScale)
@@ -408,7 +464,7 @@ namespace AccountingImmersiveAnalytics.UI.Charts
             CompleteMotion(chart);
             var g = new Glide { ToPos = chart.localPosition, ToRot = chart.localRotation, ToScale = chart.localScale };
             Transform space = chart.parent != null ? chart.parent : transform;
-            float size = ChartStyle.CardWidth * ChartStyle.PinnedScale * 0.001f;
+            float size = ChartStyle.CardWidth * ChartStyle.PinnedScale * Style.WorldScale;
             float moved = space.TransformVector(g.ToPos - prePos).magnitude;
             float turned = Quaternion.Angle(preRot, g.ToRot) * Mathf.Deg2Rad * size;
             float grown = Mathf.Abs(g.ToScale.x - preScale.x) * size;
@@ -428,7 +484,7 @@ namespace AccountingImmersiveAnalytics.UI.Charts
                 yield return null;
                 if (chart == null) yield break;
                 t += Time.deltaTime;
-                float k = Style.EaseOut(t / seconds);
+                float k = Animate.EaseOut(t / seconds);
                 chart.localPosition = Vector3.Lerp(fromPos, g.ToPos, k);
                 chart.localRotation = Quaternion.Slerp(fromRot, g.ToRot, k);
                 chart.localScale = Vector3.Lerp(fromScale, g.ToScale, k);

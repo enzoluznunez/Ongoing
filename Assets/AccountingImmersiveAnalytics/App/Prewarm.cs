@@ -10,6 +10,8 @@ namespace AccountingImmersiveAnalytics.App
 {
     public class Prewarm : MonoBehaviour
     {
+        private const float InvisibleFontSize = 1f;
+
         private IEnumerator Start()
         {
             yield return null;
@@ -50,7 +52,7 @@ namespace AccountingImmersiveAnalytics.App
             canvasGo.GetComponent<Canvas>().renderMode = RenderMode.WorldSpace;
             var rect = (RectTransform)canvasGo.transform;
             rect.sizeDelta = new Vector2(2f, 2f);
-            rect.localScale = Vector3.one * 0.001f;
+            rect.localScale = Vector3.one * Style.WorldScale;
 
             AddImage(canvasGo.transform, null);
             AddImage(canvasGo.transform, Panel.FrontMaterial);
@@ -61,7 +63,7 @@ namespace AccountingImmersiveAnalytics.App
 
             var world = new GameObject("WarmWorldLabel", typeof(RectTransform)).AddComponent<OneTextMesh>();
             world.transform.SetParent(root.transform, false);
-            world.transform.localScale = Vector3.one * 0.001f;
+            world.transform.localScale = Vector3.one * Style.WorldScale;
             world.RichText = false;
             world.Text = CommonGlyphs;
 
@@ -96,7 +98,7 @@ namespace AccountingImmersiveAnalytics.App
             Style.SetBold(label, bold);
             if (outlined) label.Decoration = Style.Outline;
             label.RichText = false;
-            label.FontSize = 1f;
+            label.FontSize = InvisibleFontSize;
             label.Text = CommonGlyphs;
         }
     }

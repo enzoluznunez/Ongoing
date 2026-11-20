@@ -7980,10 +7980,11 @@ MonoBehaviour:
   _hand: {fileID: 1048234294}
   geminiClient: {fileID: 704980503}
   yOffsetFromHand: 0.025
-  posMinCutoff: 1
-  posBeta: 0.02
-  rotMinCutoff: 1
-  rotBeta: 0.05
+  smoothing:
+    posMinCutoff: 1
+    posBeta: 0.02
+    rotMinCutoff: 1
+    rotBeta: 0.05
   lowConfidenceHardening: 0.25
 --- !u!4 &1662494103
 Transform:

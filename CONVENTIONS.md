@@ -19,13 +19,13 @@ Inside the project folder, content is grouped **by feature**. Each feature keeps
 | Folder | Holds |
 |---|---|
 | `App/` | Start-up, camera, head pose, recentring, the asset library |
-| `Assistant/` | Ada (Gemini): `Live/` connection, `Session/` turn state, `Tools/` Ada's tools |
+| `Assistant/` | The assistant (Ada): `AssistantSwitch` turns her on and off, `SystemPrompt` her instructions, `GeminiKey` the API key; `Voice/` the live voice session (connection, microphone, replies, transcripts, tool calls, context budget); `Live/` the Gemini Live wire client; `Context/` what she is told about the scene and her current turn; `FlashLite/` one-off Gemini requests, their cache and mark explanations; `Tools/` her tools: `AssistantTool` base, `ToolRegistry`, `ToolTargets` and `ToolResult` helpers, `Arguments/` the argument schema, and one folder per subject: `Chart/`, `Documents/`, `Lists/`, `General/` |
 | `Audio/` | Speaker and voice |
 | `Data/` | Streaming-file access |
 | `Documents/` | PDF reading |
 | `Hands/` | Hand rays, ray visuals, the data inspector |
 | `Text/` | Languages, translation, strings, number formats (generated from CLDR), `Fonts/` source fonts |
-| `UI/Charts/` | Chart engine: `Data/` CSV reading, `Spec/` chart specs, planner and sort/filter, `Scales/` axes, `Layout/` the shared card layout, `Marks/` the shape surface, `Elements/` text, key panel and its slider, `Types/` one class per chart type, `View/` cards, the chart column and the pinned chart, `Tools/` tool selection; `ChartStyle` holds the chart-only constants; `ChartMarks` shader and material |
+| `UI/Charts/` | Chart engine. Shared by every chart, flat or not: `Data/` CSV reading, `Spec/` chart specs, planner and sort/filter, `Scales/` axes, `View/` chart entries, the chart column, the pinned chart and grabbing, `Tools/` tool selection and tool panels, `Edit` the undo history, `ChartManager`; `ChartStyle` holds the chart-only constants. `2D/` flat cards: `Layout/` the shared card layout, `Marks/` the shape surface, `Elements/` text, key panel and its slider, `Types/` one class per chart type, `View/` the card, its outline and mark hits; `ChartMarks` shader and material. `3D/` holds the 3D charts |
 | `UI/Panels/` | Panels, cards, tooltips, panel materials and shaders |
 | `UI/Icons/` | Icon images and icon scripts |
 | `UI/Interactions/` | Buttons, scrolls, scrollbars, pointer and grab handling |
@@ -43,8 +43,11 @@ Folder names are PascalCase, with no spaces.
 
 ## Scripts
 
-- One class, struct or interface per file, and the file is named exactly after it. Small enums may stay with the class that owns them.
+- One class, struct or interface per file, and the file is named exactly after it. Small enums may stay with the class that owns them. A generic class shares the file of the non-generic class of the same name (`AssistantTool` and `AssistantTool<TArgs>`).
+- The exception is `Assistant/Live/LiveTypes.cs`: it mirrors the Gemini Live wire schema, so its many small message types stay together and keep the API's names.
+- The assistant is called **Assistant** in code: `AssistantSwitch`, `AssistantTurn`, `AssistantTool`, `InAssistantCall`. "Gemini" names only the Google service itself (`GeminiKey`), and "Ada", her name in the README, is not used in code.
 - Namespaces match folders, for example `AccountingImmersiveAnalytics.UI.Charts.Tools`. A file imports other features with `using` lines and never relies on the global namespace.
+- The exception is `UI/Charts/2D/` and `UI/Charts/3D/`: a namespace can't start with a digit, so their namespaces spell the folder out as `TwoD` and `ThreeD`, for example `AccountingImmersiveAnalytics.UI.Charts.TwoD.Types`.
 - Names follow C# conventions:
 
 | Kind | Style | Example |
@@ -93,6 +96,7 @@ All sizes are in design units, where 1 unit is 1 mm in the headset.
 | Panels and floating cards | white (`Style.Card`), corner radius 32 (`Style.LargeRadius`), content 30 from the edges (`Style.LargePad`); tracks and inner boxes grey (`Style.Control`) |
 | Shared tokens | `Style` holds text sizes 12/16/32, weights 400/600, ink measures, paddings 10/20/30, radii 2/8/32, the 2 stroke and the colours; `ChartStyle` holds only chart-specific values |
 | Pinned chart buttons | Sort, Filter, Trendline, Key, Edits, Place and Scale in a column right of the pinned card, 10 apart, sized together to fill the card's height |
+| Documents column | a scrolling column 10 left of the Documents panel, as tall as the panel, scrolling like the chart column; each document's first page itself (no card or title), right-aligned, corner radius 16, 10 apart, each at half the size it shows in the panel (`ChartStyle.PreviewScale`, as chart previews are to pinned charts), so the column is as wide as its widest page (320 for US Letter); documents that can't be shown are a blank US Letter page with `documents.display`; the open document has the pinned chart's outline (black, 2, radius 16); pressing it closes the document and the panel says `documents.select` |
 | Where charts show | a scrolling column beside the Documents panel (cards at half size, no key panels; it scrolls by poke or ray drag and glides to a stop, with no scrollbar); pressing a card pins it and outlines it in black (2), pressing it again unpins; one pinned chart at a time in front of the panel, card only; mark tooltips only on the pinned chart while no tool is selected |
 
 ## Checking a change

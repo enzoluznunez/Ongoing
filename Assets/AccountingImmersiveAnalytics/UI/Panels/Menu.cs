@@ -1,38 +1,33 @@
 using System;
 using AccountingImmersiveAnalytics.App;
 using AccountingImmersiveAnalytics.Assistant;
-using AccountingImmersiveAnalytics.Assistant.Session;
+using AccountingImmersiveAnalytics.Assistant.Context;
+using AccountingImmersiveAnalytics.Assistant.Voice;
 using AccountingImmersiveAnalytics.Text;
-using AccountingImmersiveAnalytics.UI.Charts.Elements;
+using AccountingImmersiveAnalytics.UI.Charts.TwoD.Elements;
 using AccountingImmersiveAnalytics.UI.Helpers;
 using AccountingImmersiveAnalytics.UI.Interactions;
 using Oculus.Interaction;
 using Oculus.Interaction.Input;
 using UnityEngine;
+using UnityEngine.Serialization;
 using UnityEngine.UI;
 
 namespace AccountingImmersiveAnalytics.UI.Panels
 {
-    public enum AssistantCause { User, Agent, Failure }
+    public enum AssistantCause { User, Assistant, Failure }
 
     public class Menu : MonoBehaviour
     {
         [SerializeField, Interface(typeof(IHand))]
         private UnityEngine.Object _hand;
 
-        public GeminiClient geminiClient;
+        [SerializeField, FormerlySerializedAs("geminiClient")] private AssistantSwitch _assistantSwitch;
 
-        public float yOffsetFromHand = 0.03f;
+        public float yOffsetFromHand = Style.HandOffset;
 
         [Header("Pose smoothing")]
-        [Tooltip("Lowest position smoothing frequency in Hz; lower removes more shimmer at rest.")]
-        public float posMinCutoff = 1f;
-        [Tooltip("How quickly position smoothing releases as the hand speeds up; raise if the Menu trails fast motion.")]
-        public float posBeta = 0.02f;
-        [Tooltip("Lowest rotation smoothing frequency in Hz; lower removes more shimmer at rest.")]
-        public float rotMinCutoff = 1f;
-        [Tooltip("How quickly rotation smoothing releases as the hand speeds up.")]
-        public float rotBeta = 0.05f;
+        public OneEuroPoseFilter.Settings smoothing = new OneEuroPoseFilter.Settings();
         [Tooltip("Smoothing multiplier while hand tracking confidence is low; lower holds steadier.")]
         [Range(0.05f, 1f)] public float lowConfidenceHardening = 0.25f;
 
@@ -120,15 +115,15 @@ namespace AccountingImmersiveAnalytics.UI.Panels
             _assistantBtn.Button.onClick.AddListener(OnAssistantClicked);
         }
 
-        private void OnAssistantClicked() => SetGeminiActive(!IsGeminiActive, AssistantCause.User);
+        private void OnAssistantClicked() => SetAssistantActive(!IsAssistantActive, AssistantCause.User);
 
         private void SyncAssistantButton()
         {
             if (_assistantBtn == null) return;
 
-            bool on = IsGeminiActive;
-            bool connecting = on && Gemini.Status != GeminiStatus.Live;
-            int dots = connecting ? Style.Dots : -1;
+            bool on = IsAssistantActive;
+            bool connecting = on && VoiceSession.Status != VoiceStatus.Live;
+            int dots = connecting ? LoadingDots.Count : -1;
 
             if (on != _assistantOn)
             {
@@ -143,7 +138,7 @@ namespace AccountingImmersiveAnalytics.UI.Panels
             _assistantText.gameObject.SetActive(connecting);
             if (!connecting) return;
             _assistantText.color = Style.Card;
-            Texts.Bind(_assistantText, () => Style.Counting(Strings.Get("assistant.connecting")));
+            LoadingDots.Bind(_assistantText, () => Strings.Get("assistant.connecting"), counting: true);
         }
 
 
@@ -263,16 +258,16 @@ namespace AccountingImmersiveAnalytics.UI.Panels
         }
 
 
-        public bool IsGeminiActive => geminiClient != null && geminiClient.Active;
+        public bool IsAssistantActive => _assistantSwitch != null && _assistantSwitch.Active;
 
 
-        public void SetGeminiActive(bool active, AssistantCause cause)
+        public void SetAssistantActive(bool active, AssistantCause cause)
         {
-            if (geminiClient == null) return;
-            if (geminiClient.Active == active) return;
-            if (!active && cause != AssistantCause.Agent) AgentTurn.UserTookControl();
+            if (_assistantSwitch == null) return;
+            if (_assistantSwitch.Active == active) return;
+            if (!active && cause != AssistantCause.Assistant) AssistantTurn.UserTookControl();
             if (!active) Notices.HideNotice();
-            geminiClient.SetActive(active);
+            _assistantSwitch.SetActive(active);
             ReportActivation(active, cause);
         }
 
@@ -282,8 +277,8 @@ namespace AccountingImmersiveAnalytics.UI.Panels
                 ? "the assistant is on and listening"
                 : "the assistant is off";
 
-            if (cause == AssistantCause.Failure) StateChannel.SetState("assistant", what);
-            else StateChannel.RecordState("assistant", what);
+            if (cause == AssistantCause.Failure) ActivityFeed.SetState("assistant", what);
+            else ActivityFeed.RecordState("assistant", what);
         }
 
         private void SyncPanelButtonStates()
@@ -297,11 +292,11 @@ namespace AccountingImmersiveAnalytics.UI.Panels
                 _documentsPanelOpen = selected;
                 ButtonFactory.SetSelected(_documentsBtn, selected);
             }
-            int dots = loading ? Style.Dots : -1;
+            int dots = loading ? LoadingDots.Count : -1;
             if (dots == _documentsDots) return;
             _documentsDots = dots;
-            if (loading) Texts.Bind(_documentsBtn.Text, () => Style.Counting(Strings.Get("loading")));
-            else Texts.Bind(_documentsBtn.Text, () => Strings.Get("panel.documents"));
+            if (loading) LoadingDots.Bind(_documentsBtn.Text, () => Strings.Get("loading"), counting: true);
+            else LoadingDots.Bind(_documentsBtn.Text, () => Strings.Get("panel.documents"), counting: false);
         }
 
         private void OnEnable()
@@ -310,30 +305,30 @@ namespace AccountingImmersiveAnalytics.UI.Panels
             _hasPose = false;
             _lostAt = -1f;
 
-            if (geminiClient == null) return;
-            geminiClient.StatusChanged += OnGeminiStatusChanged;
-            geminiClient.ContextWarning += OnContextWarning;
-            geminiClient.ContextExhausted += OnContextExhausted;
+            if (_assistantSwitch == null) return;
+            _assistantSwitch.StatusChanged += OnVoiceStatusChanged;
+            _assistantSwitch.ContextWarning += OnContextWarning;
+            _assistantSwitch.ContextExhausted += OnContextExhausted;
         }
 
         private void OnDisable()
         {
-            if (geminiClient == null) return;
-            geminiClient.StatusChanged -= OnGeminiStatusChanged;
-            geminiClient.ContextWarning -= OnContextWarning;
-            geminiClient.ContextExhausted -= OnContextExhausted;
+            if (_assistantSwitch == null) return;
+            _assistantSwitch.StatusChanged -= OnVoiceStatusChanged;
+            _assistantSwitch.ContextWarning -= OnContextWarning;
+            _assistantSwitch.ContextExhausted -= OnContextExhausted;
         }
 
 
-        private void OnGeminiStatusChanged(GeminiStatus status)
+        private void OnVoiceStatusChanged(VoiceStatus status)
         {
-            if (status == GeminiStatus.Failed || status == GeminiStatus.MicDenied)
+            if (status == VoiceStatus.Failed || status == VoiceStatus.MicDenied)
             {
-                bool wasActive = IsGeminiActive;
-                SetGeminiActive(false, AssistantCause.Failure);
+                bool wasActive = IsAssistantActive;
+                SetAssistantActive(false, AssistantCause.Failure);
 
                 if (wasActive)
-                    Notices.Show(this, Strings.Original(status == GeminiStatus.MicDenied ? "notice.micDenied" : "notice.disconnected"));
+                    Notices.Show(this, Strings.Original(status == VoiceStatus.MicDenied ? "notice.micDenied" : "notice.disconnected"));
             }
         }
 
@@ -344,7 +339,7 @@ namespace AccountingImmersiveAnalytics.UI.Panels
 
         private void OnContextExhausted()
         {
-            SetGeminiActive(false, AssistantCause.Failure);
+            SetAssistantActive(false, AssistantCause.Failure);
             Notices.Show(this, Strings.Original("notice.full.body"));
         }
 
@@ -368,10 +363,7 @@ namespace AccountingImmersiveAnalytics.UI.Panels
             _lostAt = -1f;
 
             if (!_hasPose) _poseFilter.Reset();
-            _poseFilter.posMinCutoff = posMinCutoff;
-            _poseFilter.posBeta = posBeta;
-            _poseFilter.rotMinCutoff = rotMinCutoff;
-            _poseFilter.rotBeta = rotBeta;
+            _poseFilter.settings = smoothing;
 
             float hardening = _ihand.IsHighConfidence ? 1f : lowConfidenceHardening;
             Pose filtered = _poseFilter.Filter(new Pose(position, rotation), Time.unscaledDeltaTime, hardening);
@@ -444,7 +436,7 @@ namespace AccountingImmersiveAnalytics.UI.Panels
 
             if (Engaged) return;
 
-            float t = Style.Damp(CalibrationRate, Time.unscaledDeltaTime);
+            float t = Animate.Damp(CalibrationRate, Time.unscaledDeltaTime);
             _anchorOffset = Vector3.Lerp(_anchorOffset, offset, t);
             _anchorRotation = Quaternion.Slerp(_anchorRotation, twist, t);
         }

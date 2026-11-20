@@ -28,7 +28,7 @@ namespace AccountingImmersiveAnalytics.UI.Charts
         public const float DonutInset = 2f;
         public const float AntiAlias = 2f;
 
-        public const float RampHeight = 12f;
+        public const float RampHeight = Style.TrackHeight;
 
         public const float PreviewScale = 0.5f;
         public const float PinnedScale = 1f;
@@ -55,7 +55,5 @@ namespace AccountingImmersiveAnalytics.UI.Charts
             int i = Mathf.Min(Ramp.Length - 2, Mathf.FloorToInt(s));
             return Color.Lerp(Ramp[i], Ramp[i + 1], s - i);
         }
-
-
     }
 }

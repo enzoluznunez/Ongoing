@@ -9,8 +9,12 @@ namespace AccountingImmersiveAnalytics.Documents
         public string Id;
         public string Title;
         public string File;
+        public double PageWidth = LetterWidth;
+        public double PageHeight = LetterHeight;
+        public bool Showable;
 
         public const string CsvExtension = ".csv";
+        public const double LetterWidth = 612, LetterHeight = 792;
 
         public bool IsCsv => File != null && File.EndsWith(CsvExtension, StringComparison.OrdinalIgnoreCase);
     }
@@ -37,6 +41,7 @@ namespace AccountingImmersiveAnalytics.Documents
         public string Title;
         public readonly List<DocumentPage> Pages = new List<DocumentPage>();
         public readonly List<DocumentPassage> Passages = new List<DocumentPassage>();
+        public readonly List<PdfTable> Tables = new List<PdfTable>();
         private int _words;
 
         public int Minutes => Math.Max(1, (int)Math.Round(_words / (double)WordsPerMinute));

@@ -35,5 +35,18 @@ namespace AccountingImmersiveAnalytics.UI.Helpers
                 : TextAlignment.Start;
             label.VerticalAlignment = anchor == LabelAnchor.TopStart ? VerticalAlignment.Top : VerticalAlignment.Middle;
         }
+
+        public static OneTextMesh MakeWorldBanner(Transform parent, string name, Vector2 size)
+        {
+            RectTransform holder = LayoutTools.EnsureChild(parent, name);
+            holder.sizeDelta = size;
+            OneTextMesh label = LayoutTools.Ensure<OneTextMesh>(holder.gameObject);
+            Style.ApplyWorldTitle(label);
+            label.Alignment = TextAlignment.Center;
+            label.Wrap = TextWrap.NoWrap;
+            label.Color = Style.Card;
+            label.transform.localScale = Vector3.one * (Style.WorldTextScale * 2f);
+            return label;
+        }
     }
 }

@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using AccountingImmersiveAnalytics.Text;
-using AccountingImmersiveAnalytics.UI.Charts.Marks;
+using AccountingImmersiveAnalytics.UI.Charts.TwoD.Marks;
 using AccountingImmersiveAnalytics.UI.Helpers;
 using AccountingImmersiveAnalytics.UI.Interactions;
 using OneText;
@@ -29,6 +29,28 @@ namespace AccountingImmersiveAnalytics.UI.Panels
         private RectTransform _list;
         private float _listY;
         private int _listRows;
+        private readonly List<Fit> _fits = new List<Fit>();
+        private readonly CardFit _watch;
+        private float _built;
+        private bool _ended;
+        private float _oneLine = -1f;
+
+        private sealed class Fit
+        {
+            public RectTransform Row;
+            public float Top;
+            public float Height;
+            public readonly List<FitText> Texts = new List<FitText>();
+        }
+
+        private sealed class FitText
+        {
+            public OneTextLabel Label;
+            public float Slack;
+            public float Height;
+        }
+
+        public event Action Resized;
 
         public PanelCard(Transform parent, string name, float width)
         {
@@ -43,6 +65,8 @@ namespace AccountingImmersiveAnalytics.UI.Panels
             fill.color = Style.Card;
             fill.raycastTarget = true;
             BackFace.Add(Root, Style.LargeRadius);
+            _watch = LayoutTools.Ensure<CardFit>(Root.gameObject);
+            _watch.Refit = () => Refit(true);
             _width = width;
             Begin(width);
         }
@@ -62,6 +86,9 @@ namespace AccountingImmersiveAnalytics.UI.Panels
             _y = Inset;
             _rows = 0;
             _list = null;
+            _fits.Clear();
+            _ended = false;
+            _oneLine = -1f;
         }
 
         public void BeginList()
@@ -80,7 +107,7 @@ namespace AccountingImmersiveAnalytics.UI.Panels
             RectTransform viewport = (RectTransform)content.parent;
             _list = null;
             float total = Mathf.Max(0f, _listY - RowGap);
-            float shown = Mathf.Min(total, ListHeight);
+            float shown = ListHeight;
             content.sizeDelta = new Vector2(InnerWidth, total);
             viewport.sizeDelta = new Vector2(InnerWidth, shown);
             _y += shown + RowGap;
@@ -101,7 +128,59 @@ namespace AccountingImmersiveAnalytics.UI.Panels
         {
             Height = _rows == 0 ? Inset * 2f : _y - RowGap + Inset;
             Root.sizeDelta = new Vector2(_width, Height);
+            _built = Height;
+            foreach (Fit fit in _fits)
+            {
+                fit.Top = -fit.Row.anchoredPosition.y;
+                fit.Height = fit.Row.sizeDelta.y;
+                foreach (FitText text in fit.Texts) text.Height = text.Label.rectTransform.sizeDelta.y;
+            }
+            _ended = true;
+            Refit(false);
             return Height;
+        }
+
+        private void Refit(bool notify)
+        {
+            if (!_ended) return;
+            float shift = 0f;
+            foreach (Fit fit in _fits)
+            {
+                if (fit.Row == null) continue;
+                float need = fit.Height;
+                foreach (FitText text in fit.Texts)
+                    if (text.Label != null && text.Label.gameObject.activeSelf)
+                        need = Mathf.Max(need, Mathf.Ceil(text.Label.preferredHeight) + text.Slack);
+                float grow = need - fit.Height;
+                SetTopAndHeight(fit.Row, fit.Top + shift, need);
+                foreach (FitText text in fit.Texts)
+                    if (text.Label != null) SetTopAndHeight(text.Label.rectTransform, -text.Label.rectTransform.anchoredPosition.y, text.Height + grow);
+                shift += grow;
+            }
+            float height = _built + shift;
+            if (Mathf.Approximately(height, Height)) return;
+            Height = height;
+            Root.sizeDelta = new Vector2(_width, Height);
+            if (notify) Resized?.Invoke();
+        }
+
+        private static void SetTopAndHeight(RectTransform rt, float top, float height)
+        {
+            Vector2 at = new Vector2(rt.anchoredPosition.x, -top);
+            if (rt.anchoredPosition != at) rt.anchoredPosition = at;
+            Vector2 size = new Vector2(rt.sizeDelta.x, height);
+            if (rt.sizeDelta != size) rt.sizeDelta = size;
+        }
+
+        private void Track(RectTransform row, OneTextLabel label, float slack)
+        {
+            for (int i = _fits.Count - 1; i >= 0; i--)
+            {
+                if (_fits[i].Row != row) continue;
+                _fits[i].Texts.Add(new FitText { Label = label, Slack = slack });
+                label.RegisterDirtyLayoutCallback(_watch.MarkDirty);
+                return;
+            }
         }
 
         public RectTransform Row(float height, float gapAbove = RowGap)
@@ -115,6 +194,7 @@ namespace AccountingImmersiveAnalytics.UI.Panels
             }
             if (_rows > 0) _y += gapAbove - RowGap;
             RectTransform row = Place(LayoutTools.EnsureChild(Root, $"Row {_rows}"), Inset, _y, InnerWidth, height);
+            _fits.Add(new Fit { Row = row });
             _rows++;
             _y += height + RowGap;
             return row;
@@ -158,6 +238,7 @@ namespace AccountingImmersiveAnalytics.UI.Panels
             if (keepSide) Place(label.rectTransform, x, 0f, width, row.rect.height);
             else PlaceIn(label.rectTransform, x, 0f, width, row.rect.height);
             Texts.Bind(label, text);
+            if (wrap) Track(row, label, RowHeight - OneLine);
             return label;
         }
 
@@ -177,7 +258,7 @@ namespace AccountingImmersiveAnalytics.UI.Panels
             return height;
         }
 
-        private float OneLine => TextHeight(() => "A", 1000f);
+        private float OneLine => _oneLine >= 0f ? _oneLine : _oneLine = TextHeight(() => "A", 1000f);
 
         public float RowFor(Func<string> text, float width) =>
             text == null ? RowHeight : Mathf.Max(RowHeight, TextHeight(text, width) + RowHeight - OneLine);
@@ -191,6 +272,14 @@ namespace AccountingImmersiveAnalytics.UI.Panels
         {
             RectTransform row = Row(RowFor(text, InnerWidth));
             return Label(row, text, 0f, InnerWidth, LabelAnchor.Start, muted: true, wrap: true);
+        }
+
+        public OneTextLabel CountingLine(Func<string> word)
+        {
+            RectTransform row = Row(RowFor(() => word() + new string('.', LoadingDots.Most), InnerWidth));
+            OneTextLabel label = Label(row, word, 0f, InnerWidth, LabelAnchor.Start, muted: true, wrap: true);
+            LoadingDots.Bind(label, word, counting: true);
+            return label;
         }
 
         public void Pair(Func<string> name, Func<string> value, bool mutedValue, bool wrap = true)
@@ -234,7 +323,7 @@ namespace AccountingImmersiveAnalytics.UI.Panels
             foreach (var chip in chips)
             {
                 var c = chip;
-                float wide = Mathf.Ceil(Charts.Elements.ChartText.Width(Charts.Elements.ChartText.Clip(c.Label(), Style.MediumText, ChipRoom), Style.MediumText)) + Style.MediumPad * 2f;
+                float wide = Mathf.Ceil(Charts.TwoD.Elements.ChartText.Width(Charts.TwoD.Elements.ChartText.Clip(c.Label(), Style.MediumText, ChipRoom), Style.MediumText)) + Style.MediumPad * 2f;
                 items.Add((wide, holder =>
                 {
                     ButtonFactory.Handle button = ButtonFactory.Create(holder, "Chip", "");
@@ -242,7 +331,7 @@ namespace AccountingImmersiveAnalytics.UI.Panels
                     LayoutTools.Stretch((RectTransform)button.Root.transform);
                     ButtonFactory.SetSelected(button, c.Selected);
                     ButtonFactory.FixText(button);
-                    Texts.Bind(button.Text, () => Charts.Elements.ChartText.Clip(c.Label(), Style.MediumText, ChipRoom));
+                    Texts.Bind(button.Text, () => Charts.TwoD.Elements.ChartText.Clip(c.Label(), Style.MediumText, ChipRoom));
                     button.Button.onClick.AddListener(() => c.Press?.Invoke());
                 }));
             }
@@ -347,6 +436,7 @@ namespace AccountingImmersiveAnalytics.UI.Panels
             OneTextLabel label = LabelFactory.Make(row, "Text", Style.Ink, LabelAnchor.TopStart, TextOverflow.Overflow, wrap: true);
             Place(label.rectTransform, Style.MediumPad, Style.SmallPad, boxWidth - Style.MediumPad * 2f, textHeight);
             Texts.Bind(label, text);
+            Track(row, label, Style.SmallPad * 2f);
             return label;
         }
     }

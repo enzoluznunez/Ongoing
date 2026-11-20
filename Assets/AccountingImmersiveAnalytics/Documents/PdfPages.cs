@@ -159,9 +159,10 @@ namespace AccountingImmersiveAnalytics.Documents
             return new Vector2Int(Math.Max(1, (int)Math.Round(pageWidth * scale)), Math.Max(1, (int)Math.Round(pageHeight * scale)));
         }
 
-        public static Texture2D MakeTexture(PagePixels pixels)
+        public static Texture2D MakeTexture(PagePixels pixels, float cornerPixels = 0f)
         {
             if (pixels == null) return null;
+            RoundCorners(pixels, cornerPixels);
             var texture = new Texture2D(pixels.Width, pixels.Height, TextureFormat.RGBA32, true, false)
             {
                 wrapMode = TextureWrapMode.Clamp,
@@ -172,6 +173,36 @@ namespace AccountingImmersiveAnalytics.Documents
             pixels.Native.Dispose();
             texture.Apply(true, true);
             return texture;
+        }
+
+        private static void RoundCorners(PagePixels pixels, float radius)
+        {
+            int width = pixels.Width, height = pixels.Height;
+            radius = Mathf.Min(radius, Mathf.Min(width, height) * 0.5f);
+            int reach = Mathf.CeilToInt(radius);
+            if (reach < 1 || pixels.Native.Length < width * height * 4) return;
+            NativeArray<byte> bytes = pixels.Native;
+            for (int y = 0; y < reach; y++)
+            {
+                float dy = radius - (y + 0.5f);
+                for (int x = 0; x < reach; x++)
+                {
+                    float dx = radius - (x + 0.5f);
+                    if (dx <= 0f || dy <= 0f) continue;
+                    float cover = Mathf.Clamp01(radius - Mathf.Sqrt(dx * dx + dy * dy) + 0.5f);
+                    if (cover >= 1f) continue;
+                    Fade(bytes, width, x, y, cover);
+                    Fade(bytes, width, width - 1 - x, y, cover);
+                    Fade(bytes, width, x, height - 1 - y, cover);
+                    Fade(bytes, width, width - 1 - x, height - 1 - y, cover);
+                }
+            }
+        }
+
+        private static void Fade(NativeArray<byte> bytes, int width, int x, int y, float cover)
+        {
+            int at = (y * width + x) * 4 + 3;
+            bytes[at] = (byte)Mathf.RoundToInt(bytes[at] * cover);
         }
 
         public static void Discard(PagePixels pixels)

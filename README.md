@@ -1,8 +1,9 @@
 # Accounting Immersive Analytics
 
 A mixed-reality app for Meta Quest 3, built in Unity, that helps people new to accounting read
-business data. In passthrough, you open a document in the Documents panel. A PDF shows its pages; a
-CSV file becomes a column of flat 2D charts beside the panel. Ada, a voice assistant, can open
+business data. In passthrough, you open a document in the Documents panel. A PDF shows its pages,
+and each table in it becomes a flat 2D chart in a column beside the panel; a CSV file becomes a
+column of charts. Ada, a voice assistant, can open
 documents, pin and move charts, sort and filter them, and answer questions about their data.
 
 - [What you will see](#what-you-will-see)
@@ -13,9 +14,12 @@ documents, pin and move charts, sort and filter them, and answer questions about
 ## What you will see
 
 When the app starts, a **Loading** line floats ahead of you while everything gets ready. Then the
-Documents panel opens the first document in `StreamingAssets/Documents`. Today that is
-`Quarterly Sales.csv`, so its charts appear in a scrolling column to the right of the panel, at half
-size, without keys.
+Documents panel opens the first document in `StreamingAssets/Documents`, in file-name order. Today
+that is *01 Sales Review 2025*, one of five practice reports from a made-up business, Maple Street
+Bakery. Each is two US Letter pages with two data tables. A column of every document's first page
+stands to the left of the panel. When a document is open, its charts appear in a scrolling column to
+the right of the panel, at half size, without keys: one per table in a PDF, of the kind the table's
+caption names, or one per insight in a CSV file.
 
 Charts are flat white cards with black text and gridlines, a title, axis titles and tick values, and
 coloured marks. Press a card in the column to pin it: a full-size copy of the card appears just in front
@@ -68,19 +72,30 @@ with a white icon when on. While one of them is on, the others are faded and can
 
 The panel's title is the name of the open document, and blank when nothing is open. The name shows
 only in the title bar, not again in the panel's body. The documents are the PDF and CSV files in
-`StreamingAssets/Documents`; ask Ada to open one. With nothing open the panel says there is no document
-to display.
+`StreamingAssets/Documents`. Press a page in the documents column on the panel's left to open that
+document, or ask Ada. The column shows each document's first page at half the size it has in the
+panel, as the chart column shows charts at half their pinned size; it scrolls like the chart column,
+and the open document has a black outline. A document that can't be shown as pages, such as a CSV file, appears as a blank US Letter
+page saying *Cannot be displayed*. Press the outlined page to close the document: the panel goes
+back to US Letter size and says *Select a document*.
 
 The panel is at least the size of a US Letter page and grows to fit the open document: every page is
 shown at the same scale, so the panel widens for landscape pages and grows taller for long ones, such
 as Legal. Smaller pages sit centred.
 
+Every document gets a short plain summary at the top of the panel when Gemini can be reached. It is
+written the first time a document is opened and saved on the headset, so opening it again, even after
+a restart, shows it at once. Chart plans and mark explanations are saved the same way.
+
 - **A PDF** shows its pages exactly as printed, as pictures you scroll by dragging, with the page count
-  and reading time above them. When Gemini can be reached, an **In short** box gives a plain summary.
-  PDF pages are drawn by Android's PDF renderer, so they only show on the headset, not in the Unity
-  editor.
-- **A CSV** isn't shown as a table. The panel says the file can't be displayed, and its charts fill the
-  column to its right. Opening another document replaces the column.
+  and reading time above them. PDF pages are drawn by Android's PDF renderer, so they only show on the
+  headset; in the Unity editor the panel shows a blank page saying *Cannot be displayed*, under the
+  page count, reading time and summary. Each table in the PDF becomes one chart in the column to its right, in the editor too. A
+  table is read from the PDF's text: a header row and at least two rows below it with the same
+  columns. If the caption under it names a chart, such as "Shown best as a heatmap", the chart is
+  that kind.
+- **A CSV** isn't shown as a table. The panel shows its summary above a blank page saying *Cannot be
+  displayed*, and its charts fill the column to its right. Opening another document replaces the column.
 
 ### Moving panels
 
@@ -94,7 +109,9 @@ panes, then **Move**, then **✕**.
 - **✕** closes the panel.
 
 Open panels stand side by side on a curve in front of you, centred on where you're facing. A panel
-you move by hand leaves the row and stays where you put it until you close and reopen it.
+you move by hand leaves the row and stays where you put it until you close and reopen it. When a
+panel in the row changes size, such as the Documents panel when its chart column appears or it opens
+a page of another size, it stays where it is and the panels beside it slide to make room.
 
 ### Language
 
@@ -142,7 +159,7 @@ slice, cell, box or tile) turns black, and a tooltip by your hand shows its name
 
 **Pinch** the mark to ask Ada to explain it, whether or not the voice assistant is on. The tooltip
 shows *Connecting…* and then *Ada is writing…* before filling in two plain-language lines: what the mark
-stands for, and one comparison that gives its value meaning. Each explanation is written once and kept.
+stands for, and one comparison that gives its value meaning. Each explanation is written once and saved on the headset.
 Hovering alone never asks Ada, so it costs nothing. When the voice assistant is on, Ada also knows what
 you pinched, so you can follow up: *"why is this one so high?"*
 
@@ -276,4 +293,5 @@ Only the Gemini API, for Ada, chart planning, explanations, summaries and transl
 
 **Does the app store anything about me?**
 No. Documents are bundled with the app. Your speech goes to Gemini only while Ada is on, and the
-columns and first rows of an opened CSV go to Gemini to plan its charts.
+columns and first rows of an opened CSV, or of each table in an opened PDF, go to Gemini to plan
+their charts.

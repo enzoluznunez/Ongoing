@@ -1,5 +1,6 @@
 using AccountingImmersiveAnalytics.UI.Charts.Data;
 using AccountingImmersiveAnalytics.UI.Charts.Spec;
+using AccountingImmersiveAnalytics.UI.Charts.TwoD.View;
 
 namespace AccountingImmersiveAnalytics.UI.Charts.View
 {

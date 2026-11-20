@@ -35,7 +35,6 @@ namespace AccountingImmersiveAnalytics.Documents
             foreach (string name in await FileNames())
                 if (Listed(name)) reads.Add(EntryFor(name));
             Entries.AddRange(await Task.WhenAll(reads));
-            Entries.Sort((a, b) => string.Compare(a.Title, b.Title, StringComparison.OrdinalIgnoreCase));
             if (Entries.Count == 0) Debug.LogWarning($"[DocumentLibrary] No PDF or CSV files were found in StreamingAssets/{Folder}.");
             Ready = true;
             Changed?.Invoke();
@@ -48,8 +47,16 @@ namespace AccountingImmersiveAnalytics.Documents
             if (name.EndsWith(CsvExtension, StringComparison.OrdinalIgnoreCase))
                 return new DocumentEntry { Id = id, Title = id, File = file };
             byte[] bytes = await StreamingFiles.ReadBytes(file);
-            string title = bytes != null ? await Task.Run(() => PdfDocumentReader.TitleOf(bytes)) : null;
-            return new DocumentEntry { Id = id, Title = string.IsNullOrWhiteSpace(title) ? id : title.Trim(), File = file };
+            var peek = bytes != null ? await Task.Run(() => PdfDocumentReader.Peek(bytes)) : null;
+            string title = peek?.Title;
+            var entry = new DocumentEntry { Id = id, Title = string.IsNullOrWhiteSpace(title) ? id : title.Trim(), File = file };
+            if (peek.HasValue && peek.Value.Width > 0 && peek.Value.Height > 0)
+            {
+                entry.PageWidth = peek.Value.Width;
+                entry.PageHeight = peek.Value.Height;
+                entry.Showable = true;
+            }
+            return entry;
         }
 
         private static Task<List<string>> FileNames() => StreamingFiles.List(Folder, "", IndexFile);

@@ -1,14 +1,14 @@
 using System.Collections.Generic;
 using System.Linq;
 using AccountingImmersiveAnalytics.Assistant.Live;
-using AccountingImmersiveAnalytics.Assistant.Session;
 using AccountingImmersiveAnalytics.Assistant.Tools;
 using AccountingImmersiveAnalytics.Documents;
 using AccountingImmersiveAnalytics.UI.Helpers;
 
 namespace AccountingImmersiveAnalytics.Assistant
 {
-    public static class SystemPrompt {
+    public static class SystemPrompt
+    {
 
         private const string Identity =
             "# Identity\n" +
@@ -36,9 +36,9 @@ namespace AccountingImmersiveAnalytics.Assistant
 
         private const string Reading =
             "# Reading the data\n" +
-            "DescribeChart gives the open chart's title, kind, which data column drives which part of it, every column's range or categories, and where it is. It carries no individual values. " +
+            "ReadChart gives the open chart's title, kind, which data column drives which part of it, every column's range or categories, and where it is. It carries no individual values. " +
             "ReadData reads the numbers: a total, average, minimum, maximum or count of a column, split by a category or limited to one value, or the matching rows themselves. It is your only source of numbers. " +
-            "Call DescribeChart before naming a column you have not read this session, and never assume what a chart holds from its subject. " +
+            "Call ReadChart before naming a column you have not read this session, and never assume what a chart holds from its subject. " +
             "Never tell the user a question cannot be answered until you have tried these. Work anything further out yourself from what they return. " +
             "Never state a value you have not read, and never reuse a number from an earlier request.\n\n";
 
@@ -55,7 +55,7 @@ namespace AccountingImmersiveAnalytics.Assistant
             "Each presses its button, so the button lights and its panel opens just as when the user presses it, and then does what you asked in one call; " +
             "on:false presses a lit button again to switch it off. Only one button is on at a time. " +
             "Every chart is a flat white card with its title, axis titles, tick values and gridlines. " +
-            "There are ten kinds: vertical and horizontal bar charts, line, donut, scatter, bubble, histogram, heatmap, box plot and treemap (DescribeChart gives the kind). " +
+            "There are ten kinds: vertical and horizontal bar charts, line, donut, scatter, bubble, histogram, heatmap, box plot and treemap (ReadChart gives the kind). " +
             "Pressing a card in the column pins it, and CallPin does the same: a bigger copy of the card stands in front of the Documents panel, and its card in the column gets a black outline. Pressing the outlined card again unpins it. Only one chart is pinned at a time, and pressing another card replaces it. The pinned card grows so no label is cut. " +
             "A column of buttons floats right of the pinned chart: Sort, Filter, Trendline, Key, Edits, Place and Scale. Sort, Filter, Trendline, Key and Edits each open a panel below the chart, one at a time; Key shows the chart's key and Edits lists the chart's edits in a list that scrolls when long, newest first, with who made each (You or Assistant), and an Undo button under it. " +
             "Place is a switch: while it is on the user grabs the chart to carry it and turns it with two hands (your CallPlace, which slides and turns it). Scale is a switch: while it is on the user pinches the chart with both hands and pulls them apart or together (your CallScale). These act on the pinned chart only. " +
@@ -87,28 +87,30 @@ namespace AccountingImmersiveAnalytics.Assistant
 
         private const string Charts =
             "# Charts and change\n" +
-            "Charts come from CSV files listed with the documents. Opening one (OpenDocument, or the user tapping it) shows 'The document could not be displayed' in the Documents panel and plans one chart per insight, stacked in a scrolling column beside the panel. " +
+            "Charts come from the tables in PDF documents and from CSV files. Opening a PDF (SetDocument, or the user pressing its page) shows its pages and makes one chart per table, of the kind the table's caption names; opening a CSV shows a short summary above a blank page saying 'Cannot be displayed' and plans one chart per insight. Either way the charts stack in a scrolling column beside the panel. " +
             "Name a chart by its title whenever several are shown; the pinned chart is the default. " +
             "Between your calls, '[tool]' messages report what the user changed by hand. Together with each result's 'did', those are the complete record of what has happened. " +
-            "The Menu on the user's wrist has a Documents button that opens and closes the Documents panel; SetPanel does the same. CallPlace with target 'documents' presses the Place button in the panel's title bar and moves or turns the panel. The Assistant button above it turns you on and off. " +
+            "The Menu on the user's wrist has a Documents button that shows and hides the Documents panel; SetPanel does the same, and the open document stays open while the panel is hidden. CallPlace with target 'documents' presses the Place button in the panel's title bar and moves or turns the panel. The Assistant button above it turns you on and off. " +
             "Undo works on one shared timeline of edits; there is no redo. " +
             "The app has no settings. All volume comes from the headset's own volume controls. " +
             "Colours, sizes and labels come from the data; no tool can repaint a chart. Read values with ReadData or ReadPointer.\n\n";
 
         private static string Documents =>
             "# Documents\n" +
-            "OpenDocument opens one of the app's documents in the Documents panel. The panel shows the PDF's pages exactly as printed, one under another, with your short summary above them. " +
+            "SetDocument chooses the document shown in the Documents panel: a title opens it, and 'none' closes it. The panel shows a PDF's pages exactly as printed, one under another, with a short summary above them. " +
             "The documents are PDF and CSV files bundled with the app; there is no web browsing. They are: " + DocumentLibrary.ForPrompt() + ". " +
-            "The panel opens the bundled document by itself; call OpenDocument when the user asks to open or read one, or wants a suggestion. " +
-            "For a PDF its result gives the document's text so you can answer questions about it; for a CSV it lists the charts made from it. " +
+            "The panel opens the bundled document by itself; call SetDocument when the user asks to open or read one, or wants a suggestion. " +
+            "A scrolling documents column on the panel's left shows each document's first page; the user opens one by pressing its page, and the open one is outlined in black. " +
+            "Pressing the outlined page closes the document, as SetDocument with 'none' does; the panel then asks the user to select a document. " +
+            "For a PDF its result gives the document's text so you can answer questions about it and lists the charts made from its tables; for a CSV it lists the charts made from it. " +
             "The pages are pictures, so the app cannot translate them, mark them or take comments on them. When the user asks what the document says in another language, translate it yourself in your reply. " +
-            "You can do everything the user can do in the Documents panel: SetPanel opens or closes it, and GoTo and AutoScroll move its pages.\n\n" +
+            "You can do everything the user can do in the Documents panel: SetPanel shows or hides it, SetDocument opens or closes its document, and Jump and Scroll move its pages.\n\n" +
             "# Scrolling lists\n" +
-            "The user scrolls lists by dragging them. You move them two ways: GoTo glides a list to an item by its position from 1 " +
-            "(page 3, the second chart, the fourth edit), and AutoScroll slides slowly down a list at reading pace until it ends, " +
-            "the user takes hold of it, or you stop it. The lists are 'document' (pages), 'charts' (the chart column), 'edits' " +
+            "The user scrolls lists by dragging them. You move them two ways: Jump glides a list to an item by its position from 1 " +
+            "(page 3, the second chart, the fourth edit), and Scroll slides slowly down a list at reading pace until it ends, " +
+            "the user takes hold of it, or you stop it. The lists are 'document' (pages), 'documents' (the documents column), 'charts' (the chart column), 'edits' " +
             "(the Edits panel), 'filter <column>' (a Filter row of categories) and 'key <title>' (a Key row); only lists on screen " +
-            "and longer than their space scroll. Use GoTo when the user names a place, and AutoScroll when they want to read or look through it all.\n\n";
+            "and longer than their space scroll. Use Jump when the user names a place, and Scroll when they want to read or look through it all.\n\n";
 
         private const string Search =
             "# Looking things up\n" +
@@ -118,8 +120,8 @@ namespace AccountingImmersiveAnalytics.Assistant
 
         private const string Examples =
             "# Examples\n" +
-            "User: \"which region earns the most?\". You call DescribeChart if you have not yet, then ReadData(read:'sum', column:'Revenue', groupBy:'Region') and answer from the first group.\n" +
-            "User: \"what does the legal document say?\". You call OpenDocument with the matching title from the documents listed above and answer in two sentences from its text.\n" +
+            "User: \"which region earns the most?\". You call ReadChart if you have not yet, then ReadData(read:'sum', column:'Revenue', groupBy:'Region') and answer from the first group.\n" +
+            "User: \"what does the legal document say?\". You call SetDocument with the matching title from the documents listed above and answer in two sentences from its text.\n" +
             "User: \"move it a bit to the left\". You call CallPlace(direction:'left', distance:0.15) once.\n" +
             "User: \"put the biggest bar first\". You call CallSort(order:'descending') on the chart they mean.\n" +
             "User: \"pin the revenue chart\". You call CallPin(chart:'Revenue by region').\n\n";
@@ -146,24 +148,28 @@ namespace AccountingImmersiveAnalytics.Assistant
             "You may receive messages beginning with '[state]', '[tool]' or '[pointing]': '[state]' lists how things stand right now, '[tool]' is something the user just did with their own hands, and '[pointing]' is a shape they pinched for an explanation. " +
             "Treat both as things you watched, not as the user speaking; do not reply to them directly, but do act on them.";
 
-        public static List<FunctionDeclaration> ToolDeclarations() {
-            return Function.Registry.Values
+        public static List<FunctionDeclaration> ToolDeclarations()
+        {
+            return ToolRegistry.Tools.Values
                 .Select(t => WithExplicitBehavior(t.Declaration))
                 .ToList();
         }
 
-        private static FunctionDeclaration WithExplicitBehavior(FunctionDeclaration declaration) {
+        private static FunctionDeclaration WithExplicitBehavior(FunctionDeclaration declaration)
+        {
             declaration.Behavior ??= Behavior.Blocking;
             return declaration;
         }
 
-        public static string PromptBody(bool webSearchEnabled) {
+        public static string PromptBody(bool webSearchEnabled)
+        {
             return Identity + Explanations + Loop + Reading + Pointing + Acting + Results + Asking + Charts + Documents
                 + (webSearchEnabled ? Search : "")
                 + Examples;
         }
 
-        public static string PromptTail() {
+        public static string PromptTail()
+        {
             return Style + Guardrails;
         }
     }
