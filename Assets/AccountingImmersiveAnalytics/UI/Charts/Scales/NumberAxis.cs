@@ -23,7 +23,7 @@ namespace AccountingImmersiveAnalytics.UI.Charts.Scales
             }
             if (max - min < 1e-12)
             {
-                double pad = Math.Abs(max) > 0d ? Math.Abs(max) * 0.5d : 1d;
+                double pad = whole ? 2d : Math.Abs(max) > 0d ? Math.Abs(max) * 0.5d : 1d;
                 if (includeZero && min >= 0d) max += pad;
                 else { min -= pad; max += pad; }
             }

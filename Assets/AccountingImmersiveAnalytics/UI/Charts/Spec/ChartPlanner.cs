@@ -158,8 +158,8 @@ namespace AccountingImmersiveAnalytics.UI.Charts.Spec
                     Horizontal = string.Equals(Clean(chart["orientation"]), "horizontal", StringComparison.OrdinalIgnoreCase),
                     Title = Clean(chart["title"]) ?? title,
                     Insight = Clean(chart["insight"]),
-                    LogX = (bool?)chart["logX"] == true,
-                    LogY = (bool?)chart["logY"] == true
+                    LogX = chart["logX"]?.Type == JTokenType.Boolean && (bool)chart["logX"],
+                    LogY = chart["logY"]?.Type == JTokenType.Boolean && (bool)chart["logY"]
                 };
                 if (Enum.TryParse(Clean(chart["aggregate"]) ?? "", true, out Aggregate how)) spec.Aggregate = how;
                 foreach (string key in RoleKeys)

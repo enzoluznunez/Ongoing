@@ -29,6 +29,7 @@ namespace AccountingImmersiveAnalytics.Text
             ["trend.needsBoth"] = "{0} needs every {1} and {2} above 0",
             ["trend.needsMore"] = "{0} needs at least {1} different {2}",
             ["trend.needsPoints"] = "{0} needs at least {1} points",
+            ["trend.noCurve"] = "{0} can't be drawn for these values",
             ["trend.None"] = "Off",
             ["trend.Linear"] = "Linear",
             ["trend.Exponential"] = "Exponential",

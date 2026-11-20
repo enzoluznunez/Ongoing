@@ -102,11 +102,12 @@ namespace AccountingImmersiveAnalytics.UI.Charts.TwoD.Types
         protected static AxisSpec NumberAxes(ChartDrawing d, CsvField x,
             (double Min, double Max) xRange, (double Min, double Max) yRange, int shownRows)
         {
-            NumberAxis xAxis = NumberAxis.For(xRange.Min, xRange.Max, log: d.Spec.LogX);
+            bool years = YearLike(x) && !d.Spec.LogX;
+            NumberAxis xAxis = NumberAxis.For(xRange.Min, xRange.Max, log: d.Spec.LogX, whole: years);
             NumberAxis yAxis = NumberAxis.For(yRange.Min, yRange.Max, log: d.Spec.LogY);
             xAxis.Reversed = d.Shaping.Sort == SortOrder.Descending;
             var xSpec = AxisSpec.Of(d.Spec.TitleFor(Role.X), xAxis);
-            xSpec.WholeNumbers = YearLike(x) && !d.Spec.LogX;
+            xSpec.WholeNumbers = years;
             d.Axes(xSpec, AxisSpec.Of(d.Spec.TitleFor(Role.Y), yAxis));
             if (shownRows == 0) d.Notice = NothingShown;
             return xSpec;

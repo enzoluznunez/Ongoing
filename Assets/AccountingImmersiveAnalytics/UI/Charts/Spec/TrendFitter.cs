@@ -101,14 +101,14 @@ namespace AccountingImmersiveAnalytics.UI.Charts.Spec
         }
 
         public static bool Fits(ChartSpec spec, CsvTable table, ChartShaping shaping, TrendKind kind) =>
-            Offered(spec) && Fits(kind, Points(spec, table, shaping));
+            kind == TrendKind.None ? Offered(spec) : Fit(spec, table, shaping, kind) != null;
 
         public static string WhyNot(ChartSpec spec, CsvTable table, ChartShaping shaping, TrendKind kind)
         {
             if (!Offered(spec) || table == null || kind == TrendKind.None) return null;
             List<(double X, double Y)> points = Points(spec, table, shaping);
-            if (Fits(kind, points)) return null;
             string name = Strings.Get("trend." + kind), x = spec.TitleFor(Role.X), y = spec.TitleFor(Role.Y);
+            if (Fits(kind, points)) return Fit(spec, table, shaping, kind) != null ? null : Strings.Format("trend.noCurve", name);
             int needed = kind == TrendKind.Polynomial ? 3 : 2;
             int distinct = DistinctX(points, needed);
             if (kind == TrendKind.Smooth && points.Count < SmoothFewest) return Strings.Format("trend.needsPoints", name, SmoothFewest);

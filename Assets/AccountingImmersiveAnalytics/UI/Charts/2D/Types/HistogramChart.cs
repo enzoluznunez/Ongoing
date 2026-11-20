@@ -29,7 +29,8 @@ namespace AccountingImmersiveAnalytics.UI.Charts.TwoD.Types
             List<int> rows = Rows(d, true);
 
             (double min, double max) = Range(value, all);
-            NumberAxis xAxis = NumberAxis.For(min, max);
+            bool years = YearLike(value);
+            NumberAxis xAxis = NumberAxis.For(min, max, whole: years);
             int bins = BinsFor(all.Count);
             double width = (xAxis.High - xAxis.Low) / bins;
 
@@ -51,7 +52,7 @@ namespace AccountingImmersiveAnalytics.UI.Charts.TwoD.Types
             NumberAxis yAxis = NumberAxis.For(0d, Math.Max(most, 4), includeZero: true, whole: true);
 
             var xSpec = AxisSpec.Of(d.Spec.TitleFor(Role.Value), xAxis);
-            xSpec.WholeNumbers = YearLike(value);
+            xSpec.WholeNumbers = years;
             d.Axes(xSpec, AxisSpec.Of(d.Spec.Titles.TryGetValue(Role.Y, out string yTitle) ? yTitle : "Count", yAxis));
             if (rows.Count == 0) d.Notice = NothingShown;
 

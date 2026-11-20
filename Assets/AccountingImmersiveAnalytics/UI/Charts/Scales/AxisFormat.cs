@@ -7,6 +7,9 @@ namespace AccountingImmersiveAnalytics.UI.Charts.Scales
 {
     public static class AxisFormat
     {
+        private const int MostUnitDecimals = 2;
+        private const int MostDecimals = 6;
+
         public static string Number(double value, double step) => Number(value, step, NumberStyle.Invariant);
 
         public static string Value(double value) => Value(value, NumberStyle.Invariant);
@@ -19,6 +22,7 @@ namespace AccountingImmersiveAnalytics.UI.Charts.Scales
             {
                 if (magnitude < unit.Threshold) continue;
                 if (unit.Divisor <= 1d) break;
+                if (Decimals(step / unit.Divisor) > MostUnitDecimals) continue;
                 string digits = Plain(value / unit.Divisor, step / unit.Divisor, style, smallestGrouped: 5);
                 bool one = Math.Abs(value / unit.Divisor - 1d) < 1e-9;
                 return (one ? unit.OnePrefix : unit.Prefix) + digits + (one ? unit.OneSuffix : unit.Suffix);
@@ -43,12 +47,23 @@ namespace AccountingImmersiveAnalytics.UI.Charts.Scales
 
         public static string Plain(double value, double step, NumberStyle style, int smallestGrouped = 0)
         {
-            int decimals = 0;
-            double s = Math.Abs(step);
-            while (decimals < 6 && s > 0d && Math.Abs(s * Math.Pow(10d, decimals) - Math.Round(s * Math.Pow(10d, decimals))) > 1e-6) decimals++;
+            int decimals = Decimals(step);
             string text = Math.Round(value, decimals).ToString("F" + decimals, CultureInfo.InvariantCulture);
             if (decimals > 0) text = text.TrimEnd('0').TrimEnd('.');
             return Signed(text, style, grouped: true, smallestGrouped);
+        }
+
+        private static int Decimals(double step)
+        {
+            int decimals = 0;
+            double s = Math.Abs(step);
+            while (decimals < MostDecimals && s > 0d)
+            {
+                double scaled = s * Math.Pow(10d, decimals);
+                if (Math.Round(scaled) > 0d && Math.Abs(scaled - Math.Round(scaled)) <= 1e-6) break;
+                decimals++;
+            }
+            return decimals;
         }
 
         private static string Signed(string ascii, NumberStyle style, bool grouped, int smallestGrouped = 0)

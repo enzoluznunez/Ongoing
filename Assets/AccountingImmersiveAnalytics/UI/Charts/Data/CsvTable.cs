@@ -98,7 +98,7 @@ namespace AccountingImmersiveAnalytics.UI.Charts.Data
             string clean = cell.Replace("$", "").Replace("%", "").Replace(" ", "");
             if (clean.Length > 1 && clean[0] == '(' && clean[clean.Length - 1] == ')') clean = "-" + clean.Substring(1, clean.Length - 2);
             clean = clean.Replace(",", "");
-            return double.TryParse(clean, NumberStyles.Float, CultureInfo.InvariantCulture, out value);
+            return double.TryParse(clean, NumberStyles.Float, CultureInfo.InvariantCulture, out value) && !double.IsNaN(value) && !double.IsInfinity(value);
         }
 
         private static string Cell(List<string> row, int at) => at < row.Count ? row[at].Trim() : "";
