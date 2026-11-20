@@ -25,7 +25,8 @@ namespace AccountingImmersiveAnalytics.Editor
         [MenuItem(MenuPath)]
         private static void Capture()
         {
-            PanelCapture capture = new GameObject("PanelCapture").AddComponent<PanelCapture>();
+            var holder = new GameObject("PanelCapture") { hideFlags = HideFlags.DontSave };
+            PanelCapture capture = holder.AddComponent<PanelCapture>();
             capture.StartCoroutine(capture.Run());
         }
 
@@ -58,9 +59,9 @@ namespace AccountingImmersiveAnalytics.Editor
 
             int width = Mathf.RoundToInt(canvas.rect.width * PixelsPerUnit);
             int height = Mathf.RoundToInt(canvas.rect.height * PixelsPerUnit);
-            var target = new RenderTexture(width, height, 24, RenderTextureFormat.ARGB32);
+            RenderTexture target = RenderTexture.GetTemporary(width, height, 24, RenderTextureFormat.ARGB32);
 
-            var holder = new GameObject("PanelCaptureCamera");
+            var holder = new GameObject("PanelCaptureCamera") { hideFlags = HideFlags.DontSave };
             Camera camera = holder.AddComponent<Camera>();
             camera.orthographic = true;
             camera.orthographicSize = worldHeight * 0.5f * Margin;
@@ -78,7 +79,6 @@ namespace AccountingImmersiveAnalytics.Editor
             RenderTexture.active = target;
             var image = new Texture2D(width, height, TextureFormat.RGB24, false);
             image.ReadPixels(new Rect(0, 0, width, height), 0, 0);
-            image.Apply();
             RenderTexture.active = previous;
 
             File.WriteAllBytes(Path.Combine(OutputDirectory, name + ".png"), image.EncodeToPNG());
@@ -86,8 +86,7 @@ namespace AccountingImmersiveAnalytics.Editor
             Destroy(image);
             camera.targetTexture = null;
             Destroy(holder);
-            target.Release();
-            Destroy(target);
+            RenderTexture.ReleaseTemporary(target);
         }
     }
 }

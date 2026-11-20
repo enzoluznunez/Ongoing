@@ -50,7 +50,6 @@ namespace AccountingImmersiveAnalytics.Assistant.Voice
             foreach (var pair in _pending)
             {
                 PendingCall call = pair.Value;
-                if (call == null) { _pending.TryRemove(pair.Key, out _); continue; }
                 if ((now - call.SentUtc).TotalMilliseconds < StallMilliseconds) continue;
                 if (!_pending.TryRemove(pair.Key, out _)) continue;
 

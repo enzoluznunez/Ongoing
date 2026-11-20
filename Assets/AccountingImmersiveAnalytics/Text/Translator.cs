@@ -20,6 +20,7 @@ namespace AccountingImmersiveAnalytics.Text
         private const int PumpDelayMilliseconds = 250;
         private const int SaveDelayMilliseconds = 2000;
         private const string Folder = "translations-v2";
+        private const string OldFolder = "translations";
 
         public static event Action Changed;
 
@@ -72,39 +73,19 @@ namespace AccountingImmersiveAnalytics.Text
         private static string _folder;
         private static bool _pumping;
 
-        private static string Target => Language.Current;
-
         public static int Misses { get; private set; }
 
         public static int Lookups { get; private set; }
 
         public static string Get(string original, string source = Language.English, string context = null)
         {
-            string target = Target;
-            if (Lookup(original, source, target, out string translated)) return translated;
-
-            EnsureFolder();
-            if (!Asking.Contains((target, original)))
-            {
-                if (!Wanted.TryGetValue(target, out Queue queue)) Wanted[target] = queue = new Queue();
-                if (queue.Add(new Item(original, source, context))) StartPump();
-            }
-            return original;
-        }
-
-        public static string Peek(string original, string source)
-        {
-            Lookup(original, source, Target, out string translated);
-            return translated;
-        }
-
-        private static bool Lookup(string original, string source, string target, out string translated)
-        {
+            string target = Language.Current;
             if (!string.IsNullOrEmpty(original) && HasLetters(original)) Lookups++;
-            if (TryCached(original, source, target, out translated)) return true;
+            if (TryCached(original, source, target, out string translated)) return translated;
+
             Misses++;
-            translated = original;
-            return false;
+            if (!Asking.Contains((target, original)) && QueueFor(target).Add(new Item(original, source, context))) StartPump();
+            return original;
         }
 
         public static bool TryCached(string original, string source, string target, out string translated)
@@ -115,14 +96,25 @@ namespace AccountingImmersiveAnalytics.Text
                    known.TryGetValue(original, out translated);
         }
 
+        private static Queue QueueFor(string target)
+        {
+            if (!Wanted.TryGetValue(target, out Queue queue)) Wanted[target] = queue = new Queue();
+            return queue;
+        }
+
+        private static Dictionary<string, string> CacheFor(string target)
+        {
+            if (!Cache.TryGetValue(target, out Dictionary<string, string> known)) Cache[target] = known = new Dictionary<string, string>();
+            return known;
+        }
+
         public static async Task Prioritize(string target, string original, string source = Language.English)
         {
-            EnsureFolder();
             if (TryCached(original, source, target, out _) || !Asking.Add((target, original))) return;
             await Request(target, source, null, new List<string> { original });
         }
 
-        public static async Task Fetch(string target)
+        private static async Task Fetch(string target)
         {
             if (!Fetching.Add(target)) return;
             try
@@ -167,7 +159,7 @@ namespace AccountingImmersiveAnalytics.Text
                 Debug.LogWarning($"[Translator] {batch.Count} texts into {Language.NameOf(target)} did not come back " +
                                  $"({(translations == null ? "no answer" : $"{translations.Count} answers")}); retrying in {RetrySeconds:F0} s.");
                 RetryAt[target] = Time.realtimeSinceStartup + RetrySeconds;
-                if (!Wanted.TryGetValue(target, out Queue queue)) Wanted[target] = queue = new Queue();
+                Queue queue = QueueFor(target);
                 foreach (string original in batch) queue.Add(new Item(original, source, context));
                 return;
             }
@@ -183,8 +175,7 @@ namespace AccountingImmersiveAnalytics.Text
                 }
                 if (Retried.Add((target, original)))
                 {
-                    if (!Wanted.TryGetValue(target, out Queue queue)) Wanted[target] = queue = new Queue();
-                    queue.Add(new Item(original, source, context));
+                    QueueFor(target).Add(new Item(original, source, context));
                     StartPump();
                     continue;
                 }
@@ -231,8 +222,7 @@ namespace AccountingImmersiveAnalytics.Text
                 ? "Keep numbers, units and symbols. "
                 : $"Keep every number's value, unit and symbol, but write numbers the way {Language.NameOf(target)} readers usually do, " +
                   "with that language's decimal and thousands separators" +
-                  (NumberFormats.ByLanguage.TryGetValue(target, out var style) && style.Digits != null
-                      ? $" and its own digits ({style.Digits})" : "") + ". ") +
+                  (Numbers.StyleOf(target).Digits is string digits ? $" and its own digits ({digits})" : "") + ". ") +
             "Some items carry markers written like ⟦5⟧ and ⟦/⟧: keep every marker, unchanged, around the " +
             "words that translate the words it surrounds, and add none. " +
             "Markers written like ⟦#2⟧ stand for text that must not change, such as code, a web address or a formula: " +
@@ -269,48 +259,41 @@ namespace AccountingImmersiveAnalytics.Text
             }
         }
 
-        public static bool NeedsTranslation(string original, string source, string target) =>
+        private static bool NeedsTranslation(string original, string source, string target) =>
             !string.IsNullOrEmpty(original) && !Language.Same(source, target) && HasLetters(original) && !Numbers.IsNumber(original);
 
-        public static void Store(string target, IReadOnlyDictionary<string, string> translations)
+        private static void Store(string target, IReadOnlyDictionary<string, string> translations)
         {
             if (translations == null || translations.Count == 0) return;
-            if (!Cache.TryGetValue(target, out Dictionary<string, string> known))
-                Cache[target] = known = new Dictionary<string, string>();
-
+            Dictionary<string, string> known = CacheFor(target);
             foreach (KeyValuePair<string, string> pair in translations)
                 if (!string.IsNullOrEmpty(pair.Value)) known[pair.Key] = pair.Value;
             if (target == Language.Current) AnnounceChange();
             SaveSoon(target);
         }
 
-        private static readonly string[] OldFolders = { "translations" };
+        private static string FolderPath => _folder ??= PrepareFolder();
 
-        private static void EnsureFolder()
+        private static string PrepareFolder()
         {
-            if (_folder != null) return;
-            _folder = Path.Combine(Application.persistentDataPath, Folder);
-            foreach (string old in OldFolders)
+            string old = Path.Combine(Application.persistentDataPath, OldFolder);
+            try
             {
-                string path = Path.Combine(Application.persistentDataPath, old);
-                try
-                {
-                    if (Directory.Exists(path)) Directory.Delete(path, true);
-                }
-                catch (Exception e)
-                {
-                    Debug.LogWarning($"[Translator] Could not delete the old translation cache {path}: {e.Message}");
-                }
+                if (Directory.Exists(old)) Directory.Delete(old, true);
             }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[Translator] Could not delete the old translation cache {old}: {e.Message}");
+            }
+            return Path.Combine(Application.persistentDataPath, Folder);
         }
 
-        private static string FileOf(string target) => _folder == null ? null : Path.Combine(_folder, target + ".json");
+        private static string FileOf(string target) => Path.Combine(FolderPath, target + ".json");
 
         private static async Task LoadFromDisk(string target)
         {
             if (!LoadedFromDisk.Add(target)) return;
             string file = FileOf(target);
-            if (file == null) return;
             Dictionary<string, string> saved = await Task.Run(() =>
             {
                 try
@@ -323,7 +306,7 @@ namespace AccountingImmersiveAnalytics.Text
                 }
             });
             if (saved == null || saved.Count == 0) return;
-            if (!Cache.TryGetValue(target, out Dictionary<string, string> known)) Cache[target] = known = new Dictionary<string, string>();
+            Dictionary<string, string> known = CacheFor(target);
             foreach (KeyValuePair<string, string> pair in saved)
                 if (!known.ContainsKey(pair.Key)) known[pair.Key] = pair.Value;
             if (target == Language.Current) AnnounceChange();
@@ -331,8 +314,8 @@ namespace AccountingImmersiveAnalytics.Text
 
         private static async void SaveSoon(string target)
         {
+            if (!Saving.Add(target)) return;
             string file = FileOf(target);
-            if (file == null || !Saving.Add(target)) return;
             try
             {
                 await Task.Delay(SaveDelayMilliseconds);

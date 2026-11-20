@@ -55,7 +55,7 @@ namespace AccountingImmersiveAnalytics.UI.Charts.Tools
 
         private void Select(ToolType next)
         {
-            if (ActivityFeed.UserDriven) AssistantTurn.UserTookControl();
+            AssistantTurn.UserActed();
             if (next == SelectedTool) return;
 
             SelectedTool = next;

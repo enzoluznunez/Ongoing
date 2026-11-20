@@ -22,6 +22,11 @@ namespace AccountingImmersiveAnalytics.Hands
 
         public IReadOnlyList<PointableCanvas> Canvases => _canvases;
 
+        private void Start()
+        {
+            _inspector = new DataInspector(transform);
+        }
+
         private void Update()
         {
             RescanCanvases();
@@ -46,7 +51,6 @@ namespace AccountingImmersiveAnalytics.Hands
             foreach (KeyValuePair<IHand, HandRay> entry in _rays)
                 if (!_tracked.Contains(entry.Key)) entry.Value.Lose();
 
-            if (_inspector == null) _inspector = new DataInspector(transform);
             _inspector.Tick(_rays.Values);
         }
 
@@ -65,6 +69,11 @@ namespace AccountingImmersiveAnalytics.Hands
         {
             foreach (HandRay ray in _rays.Values) ray.Lose();
             _inspector?.Clear();
+        }
+
+        private void OnDestroy()
+        {
+            _inspector?.Dispose();
         }
     }
 }

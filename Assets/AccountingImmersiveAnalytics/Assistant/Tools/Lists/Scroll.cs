@@ -14,7 +14,7 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools.Lists
             [Doc("The scrolling list, named as for Jump: 'document', 'charts', 'edits', 'filter <column>' or 'key <title>'.")]
             public string list;
             [Doc("True to start sliding down the list, false to stop it. Defaults to true."), DefaultsTo(true), Optional]
-            public bool? on;
+            public bool on;
         }
 
         public override FunctionDeclaration Declaration => new FunctionDeclaration
@@ -34,9 +34,8 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools.Lists
                 result["error"] = $"No scrolling list called '{args.list}' is on screen. Scrolling lists now: {ListMotion.Names()}.";
                 return;
             }
-            bool on = args.on ?? true;
             result["list"] = motion.Name;
-            if (on)
+            if (args.on)
             {
                 motion.StartAuto();
                 int at = motion.Current;
@@ -52,7 +51,7 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools.Lists
                 if (!was) result["note"] = "It was not auto-scrolling.";
                 else ActivityFeed.Record($"stopped the auto-scroll of the {motion.Name} list");
             }
-            result["auto"] = on;
+            result["auto"] = args.on;
         }
     }
 }

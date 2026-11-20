@@ -63,8 +63,7 @@ namespace AccountingImmersiveAnalytics.UI.Charts.TwoD.Types
                     centre.x, top + big + Style.SmallPad + Style.Ascent(Style.SmallText), Align.Middle);
             }
 
-            d.Key.Add(KeySection.Groups(d.Spec.TitleFor(Role.Category), Names(category, categories), KeyShape.Box,
-                i => ChartStyle.Group(ColourOf(category, allCategories, categories, categories[i]))));
+            GroupKey(d, Role.Category, category, allCategories, categories, KeyShape.Box);
             d.Finish();
         }
     }

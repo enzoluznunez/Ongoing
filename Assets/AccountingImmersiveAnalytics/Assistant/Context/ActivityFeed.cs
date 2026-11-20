@@ -7,19 +7,7 @@ namespace AccountingImmersiveAnalytics.Assistant.Context
     {
         private const int MaxUserQueue = 40;
 
-        private static int _assistantDepth;
-
-        public static bool InAssistantCall
-        {
-            get => _assistantDepth > 0;
-            set
-            {
-                if (value) _assistantDepth++;
-                else if (_assistantDepth > 0) _assistantDepth--;
-            }
-        }
-
-        public static bool UserDriven => !InAssistantCall;
+        public static bool InAssistantCall { get; set; }
 
         private static readonly List<string> _assistantBatch = new List<string>();
         private static readonly List<string> _userQueue = new List<string>();
@@ -76,7 +64,7 @@ namespace AccountingImmersiveAnalytics.Assistant.Context
         {
             _userQueue.Clear();
             _assistantBatch.Clear();
-            _assistantDepth = 0;
+            InAssistantCall = false;
             _snapshotWanted = false;
             _pointing = null;
         }

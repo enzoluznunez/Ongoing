@@ -115,22 +115,21 @@ namespace AccountingImmersiveAnalytics.UI.Helpers
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetStatics()
         {
-            foreach (KeyValuePair<int, Sprite> kv in _sprites)
-            {
-                if (kv.Value == null) continue;
-                Texture2D stale = kv.Value.texture;
-                Object.Destroy(kv.Value);
-                if (stale != null) Object.Destroy(stale);
-            }
+            Release(_sprites.Values);
             _sprites.Clear();
-            foreach (KeyValuePair<(int, int), Sprite> kv in _rings)
+            Release(_rings.Values);
+            _rings.Clear();
+        }
+
+        private static void Release(IEnumerable<Sprite> sprites)
+        {
+            foreach (Sprite sprite in sprites)
             {
-                if (kv.Value == null) continue;
-                Texture2D stale = kv.Value.texture;
-                Object.Destroy(kv.Value);
+                if (sprite == null) continue;
+                Texture2D stale = sprite.texture;
+                Object.Destroy(sprite);
                 if (stale != null) Object.Destroy(stale);
             }
-            _rings.Clear();
         }
     }
 }

@@ -28,6 +28,7 @@ namespace AccountingImmersiveAnalytics.UI.Charts.View
         private readonly ScrollRect _scroll;
         private readonly List<Slot> _slots = new List<Slot>();
         private RectTransform _status;
+        private ChartText _statusText;
         private string _statusMessage;
         private ChartEntry _pinned;
 
@@ -114,7 +115,7 @@ namespace AccountingImmersiveAnalytics.UI.Charts.View
             float height = slot.Card.Height * ChartStyle.PreviewScale;
             RectTransform rt = DesignRect.Place((RectTransform)slot.Outline.transform, 0f, 0f, Width, height);
             rt.SetAsLastSibling();
-            CardOutline.Draw(slot.Outline, Width, height, Style.LargeRadius * ChartStyle.PreviewScale);
+            CardOutline.Draw(slot.Outline, Width, height, ChartStyle.PreviewRadius);
             slot.Outline.enabled = _pinned != null && slot.Card.Entry == _pinned;
         }
 
@@ -125,6 +126,7 @@ namespace AccountingImmersiveAnalytics.UI.Charts.View
             {
                 if (_status != null) UnityEngine.Object.Destroy(_status.gameObject);
                 _status = null;
+                _statusText = null;
                 return;
             }
             if (_status == null)
@@ -142,10 +144,12 @@ namespace AccountingImmersiveAnalytics.UI.Charts.View
             back.Box(new Rect(0f, 0f, ChartStyle.CardWidth, height), Style.Card, Style.LargeRadius);
             back.Commit();
             BackFace.Add(inner, Style.LargeRadius);
-            var text = new ChartText(DesignRect.Place(DesignRect.Child(inner, "Text"), 0f, 0f, ChartStyle.CardWidth, height));
+            RectTransform words = DesignRect.Place(DesignRect.Child(inner, "Text"), 0f, 0f, ChartStyle.CardWidth, height);
+            if (_statusText == null) _statusText = new ChartText(words);
+            ChartText text = _statusText;
             text.Begin();
             text.Put(ChartText.Clip(ChartText.Shown(message).TrimEnd('.'), Style.MediumText, ChartStyle.CardWidth - Style.LargePad * 2f), Style.MediumText,
-                Style.BoldWeight, ChartStyle.CardWidth * 0.5f, height * 0.5f + Style.Ascent(Style.MediumText) * 0.5f, Align.Middle);
+                Style.BoldWeight, ChartStyle.CardWidth * 0.5f, Style.CentredBaseline(height * 0.5f, Style.MediumText), Align.Middle);
             text.End();
         }
     }

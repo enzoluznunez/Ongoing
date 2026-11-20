@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using AccountingImmersiveAnalytics.App;
 using AccountingImmersiveAnalytics.Assistant.Live;
 using AccountingImmersiveAnalytics.Assistant.Tools.Arguments;
 using AccountingImmersiveAnalytics.UI.Charts;
@@ -17,7 +16,7 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools.Chart
         public class Args
         {
             [Doc("false switches the button off, closing the Key panel, as pressing it again does. Defaults to true."), DefaultsTo(true), Optional]
-            public bool? on;
+            public bool on;
         }
 
         public override FunctionDeclaration Declaration => new FunctionDeclaration
@@ -31,20 +30,14 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools.Chart
         protected override void Run(Args args, Dictionary<string, object> result)
         {
             if (SwitchedOff(ToolType.Key, args.on, result)) return;
-            ChartManager charts = Scene.Charts;
-            ChartCard card = charts != null ? charts.PinnedCard : null;
-            if (card == null)
-            {
-                Refuse(result, "pinned chart", "The Key button is beside a pinned chart, and none is pinned. Pin one with CallPin first.");
-                return;
-            }
-            if (card.Key.Count == 0)
+            if (!TryPinnedChart(result, "The Key button is beside a pinned chart, and none is pinned.", out ChartManager charts)) return;
+            ChartCard card = charts.PinnedCard;
+            if (card == null || card.Key.Count == 0)
             {
                 Refuse(result, "chart with a key", $"\"{charts.Pinned.Title}\" has no key: nothing on it needs explaining. Say so to the user.");
                 return;
             }
             if (!EnsureToolSelected(ToolType.Key, result)) return;
-            result["on"] = true;
             result["chart"] = charts.Pinned.Title;
 
             var sections = new List<object>();

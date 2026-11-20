@@ -34,7 +34,6 @@ namespace AccountingImmersiveAnalytics.UI.Panels
 
         public static bool IsDocked(Panel panel) => _docked.Contains(panel);
 
-        public static bool IsSliding => _slide != null;
 
         public static void Open(Panel panel, Action reveal)
         {
@@ -72,8 +71,7 @@ namespace AccountingImmersiveAnalytics.UI.Panels
         {
             if (_slide != null || !_targets.TryGetValue(panel, out Pose pose)) return;
             Transform t = panel.transform;
-            if ((t.position - pose.position).sqrMagnitude > 1e-6f || Quaternion.Angle(t.rotation, pose.rotation) > 0.1f)
-                Undock(panel);
+            if (Moved(t, pose)) Undock(panel);
         }
 
         private static void UndockMoved()
@@ -147,22 +145,23 @@ namespace AccountingImmersiveAnalytics.UI.Panels
             Vector3 now = CameraRig.Flatten(t.position - _head, _forward);
             Vector3 then = CameraRig.Flatten(goal.position - _head, _forward);
             Quaternion turn = Quaternion.AngleAxis(Vector3.SignedAngle(then, now, Vector3.up), Vector3.up);
-            var turned = new Dictionary<Panel, Pose>();
-            foreach (KeyValuePair<Panel, Pose> target in _targets)
-                turned[target.Key] = new Pose(_head + turn * (target.Value.position - _head), turn * target.Value.rotation);
-            turned[held] = new Pose(t.position, t.rotation);
-            _targets.Clear();
-            foreach (KeyValuePair<Panel, Pose> target in turned) _targets[target.Key] = target.Value;
+            foreach (Panel panel in new List<Panel>(_targets.Keys))
+            {
+                Pose target = _targets[panel];
+                _targets[panel] = new Pose(_head + turn * (target.position - _head), turn * target.rotation);
+            }
+            _targets[held] = new Pose(t.position, t.rotation);
         }
+
+        private static bool Moved(Transform t, Pose pose) =>
+            (t.position - pose.position).sqrMagnitude > 1e-6f || Quaternion.Angle(t.rotation, pose.rotation) > 0.1f;
 
         private static bool NeedsSlide(Panel arriving)
         {
             foreach (KeyValuePair<Panel, Pose> entry in _targets)
             {
                 if (entry.Key == arriving || entry.Key == null) continue;
-                Transform t = entry.Key.transform;
-                if ((t.position - entry.Value.position).sqrMagnitude > 1e-6f) return true;
-                if (Quaternion.Angle(t.rotation, entry.Value.rotation) > 0.1f) return true;
+                if (Moved(entry.Key.transform, entry.Value)) return true;
             }
             return false;
         }

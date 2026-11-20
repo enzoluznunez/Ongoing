@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using AccountingImmersiveAnalytics.App;
-using AccountingImmersiveAnalytics.UI.Charts.Tools;
 using AccountingImmersiveAnalytics.UI.Charts.TwoD.View;
 using AccountingImmersiveAnalytics.UI.Charts.View;
 using AccountingImmersiveAnalytics.UI.Interactions;
@@ -43,7 +42,6 @@ namespace AccountingImmersiveAnalytics.Hands
         public bool HasMark { get; private set; }
         public ChartHit Mark { get; private set; }
         public bool PinchedMark { get; private set; }
-        public Vector3 HandPoint { get; private set; }
         public bool PointsAtCanvas => _hoveredCanvas != null || _hold != Hold.None;
         public Vector3 CanvasPoint => _end;
 
@@ -68,7 +66,6 @@ namespace AccountingImmersiveAnalytics.Hands
             }
 
             Vector3 origin = pose.position;
-            HandPoint = origin;
             Vector3 direction = pose.forward;
             _aim = pose.rotation;
             bool pinching = _hand.GetIndexFingerIsPinching();
@@ -81,9 +78,9 @@ namespace AccountingImmersiveAnalytics.Hands
                 return;
             }
 
-            if (TryFingerMark())
+            if (TryFingerMark(out ChartHit fingerHit))
             {
-                PinchedMark = pinchStarted;
+                SetMark(fingerHit, pinchStarted);
                 StopHoveringCanvas();
                 _visual.Hide();
                 return;
@@ -100,27 +97,25 @@ namespace AccountingImmersiveAnalytics.Hands
 
             HoverCanvas(canvas, canvasPoint);
             _end = canvasPoint;
-            if (!ToolSelected && ChartHits.AtPoint(canvasPoint, out ChartHit hit))
-            {
-                HasMark = true;
-                Mark = hit;
-                PinchedMark = pinchStarted;
-            }
+            if (!Scene.ToolSelected && ChartHits.AtPoint(canvasPoint, out ChartHit hit)) SetMark(hit, pinchStarted);
             if (pinchStarted) PressCanvas(canvas, canvasPoint, Vector3.Distance(origin, canvasPoint));
 
             _visual.Show(origin, _end, _hold != Hold.None);
         }
 
-        private bool TryFingerMark()
+        private bool TryFingerMark(out ChartHit hit)
         {
-            if (ToolSelected || _poke == null || !_poke.isActiveAndEnabled) return false;
+            hit = default;
+            if (Scene.ToolSelected || _poke == null || !_poke.isActiveAndEnabled) return false;
             if (_poke.State != InteractorState.Normal) return false;
-            if (!ChartHits.Near(_poke.Origin, PokeRule.HoverDepth, out ChartHit hit)) return false;
-            HandPoint = _poke.Origin;
+            return ChartHits.Near(_poke.Origin, PokeRule.HoverDepth, out hit);
+        }
 
+        private void SetMark(ChartHit hit, bool pinched)
+        {
             HasMark = true;
             Mark = hit;
-            return true;
+            PinchedMark = pinched;
         }
 
         private void FindTarget(Vector3 origin, Vector3 direction, out PointableCanvas canvas, out Vector3 canvasPoint)
@@ -131,8 +126,7 @@ namespace AccountingImmersiveAnalytics.Hands
             IReadOnlyList<PointableCanvas> canvases = _owner.Canvases;
             for (int i = 0; i < canvases.Count; i++)
             {
-                if (!TryHitCanvas(canvases[i], origin, direction, out float distance, out Vector3 point)) continue;
-                if (distance >= nearest) continue;
+                if (!TryHitCanvas(canvases[i], origin, direction, nearest, out float distance, out Vector3 point)) continue;
                 nearest = distance;
                 canvas = canvases[i];
                 canvasPoint = point;
@@ -140,16 +134,7 @@ namespace AccountingImmersiveAnalytics.Hands
             if (canvas != null && nearest < NearestUse) canvas = null;
         }
 
-        public static bool ToolSelected
-        {
-            get
-            {
-                ToolManager tools = Scene.Tools;
-                return tools != null && tools.SelectedTool != ToolType.None;
-            }
-        }
-
-        private static bool TryHitCanvas(PointableCanvas pointable, Vector3 origin, Vector3 direction,
+        private static bool TryHitCanvas(PointableCanvas pointable, Vector3 origin, Vector3 direction, float nearest,
             out float distance, out Vector3 point)
         {
             distance = 0f;
@@ -162,11 +147,12 @@ namespace AccountingImmersiveAnalytics.Hands
             RectTransform rect = canvas.transform as RectTransform;
             if (rect == null) return false;
 
-            float facing = Vector3.Dot(direction, rect.forward);
+            Vector3 forward = rect.forward;
+            float facing = Vector3.Dot(direction, forward);
             if (facing <= 1e-4f) return false;
 
-            distance = Vector3.Dot(rect.position - origin, rect.forward) / facing;
-            if (distance <= 0f || distance > MaxDistance) return false;
+            distance = Vector3.Dot(rect.position - origin, forward) / facing;
+            if (distance <= 0f || distance >= nearest) return false;
 
             point = origin + direction * distance;
             Vector2 local = rect.InverseTransformPoint(point);
@@ -184,8 +170,7 @@ namespace AccountingImmersiveAnalytics.Hands
             {
                 Selectable control = ControlBuffer[i];
                 if (!control.IsInteractable()) continue;
-                RectTransform rect = control.transform as RectTransform;
-                if (rect != null && rect.rect.Contains(rect.InverseTransformPoint(point))) return true;
+                if (Contains(control.transform as RectTransform, point)) return true;
             }
             return false;
         }
@@ -194,10 +179,7 @@ namespace AccountingImmersiveAnalytics.Hands
         {
             canvas.GetComponentsInChildren(false, SliderBuffer);
             for (int i = 0; i < SliderBuffer.Count; i++)
-            {
-                RectTransform rect = SliderBuffer[i].transform as RectTransform;
-                if (rect != null && rect.rect.Contains(rect.InverseTransformPoint(point))) return true;
-            }
+                if (Contains(SliderBuffer[i].transform as RectTransform, point)) return true;
             return false;
         }
 
@@ -209,10 +191,13 @@ namespace AccountingImmersiveAnalytics.Hands
                 ScrollRect scroll = ScrollBuffer[i];
                 if (!scroll.isActiveAndEnabled) continue;
                 RectTransform rect = scroll.viewport != null ? scroll.viewport : scroll.transform as RectTransform;
-                if (rect != null && rect.rect.Contains(rect.InverseTransformPoint(point))) return true;
+                if (Contains(rect, point)) return true;
             }
             return false;
         }
+
+        private static bool Contains(RectTransform rect, Vector3 point) =>
+            rect != null && rect.rect.Contains(rect.InverseTransformPoint(point));
 
         private void HoverCanvas(PointableCanvas canvas, Vector3 point)
         {
@@ -239,8 +224,7 @@ namespace AccountingImmersiveAnalytics.Hands
             Panel owner = chart == null ? canvas.GetComponentInParent<Panel>() : null;
             bool armed = owner != null ? owner.GrabArmed : chart != null && chart.Armed;
             bool exempt = owner != null ? owner.IsPlacementIcon(point) : chart != null && chart.IsExempt(point);
-            bool takes = IsOnControl(canvas.Canvas, point) || IsOnSlider(canvas.Canvas, point) || IsOnScroll(canvas.Canvas, point) ||
-                         (owner != null && !armed && owner.TakesPress(point));
+            bool takes = IsOnControl(canvas.Canvas, point) || IsOnSlider(canvas.Canvas, point) || IsOnScroll(canvas.Canvas, point);
             if (takes && (!armed || exempt))
             {
                 _hold = Hold.Canvas;
@@ -288,13 +272,13 @@ namespace AccountingImmersiveAnalytics.Hands
             if (canvas == null || !canvas.enabled)
             {
                 if (_heldCanvas != null) Send(_heldCanvas, PointerEventType.Cancel, _end);
-                _hold = Hold.None;
-                _heldCanvas = null;
                 _hoveredCanvas = null;
+                EndHold();
                 return;
             }
 
-            Plane plane = new Plane(canvas.transform.forward, canvas.transform.position);
+            Transform frame = canvas.transform;
+            Plane plane = new Plane(frame.forward, frame.position);
             Ray ray = new Ray(origin, direction);
             if (plane.Raycast(ray, out float distance) && distance <= MaxDistance)
             {
@@ -304,31 +288,30 @@ namespace AccountingImmersiveAnalytics.Hands
             if (pinching) return;
 
             Send(_heldCanvas, PointerEventType.Unselect, _end);
-            _hold = Hold.None;
-            _heldCanvas = null;
+            EndHold();
         }
 
         private void ContinueCarry(Vector3 origin, Vector3 direction, bool pinching)
         {
             if (_carried == null || !_carried.isActiveAndEnabled)
             {
-                _hold = Hold.None;
-                _carried = null;
+                EndHold();
                 return;
             }
 
             _end = origin + direction * _carryDistance;
             Send(_carried, PointerEventType.Move, _end);
             if (pinching) return;
-            EndGrab();
-        }
-
-        private void EndGrab()
-        {
             Send(_carried, PointerEventType.Unselect, _end);
             Send(_carried, PointerEventType.Unhover, _end);
-            _carried = null;
+            EndHold();
+        }
+
+        private void EndHold()
+        {
             _hold = Hold.None;
+            _heldCanvas = null;
+            _carried = null;
         }
 
         public void Lose()
@@ -349,9 +332,7 @@ namespace AccountingImmersiveAnalytics.Hands
                     break;
             }
 
-            _hold = Hold.None;
-            _heldCanvas = null;
-            _carried = null;
+            EndHold();
             StopHoveringCanvas();
         }
 

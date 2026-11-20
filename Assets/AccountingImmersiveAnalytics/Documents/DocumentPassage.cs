@@ -4,6 +4,5 @@ namespace AccountingImmersiveAnalytics.Documents
     {
         public string Text;
         public int Page;
-        public double Top;
     }
 }

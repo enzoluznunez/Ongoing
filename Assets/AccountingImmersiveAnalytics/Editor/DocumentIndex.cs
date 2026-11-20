@@ -11,8 +11,9 @@ namespace AccountingImmersiveAnalytics.Editor
 {
     public sealed class DocumentIndex : AssetPostprocessor, IPreprocessBuildWithReport
     {
+        private const string StreamingAsset = "Assets/StreamingAssets/";
+        private const string FolderAsset = StreamingAsset + DocumentLibrary.Folder + "/";
         private static string FolderPath => Path.Combine(Application.streamingAssetsPath, DocumentLibrary.Folder);
-        private static string FolderAsset => "Assets/StreamingAssets/" + DocumentLibrary.Folder + "/";
 
         public int callbackOrder => 0;
 
@@ -31,14 +32,14 @@ namespace AccountingImmersiveAnalytics.Editor
         [MenuItem("Tools/Documents/Write Document Index")]
         public static void Write()
         {
-            if (!Directory.Exists(FolderPath)) Directory.CreateDirectory(FolderPath);
+            Directory.CreateDirectory(FolderPath);
             string[] names = Directory.GetFiles(FolderPath).Select(Path.GetFileName).Where(DocumentLibrary.Listed)
                 .OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToArray();
             string path = Path.Combine(Application.streamingAssetsPath, DocumentLibrary.IndexFile);
             string json = "[\n" + string.Join(",\n", names.Select(Quote)) + "\n]";
             if (File.Exists(path) && File.ReadAllText(path) == json) return;
             File.WriteAllText(path, json);
-            AssetDatabase.ImportAsset("Assets/StreamingAssets/" + DocumentLibrary.IndexFile);
+            AssetDatabase.ImportAsset(StreamingAsset + DocumentLibrary.IndexFile);
         }
     }
 }

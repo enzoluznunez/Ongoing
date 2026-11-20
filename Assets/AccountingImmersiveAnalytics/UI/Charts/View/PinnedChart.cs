@@ -124,12 +124,9 @@ namespace AccountingImmersiveAnalytics.UI.Charts.View
         {
             if (Card == null || _tools == null) return;
             ToolType selected = _tools.SelectedTool;
-            if (IsOn(tool, selected)) _tools.DeselectTool();
+            if (tool == selected) _tools.DeselectTool();
             else if (selected == ToolType.None) _tools.SelectTool(tool);
         }
-
-        private static bool IsOn(ToolType button, ToolType selected) =>
-            button == selected;
 
         private void OnToolChanged(ToolType selected)
         {
@@ -193,7 +190,7 @@ namespace AccountingImmersiveAnalytics.UI.Charts.View
             {
                 ToolType tool = Tools[i].Tool;
                 ButtonFactory.Handle button = _buttons[i];
-                bool on = IsOn(tool, selected);
+                bool on = tool == selected;
                 bool offered = ToolManager.Offered(tool, spec, Card);
                 bool free = idle || on;
                 ButtonFactory.SetSelected(button, on);

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using AccountingImmersiveAnalytics.App;
 using AccountingImmersiveAnalytics.Assistant.Live;
@@ -14,7 +15,7 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools.Chart
         {
             [Doc("How many edits to undo, one at a time. Defaults to 1.")]
             [Limits(1, 1000), DefaultsTo(1), Optional]
-            public int? count;
+            public int count;
             [Doc("The kind of edit you expect to be newest. Only checked for a single undo.")]
             [Values("move", "turn", "resize", "filter", "sort", "pin", "trend"), Optional]
             public string kind;
@@ -62,7 +63,7 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools.Chart
         protected override void Run(Args args, Dictionary<string, object> result)
         {
             var controller = Scene.Tools;
-            if (controller == null) { result["error"] = "Tool controller not found in scene."; return; }
+            if (controller == null) { result["error"] = "The tool manager was not found in the scene."; return; }
 
             var top = ChartManager.ActiveEdits.Peek();
             if (top == null)
@@ -73,12 +74,11 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools.Chart
                 return;
             }
 
-            int count = 1;
-            if (args.count.HasValue) count = args.count.Value < 1 ? 1 : args.count.Value;
+            int count = Math.Max(1, args.count);
 
             if (args.kind != null)
             {
-                string requested = args.kind.Trim().ToLowerInvariant();
+                string requested = args.kind;
                 if (Edit.KindName(top.Kind) != requested)
                 {
                     Refuse(result, "matching newest edit",
@@ -98,14 +98,14 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools.Chart
             }
 
             result["undone"] = did;
-            if (did < count)
-                result["note"] = $"Only {did} of the {count} you asked for were on the timeline; the rest never existed.";
             if (failed > 0)
             {
                 result["failed"] = failed;
                 result["note"] = failed + " edit(s) could not be reverted because they no longer matched the scene; " +
                                  "they were dropped from the history. Tell the user rather than reporting success.";
             }
+            else if (did < count)
+                result["note"] = $"Only {did} of the {count} you asked for were on the timeline; the rest never existed.";
             result["remaining"] = ChartManager.ActiveEdits.Count;
             var next = ChartManager.ActiveEdits.Peek();
             if (next != null) result["nextUndo"] = Edit.KindName(next.Kind);

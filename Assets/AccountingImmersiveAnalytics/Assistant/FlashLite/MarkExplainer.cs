@@ -19,15 +19,14 @@ namespace AccountingImmersiveAnalytics.Assistant.FlashLite
         private static readonly Dictionary<string, List<Action<Explanation?>>> Waiting =
             new Dictionary<string, List<Action<Explanation?>>>();
 
-        public static bool Reached => FlashLiteClient.Reached;
+        private static readonly JObject AnswerSchema = FlashLiteClient.Schema(("lines", "STRING_LIST"));
 
         public static bool TryCached(ChartEntry entry, MarkInfo mark, out Explanation explanation) =>
             Cache.TryGetValue(KeyFor(entry, mark), out explanation);
 
-        public static bool IsWriting(ChartEntry entry, MarkInfo mark) =>
-            Waiting.Count > 0 && Waiting.ContainsKey(KeyFor(entry, mark));
+        public static bool IsWriting(string key) => Waiting.ContainsKey(key);
 
-        public static void Request(ChartEntry entry, MarkInfo mark, MarkInfo detail, Action<Explanation?> done)
+        public static void Request(ChartEntry entry, MarkInfo mark, Action<Explanation?> done)
         {
             string key = KeyFor(entry, mark);
             if (Cache.TryGetValue(key, out Explanation cached))
@@ -42,7 +41,7 @@ namespace AccountingImmersiveAnalytics.Assistant.FlashLite
             }
 
             Waiting[key] = new List<Action<Explanation?>> { done };
-            Ask(key, entry, detail);
+            Ask(key, entry, mark);
         }
 
         private static async void Ask(string key, ChartEntry entry, MarkInfo detail)
@@ -50,8 +49,7 @@ namespace AccountingImmersiveAnalytics.Assistant.FlashLite
             Explanation? result = null;
             try
             {
-                JObject answer = await FlashLiteClient.AskOnce(Instructions(), Context(entry, detail),
-                    FlashLiteClient.Schema(("lines", "STRING_LIST")));
+                JObject answer = await FlashLiteClient.AskOnce(Instructions, Context(entry, detail), AnswerSchema);
                 result = Read(answer, detail.Rows.Count);
             }
             catch (Exception e)
@@ -64,7 +62,7 @@ namespace AccountingImmersiveAnalytics.Assistant.FlashLite
             }
         }
 
-        private static string KeyFor(ChartEntry entry, MarkInfo mark) =>
+        public static string KeyFor(ChartEntry entry, MarkInfo mark) =>
             $"{entry.File}|{entry.Spec.Title}|{entry.Spec.Describe()}|{entry.Shaping.Summary(entry.Spec)}|{mark?.Describe()}";
 
         private static void Finish(string key, Explanation? result)
@@ -88,7 +86,7 @@ namespace AccountingImmersiveAnalytics.Assistant.FlashLite
             return new Explanation { Lines = kept };
         }
 
-        private static string Instructions() =>
+        private const string Instructions =
             "You are the Assistant in a mixed-reality data app. The user pinched one shape in a chart to ask " +
             "what it means. Its tooltip has rows, each a field name and its value. Write 'lines': exactly one line per row, " +
             "in the same order, for someone who does not read charts well.\n" +
@@ -100,7 +98,7 @@ namespace AccountingImmersiveAnalytics.Assistant.FlashLite
             "Work any figure out only from the data given, check it, and round it to what is easy to read. " +
             "Never invent a number or a cause the data does not show. Each line is one sentence of at most 18 words and ends with a period.\n" +
             "Write in English; the app translates it for the user.\n" +
-            SystemPrompt.Explanations.Replace("# Explanations\n", "");
+            SystemPrompt.ExplanationRules;
 
         private static string Context(ChartEntry entry, MarkInfo detail)
         {

@@ -184,13 +184,23 @@ namespace AccountingImmersiveAnalytics.UI.Charts.TwoD.Types
             codes.Add(code);
         }
 
+        protected static void GroupKey(ChartDrawing d, Role role, CsvField field, List<int> all, List<int> shown, KeyShape shape) =>
+            d.Key.Add(KeySection.Groups(d.Spec.TitleFor(role), Names(field, shown), shape,
+                i => ChartStyle.Group(ColourOf(field, all, shown, shown[i]))));
+
         protected static int ColourOf(CsvField field, List<int> allCodes, List<int> shownCodes, int code)
         {
             if (field == null) return 0;
             if (IsOthers(field, code)) return ChartStyle.MostShown - 1;
             bool folded = field.Categories.Count > 0 && IsOthers(field, field.Categories.Count - 1);
             if (!folded && allCodes.Count <= ChartStyle.MostShown) return allCodes.IndexOf(code);
-            return shownCodes.Where(c => !IsOthers(field, c)).ToList().IndexOf(code);
+            int index = 0;
+            foreach (int c in shownCodes)
+            {
+                if (c == code) return index;
+                if (!IsOthers(field, c)) index++;
+            }
+            return -1;
         }
 
         protected static string Value(double v) => AxisFormat.Value(v);

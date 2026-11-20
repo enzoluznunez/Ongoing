@@ -19,7 +19,7 @@ namespace AccountingImmersiveAnalytics.Audio
         public static extern void Stop();
 
         [DllImport("spkr", EntryPoint = "clear")]
-        public static extern void Clear();
+        private static extern void Clear();
 
         [DllImport("spkr", EntryPoint = "play")]
         private static extern void Play(
@@ -46,7 +46,6 @@ namespace AccountingImmersiveAnalytics.Audio
         public static void Destroy() { }
         public static void Start() { }
         public static void Stop() { }
-        public static void Clear() { }
         public static void Write(byte[] data) { }
         public static void Flush() { }
 

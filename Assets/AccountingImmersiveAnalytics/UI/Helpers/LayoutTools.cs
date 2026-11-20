@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using AccountingImmersiveAnalytics.App;
 using Oculus.Interaction;
 using Oculus.Interaction.Surfaces;
 using UnityEngine;
@@ -65,11 +66,8 @@ namespace AccountingImmersiveAnalytics.UI.Helpers
 
         public static RectTransform EnsureChild(Transform parent, string name)
         {
-            Transform existing = parent.Find(name);
-            if (existing != null) return existing as RectTransform ?? existing.gameObject.AddComponent<RectTransform>();
-            GameObject child = new GameObject(name);
-            child.transform.SetParent(parent, false);
-            return child.AddComponent<RectTransform>();
+            Transform child = FindTransform.EnsureChild(parent, name);
+            return child as RectTransform ?? child.gameObject.AddComponent<RectTransform>();
         }
 
         public static void Stack(HorizontalOrVerticalLayoutGroup layout)

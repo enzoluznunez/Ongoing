@@ -45,7 +45,7 @@ namespace AccountingImmersiveAnalytics.Text
                 return;
             }
             Debug.Log($"[LanguageDetector] Heard {Language.NameOf(code)} ({confidence:F2}) in \"{transcript}\"; showing {Language.CurrentName}.");
-            if (code != Language.Current) LanguageSwitch.To(code);
+            LanguageSwitch.To(code);
         }
 
         private static bool LongEnough(string transcript)

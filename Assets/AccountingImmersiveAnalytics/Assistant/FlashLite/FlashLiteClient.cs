@@ -1,6 +1,7 @@
 using System;
 using System.Text;
 using System.Threading.Tasks;
+using AccountingImmersiveAnalytics.Assistant.Live;
 using Newtonsoft.Json.Linq;
 using UnityEngine;
 using UnityEngine.Networking;
@@ -17,11 +18,11 @@ namespace AccountingImmersiveAnalytics.Assistant.FlashLite
         public static bool Reached { get; private set; }
 
         public static Task<JObject> Ask(string instructions, string prompt, JObject schema, int timeoutSeconds = DefaultTimeoutSeconds) =>
-            Post(BuildRequest(instructions, new JArray(new JObject { ["text"] = prompt }), schema), timeoutSeconds);
+            Post(BuildRequest(instructions, prompt, schema), timeoutSeconds);
 
         public static async Task<JObject> AskOnce(string instructions, string prompt, JObject schema, int timeoutSeconds = DefaultTimeoutSeconds)
         {
-            string body = BuildRequest(instructions, new JArray(new JObject { ["text"] = prompt }), schema);
+            string body = BuildRequest(instructions, prompt, schema);
             string key = AnswerCache.KeyFor(ModelId + "\n" + body);
             string saved = await AnswerCache.Find(key);
             JObject remembered = ReadSaved(saved);
@@ -36,7 +37,7 @@ namespace AccountingImmersiveAnalytics.Assistant.FlashLite
             if (string.IsNullOrEmpty(saved)) return null;
             try
             {
-                return JObject.Parse(saved);
+                return LiveWire.Parse(saved);
             }
             catch (Exception)
             {
@@ -87,9 +88,9 @@ namespace AccountingImmersiveAnalytics.Assistant.FlashLite
         {
             try
             {
-                JObject root = JObject.Parse(response);
+                JObject root = LiveWire.Parse(response);
                 string text = (string)root.SelectToken("candidates[0].content.parts[0].text");
-                return string.IsNullOrEmpty(text) ? null : JObject.Parse(text);
+                return string.IsNullOrEmpty(text) ? null : LiveWire.Parse(text);
             }
             catch (Exception e)
             {
@@ -98,7 +99,7 @@ namespace AccountingImmersiveAnalytics.Assistant.FlashLite
             }
         }
 
-        private static string BuildRequest(string instructions, JArray parts, JObject schema)
+        private static string BuildRequest(string instructions, string prompt, JObject schema)
         {
             var request = new JObject
             {
@@ -109,7 +110,7 @@ namespace AccountingImmersiveAnalytics.Assistant.FlashLite
                 ["contents"] = new JArray(new JObject
                 {
                     ["role"] = "user",
-                    ["parts"] = parts
+                    ["parts"] = new JArray(new JObject { ["text"] = prompt })
                 }),
                 ["generationConfig"] = new JObject
                 {

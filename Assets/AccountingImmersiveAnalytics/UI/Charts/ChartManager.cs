@@ -20,6 +20,8 @@ namespace AccountingImmersiveAnalytics.UI.Charts
     public class ChartManager : MonoBehaviour
     {
         private const string ColumnName = "Chart Column";
+        private const string Superseded = "Another file was opened before this one finished.";
+        private const string NoPanel = "The Documents panel was not found, so there is nowhere to show the charts.";
         private const float MotionMetresPerSecond = 0.6f;
         private const float ShortestMotion = 0.1f;
         private const float LongestMotion = 1.5f;
@@ -39,7 +41,6 @@ namespace AccountingImmersiveAnalytics.UI.Charts
         private readonly List<ChartEntry> _shown = new List<ChartEntry>();
         private readonly Dictionary<Transform, Glide> _glides = new Dictionary<Transform, Glide>();
         private ChartColumn _column;
-        private RectTransform _columnRoot;
         private PinnedChart _pinned;
         private ChartEntry _pinnedEntry;
         private int _ticket;
@@ -101,18 +102,11 @@ namespace AccountingImmersiveAnalytics.UI.Charts
         public async Task<(IReadOnlyList<ChartEntry> charts, string failure, bool unreadable)> OpenCsv(DocumentEntry document)
         {
             int ticket = ++_ticket;
-            if (!EnsureColumn()) return (null, "The Documents panel was not found, so there is nowhere to show the charts.", false);
-            _column.Clear();
-            _shown.Clear();
-
-            if (_byFile.TryGetValue(document.File, out List<ChartEntry> known))
-            {
-                ShowEntries(known);
-                return (_shown, null, false);
-            }
+            if (!EnsureColumn()) return (null, NoPanel, false);
+            if (Reuse(document)) return (_shown, null, false);
 
             string text = await StreamingFiles.ReadText(document.File);
-            if (this == null || ticket != _ticket) return (null, "Another file was opened before this one finished.", false);
+            if (this == null || ticket != _ticket) return (null, Superseded, false);
             if (!CsvTable.LooksLikeCsv(text)) return Unreadable($"\"{document.Title}\" is not a readable CSV file.");
 
             CsvTable table;
@@ -124,29 +118,14 @@ namespace AccountingImmersiveAnalytics.UI.Charts
             {
                 return Unreadable($"\"{document.Title}\" could not be loaded: {e.Message}");
             }
-            if (this == null || ticket != _ticket) return (null, "Another file was opened before this one finished.", false);
+            if (this == null || ticket != _ticket) return (null, Superseded, false);
 
             List<ChartSpec> specs = await ChartPlanner.Plan(document.Title, table);
-            if (this == null || ticket != _ticket) return (null, "Another file was opened before this one finished.", false);
-            if (specs.Count == 0) return Fail($"No chart fits the columns in \"{document.Title}\".");
+            if (this == null || ticket != _ticket) return (null, Superseded, false);
+            if (specs.Count == 0) return (null, Failed($"No chart fits the columns in \"{document.Title}\"."), false);
 
-            var made = new List<ChartEntry>();
-            foreach (ChartSpec spec in specs)
-            {
-                var entry = new ChartEntry { Id = _nextId++, File = document.File, Source = document.Title, Spec = spec, Table = table };
-                _entries.Add(entry);
-                made.Add(entry);
-            }
-            _byFile[document.File] = made;
-            ShowEntries(made);
+            Register(document, specs.Select(spec => (spec, table)));
             return (_shown, null, false);
-
-            (IReadOnlyList<ChartEntry>, string, bool) Fail(string reason)
-            {
-                SetStatus(reason);
-                Debug.LogWarning($"[ChartManager] {reason}");
-                return (null, reason, false);
-            }
 
             (IReadOnlyList<ChartEntry>, string, bool) Unreadable(string reason)
             {
@@ -163,15 +142,8 @@ namespace AccountingImmersiveAnalytics.UI.Charts
                 CloseColumn();
                 return (null, null);
             }
-            if (!EnsureColumn()) return (null, "The Documents panel was not found, so there is nowhere to show the charts.");
-            _column.Clear();
-            _shown.Clear();
-
-            if (_byFile.TryGetValue(document.File, out List<ChartEntry> known))
-            {
-                ShowEntries(known);
-                return (_shown, null);
-            }
+            if (!EnsureColumn()) return (null, NoPanel);
+            if (Reuse(document)) return (_shown, null);
 
             var read = new List<(PdfTable source, CsvTable table)>();
             foreach (PdfTable source in tables)
@@ -187,26 +159,41 @@ namespace AccountingImmersiveAnalytics.UI.Charts
             }
 
             ChartSpec[] specs = await Task.WhenAll(read.Select(r => ChartPlanner.PlanTable(document.Title, r.table, r.source.Caption)));
-            if (this == null || ticket != _ticket) return (null, "Another file was opened before this one finished.");
+            if (this == null || ticket != _ticket) return (null, Superseded);
 
+            var planned = specs.Select((spec, i) => (spec, read[i].table)).Where(p => p.spec != null).ToList();
+            if (planned.Count == 0) return (null, Failed($"No chart fits the tables in \"{document.Title}\"."));
+            Register(document, planned);
+            return (_shown, null);
+        }
+
+        private bool Reuse(DocumentEntry document)
+        {
+            _column.Clear();
+            _shown.Clear();
+            if (!_byFile.TryGetValue(document.File, out List<ChartEntry> known)) return false;
+            ShowEntries(known);
+            return true;
+        }
+
+        private void Register(DocumentEntry document, IEnumerable<(ChartSpec spec, CsvTable table)> planned)
+        {
             var made = new List<ChartEntry>();
-            for (int i = 0; i < specs.Length; i++)
+            foreach ((ChartSpec spec, CsvTable table) in planned)
             {
-                if (specs[i] == null) continue;
-                var entry = new ChartEntry { Id = _nextId++, File = document.File, Source = document.Title, Spec = specs[i], Table = read[i].table };
+                var entry = new ChartEntry { Id = _nextId++, File = document.File, Source = document.Title, Spec = spec, Table = table };
                 _entries.Add(entry);
                 made.Add(entry);
             }
-            if (made.Count == 0)
-            {
-                string reason = $"No chart fits the tables in \"{document.Title}\".";
-                SetStatus(reason);
-                Debug.LogWarning($"[ChartManager] {reason}");
-                return (null, reason);
-            }
             _byFile[document.File] = made;
             ShowEntries(made);
-            return (_shown, null);
+        }
+
+        private string Failed(string reason)
+        {
+            SetStatus(reason);
+            Debug.LogWarning($"[ChartManager] {reason}");
+            return reason;
         }
 
         private void ShowEntries(List<ChartEntry> entries)
@@ -233,9 +220,9 @@ namespace AccountingImmersiveAnalytics.UI.Charts
         {
             DocumentsPanel documents = App.Scene.Documents;
             if (documents == null) return false;
-            _columnRoot = documents.ShowRightCard(ColumnName, ChartColumn.Width);
-            if (_columnRoot == null) return false;
-            if (_column == null) _column = new ChartColumn(_columnRoot);
+            RectTransform root = documents.ShowRightCard(ColumnName, ChartColumn.Width);
+            if (root == null) return false;
+            if (_column == null) _column = new ChartColumn(root);
             return true;
         }
 
@@ -256,7 +243,7 @@ namespace AccountingImmersiveAnalytics.UI.Charts
 
         public void TogglePin(ChartEntry entry)
         {
-            if (ActivityFeed.UserDriven) AssistantTurn.UserTookControl();
+            AssistantTurn.UserActed();
             Pin(_pinnedEntry == entry ? null : entry);
         }
 
@@ -318,9 +305,7 @@ namespace AccountingImmersiveAnalytics.UI.Charts
         public void Preview(ChartEntry entry, ChartShaping shaping)
         {
             if (entry == null || shaping == null || entry.Shaping.SameAs(shaping)) return;
-            entry.Shaping = shaping.Copy();
-            if (entry.Preview != null) entry.Preview.Redraw();
-            if (entry == _pinnedEntry && _pinned?.Card != null) _pinned.Card.Redraw();
+            Redraw(entry, shaping);
         }
 
         public bool Commit(ChartEntry entry, ChartShaping before, EditKind kind, string what, string label)
@@ -358,13 +343,16 @@ namespace AccountingImmersiveAnalytics.UI.Charts
 
         private void Apply(ChartEntry entry, ChartShaping shaping)
         {
+            if (Redraw(entry, shaping)) _pinned.ShapingChanged();
+        }
+
+        private bool Redraw(ChartEntry entry, ChartShaping shaping)
+        {
             entry.Shaping = shaping.Copy();
             if (entry.Preview != null) entry.Preview.Redraw();
-            if (entry == _pinnedEntry && _pinned?.Card != null)
-            {
-                _pinned.Card.Redraw();
-                _pinned.ShapingChanged();
-            }
+            if (entry != _pinnedEntry || _pinned?.Card == null) return false;
+            _pinned.Card.Redraw();
+            return true;
         }
 
         public bool Undo(Edit edit)
@@ -411,8 +399,11 @@ namespace AccountingImmersiveAnalytics.UI.Charts
                 PrePos = prePos,
                 PreRot = preRot,
                 PreScale = preScale
-            }, kind, what ?? (kind == EditKind.Scale ? "Resized the chart" : kind == EditKind.Rotate ? "Turned the chart" : "Moved the chart"));
+            }, kind, what ?? MoveLabel(kind));
         }
+
+        private static string MoveLabel(EditKind kind) =>
+            kind == EditKind.Scale ? "Resized the chart" : kind == EditKind.Rotate ? "Turned the chart" : "Moved the chart";
 
         private sealed class Glide
         {
@@ -468,7 +459,7 @@ namespace AccountingImmersiveAnalytics.UI.Charts
             float moved = space.TransformVector(g.ToPos - prePos).magnitude;
             float turned = Quaternion.Angle(preRot, g.ToRot) * Mathf.Deg2Rad * size;
             float grown = Mathf.Abs(g.ToScale.x - preScale.x) * size;
-            float seconds = Mathf.Clamp(Mathf.Max(moved, Mathf.Max(turned, grown)) / MotionMetresPerSecond, ShortestMotion, LongestMotion);
+            float seconds = MotionSeconds(Mathf.Max(moved, turned, grown));
             chart.localPosition = prePos;
             chart.localRotation = preRot;
             chart.localScale = preScale;
@@ -478,17 +469,13 @@ namespace AccountingImmersiveAnalytics.UI.Charts
 
         private IEnumerator GlideRoutine(Transform chart, Glide g, Vector3 fromPos, Quaternion fromRot, Vector3 fromScale, float seconds)
         {
-            float t = 0f;
-            while (t < seconds)
+            yield return Animate.Tween(seconds, k =>
             {
-                yield return null;
-                if (chart == null) yield break;
-                t += Time.deltaTime;
-                float k = Animate.EaseOut(t / seconds);
+                if (chart == null) return;
                 chart.localPosition = Vector3.Lerp(fromPos, g.ToPos, k);
                 chart.localRotation = Quaternion.Slerp(fromRot, g.ToRot, k);
                 chart.localScale = Vector3.Lerp(fromScale, g.ToScale, k);
-            }
+            });
             if (chart == null) yield break;
             chart.localPosition = g.ToPos;
             chart.localRotation = g.ToRot;

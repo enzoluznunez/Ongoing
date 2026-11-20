@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Reflection;
 using AccountingImmersiveAnalytics.Assistant.Live;
 
@@ -7,18 +8,56 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools.Arguments
 {
     public static class ToolArguments
     {
-        private static readonly Dictionary<Type, Schema> _cache = new Dictionary<Type, Schema>();
+        private sealed class Field
+        {
+            public FieldInfo Info;
+            public Type Type;
+            public bool Optional;
+            public string[] Allowed;
+            public object Fallback;
+        }
+
+        private static readonly Dictionary<Type, Schema> _schemas = new Dictionary<Type, Schema>();
+        private static readonly Dictionary<Type, Field[]> _fields = new Dictionary<Type, Field[]>();
 
         [UnityEngine.RuntimeInitializeOnLoadMethod(UnityEngine.RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void ClearCache() => _cache.Clear();
+        private static void ClearCache()
+        {
+            _schemas.Clear();
+            _fields.Clear();
+        }
 
         public static Schema Schema(Type args)
         {
             if (args == null) return null;
-            if (_cache.TryGetValue(args, out var cached)) return cached;
+            if (_schemas.TryGetValue(args, out var cached)) return cached;
             var built = Build(args);
-            _cache[args] = built;
+            _schemas[args] = built;
             return built;
+        }
+
+        private static Field[] FieldsOf(Type args)
+        {
+            if (_fields.TryGetValue(args, out var cached)) return cached;
+            FieldInfo[] infos = args.GetFields(BindingFlags.Public | BindingFlags.Instance);
+            var fields = new Field[infos.Length];
+            for (int i = 0; i < infos.Length; i++)
+            {
+                FieldInfo f = infos[i];
+                Type t = Nullable.GetUnderlyingType(f.FieldType) ?? f.FieldType;
+                var values = f.GetCustomAttribute<ValuesAttribute>();
+                var fallback = f.GetCustomAttribute<DefaultsToAttribute>();
+                fields[i] = new Field
+                {
+                    Info = f,
+                    Type = t,
+                    Optional = f.GetCustomAttribute<OptionalAttribute>() != null,
+                    Allowed = values != null ? values.Allowed : t.IsEnum ? EnumNames(t) : null,
+                    Fallback = fallback != null ? Convert(fallback.Value, t) : null
+                };
+            }
+            _fields[args] = fields;
+            return fields;
         }
 
         private static Schema Build(Type args)
@@ -26,24 +65,12 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools.Arguments
             var properties = new Dictionary<string, Schema>();
             var required = new List<string>();
 
-            foreach (FieldInfo f in Fields(args))
+            foreach (Field field in FieldsOf(args))
             {
-                Type t = Underlying(f.FieldType);
-                Schema schema;
-                if (IsComplex(t)) schema = Build(t);
-                else
-                {
-                    schema = new Schema { Type = JsonType(t) };
-                    if (t.IsArray || IsList(t))
-                    {
-                        Type el = ElementType(t);
-                        schema.Items = IsComplex(el) ? Build(el) : new Schema { Type = JsonType(el) };
-                    }
-                }
-
-                var values = f.GetCustomAttribute<ValuesAttribute>();
-                if (values != null) schema.Enum = new List<string>(values.Allowed);
-                else if (t.IsEnum) schema.Enum = EnumNames(t);
+                FieldInfo f = field.Info;
+                var schema = new Schema { Type = JsonType(field.Type) };
+                if (IsList(field.Type)) schema.Items = new Schema { Type = JsonType(ElementType(field.Type)) };
+                if (field.Allowed != null) schema.Enum = new List<string>(field.Allowed);
 
                 var limits = f.GetCustomAttribute<LimitsAttribute>();
                 if (limits != null) { schema.Minimum = limits.Min; schema.Maximum = limits.Max; }
@@ -54,7 +81,7 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools.Arguments
                 var doc = f.GetCustomAttribute<DocAttribute>();
                 if (doc != null) schema.Description = doc.Text;
                 properties[f.Name] = schema;
-                if (f.GetCustomAttribute<OptionalAttribute>() == null) required.Add(f.Name);
+                if (!field.Optional) required.Add(f.Name);
             }
 
             return new Schema
@@ -70,170 +97,90 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools.Arguments
             error = null;
             object instance = Activator.CreateInstance(args);
 
-            foreach (FieldInfo f in Fields(args))
+            foreach (Field field in FieldsOf(args))
             {
                 object raw = null;
-                bool present = values != null && values.TryGetValue(f.Name, out raw) && raw != null;
+                bool present = values != null && values.TryGetValue(field.Info.Name, out raw) && raw != null;
 
                 if (!present)
                 {
-                    if (f.GetCustomAttribute<OptionalAttribute>() == null)
+                    if (!field.Optional)
                     {
-                        error = $"Provide '{f.Name}'.";
+                        error = $"Provide '{field.Info.Name}'.";
                         return null;
                     }
+                    if (field.Fallback != null) field.Info.SetValue(instance, field.Fallback);
                     continue;
                 }
 
                 object bound;
                 try
                 {
-                    bound = Convert(raw, Underlying(f.FieldType));
+                    bound = field.Allowed != null
+                        ? Convert(Canonical(field.Allowed, LiveWire.Text(raw)), field.Type)
+                        : Convert(raw, field.Type);
                 }
                 catch (Exception)
                 {
-                    error = Rejected(f);
+                    error = Rejected(field);
                     return null;
                 }
-
-                var allowed = f.GetCustomAttribute<ValuesAttribute>();
-                if (allowed != null)
-                {
-                    if (!TryCanonical(allowed, bound as string, out string canonical))
-                    {
-                        error = Rejected(f);
-                        return null;
-                    }
-                    bound = canonical;
-                }
-                f.SetValue(instance, bound);
+                field.Info.SetValue(instance, bound);
             }
             return instance;
         }
 
-        private static bool TryCanonical(ValuesAttribute values, string bound, out string canonical)
+        private static string Canonical(string[] allowed, string bound)
         {
-            canonical = null;
-            if (bound == null) return false;
             string trimmed = bound.Trim();
-            for (int i = 0; i < values.Allowed.Length; i++)
-                if (string.Equals(values.Allowed[i], trimmed, StringComparison.OrdinalIgnoreCase))
-                {
-                    canonical = values.Allowed[i];
-                    return true;
-                }
-            return false;
+            foreach (string value in allowed)
+                if (string.Equals(value, trimmed, StringComparison.OrdinalIgnoreCase)) return value;
+            throw new FormatException("not an allowed value");
         }
 
-        private static string Rejected(FieldInfo f)
+        private static string Rejected(Field field)
         {
-            Type t = Underlying(f.FieldType);
-            var values = f.GetCustomAttribute<ValuesAttribute>();
-            List<string> allowed = values != null ? new List<string>(values.Allowed)
-                                 : t.IsEnum ? EnumNames(t)
-                                 : null;
-            if (allowed != null)
-                return $"'{f.Name}' must be one of: {string.Join(", ", allowed)}.";
-
-            if (IsComplex(t))
-            {
-                var names = new List<string>();
-                foreach (FieldInfo nested in Fields(t)) names.Add(nested.Name);
-                return $"'{f.Name}' must be an object with fields: {string.Join(", ", names)}. " +
-                       "It is not a string; send it as a nested object.";
-            }
-
-            return $"'{f.Name}' is not a valid {JsonType(t).ToString().ToLowerInvariant()}.";
+            if (field.Allowed != null)
+                return $"'{field.Info.Name}' must be one of: {string.Join(", ", field.Allowed)}.";
+            return $"'{field.Info.Name}' is not a valid {JsonType(field.Type).ToString().ToLowerInvariant()}.";
         }
-
-        private static IEnumerable<FieldInfo> Fields(Type t) =>
-            t.GetFields(BindingFlags.Public | BindingFlags.Instance);
-
-        private static Type Underlying(Type t) => Nullable.GetUnderlyingType(t) ?? t;
 
         private static bool IsList(Type t) =>
             t.IsGenericType && t.GetGenericTypeDefinition() == typeof(List<>);
 
-        private static Type ElementType(Type t) =>
-            t.IsArray ? t.GetElementType() : t.GetGenericArguments()[0];
+        private static Type ElementType(Type t) => t.GetGenericArguments()[0];
 
-        private static List<string> EnumNames(Type t)
+        private static string[] EnumNames(Type t)
         {
-            string[] names = System.Enum.GetNames(t);
-            var list = new List<string>(names.Length);
-            for (int i = 0; i < names.Length; i++) list.Add(names[i].ToLowerInvariant());
-            return list;
+            string[] names = Enum.GetNames(t);
+            for (int i = 0; i < names.Length; i++) names[i] = names[i].ToLowerInvariant();
+            return names;
         }
 
         private static SchemaType JsonType(Type t)
         {
-            if (t.IsEnum) return SchemaType.String;
             if (t == typeof(int) || t == typeof(long)) return SchemaType.Integer;
             if (t == typeof(float) || t == typeof(double)) return SchemaType.Number;
             if (t == typeof(bool)) return SchemaType.Boolean;
-            if (t == typeof(string)) return SchemaType.String;
-            if (t.IsArray || IsList(t)) return SchemaType.Array;
+            if (IsList(t)) return SchemaType.Array;
             return SchemaType.String;
-        }
-
-        private static bool IsComplex(Type t) =>
-            t.IsClass && t != typeof(string) && !t.IsArray && !IsList(t);
-
-        private static Dictionary<string, object> AsMap(object value)
-        {
-            var map = new Dictionary<string, object>();
-            if (value is Dictionary<string, object> d)
-            {
-                foreach (var kv in d) map[kv.Key] = kv.Value;
-            }
-            return map;
         }
 
         private static object Convert(object value, Type target)
         {
-            if (target.IsArray || IsList(target)) return ConvertList(value, target);
-
-            if (IsComplex(target))
+            if (IsList(target))
             {
-                if (!(value is Dictionary<string, object>)) throw new InvalidOperationException("not an object");
-                object bound = Bind(target, AsMap(value), out string error);
-                if (bound == null) throw new InvalidOperationException(error ?? "bad object");
-                return bound;
+                Type element = ElementType(target);
+                var list = (System.Collections.IList)Activator.CreateInstance(target);
+                if (value is System.Collections.IEnumerable items && !(value is string))
+                    foreach (var item in items) list.Add(Convert(item, element));
+                else
+                    list.Add(Convert(value, element));
+                return list;
             }
-
-            if (target.IsEnum)
-            {
-                return System.Enum.Parse(target, LiveWire.Text(value).Trim(), true);
-            }
-
+            if (target.IsEnum) return Enum.Parse(target, LiveWire.Text(value), true);
             if (target == typeof(string)) return LiveWire.Text(value);
-            return System.Convert.ChangeType(value, target, System.Globalization.CultureInfo.InvariantCulture);
-        }
-
-        private static object ConvertList(object value, Type target)
-        {
-            Type element = ElementType(target);
-            var items = new List<object>();
-
-            if (value is System.Collections.IEnumerable en && !(value is string))
-            {
-                foreach (var el in en) items.Add(Convert(el, element));
-            }
-            else
-            {
-                items.Add(Convert(value, element));
-            }
-
-            if (target.IsArray)
-            {
-                Array array = Array.CreateInstance(element, items.Count);
-                for (int i = 0; i < items.Count; i++) array.SetValue(items[i], i);
-                return array;
-            }
-
-            var list = (System.Collections.IList)Activator.CreateInstance(target);
-            for (int i = 0; i < items.Count; i++) list.Add(items[i]);
-            return list;
+            return System.Convert.ChangeType(value, target, CultureInfo.InvariantCulture);
         }
     }
 }

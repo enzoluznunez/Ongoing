@@ -38,8 +38,8 @@ namespace AccountingImmersiveAnalytics.Assistant.Live
                 case byte n: return new JValue((long)n);
                 case int n: return new JValue((long)n);
                 case long n: return new JValue(n);
-                case float n: return new JValue((double)n);
-                case double n: return new JValue(n);
+                case float n: return float.IsNaN(n) || float.IsInfinity(n) ? JValue.CreateNull() : new JValue((double)n);
+                case double n: return double.IsNaN(n) || double.IsInfinity(n) ? JValue.CreateNull() : new JValue(n);
                 case decimal n: return new JValue(n);
                 case IDictionary map:
                     {

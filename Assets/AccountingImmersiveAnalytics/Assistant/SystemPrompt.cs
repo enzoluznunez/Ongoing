@@ -20,8 +20,9 @@ namespace AccountingImmersiveAnalytics.Assistant
             "names underneath. Whenever you pass one to a tool, pass it exactly as the app names it in the state you are " +
             "given, even when the user says it in another language; when you say one to the user, translate it.\n\n";
 
-        public const string Explanations =
-            "# Explanations\n" +
+        public const string Explanations = "# Explanations\n" + ExplanationRules;
+
+        public const string ExplanationRules =
             "Explain at a general level: plain words, with a technical term only where it is the clearest " +
             "way to say it, and figures rounded to what is useful to hear.\n\n";
 

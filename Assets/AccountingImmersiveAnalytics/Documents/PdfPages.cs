@@ -9,7 +9,7 @@ namespace AccountingImmersiveAnalytics.Documents
 {
     public sealed class PdfPages : IDisposable
     {
-        public const int LongestSide = 2048;
+        private const int LongestSide = 2048;
 
     #if UNITY_ANDROID && !UNITY_EDITOR
         public static bool Supported => true;
@@ -60,7 +60,7 @@ namespace AccountingImmersiveAnalytics.Documents
                     }
                     catch
                     {
-                        pixels.Native.Dispose();
+                        pixels.Dispose();
                         throw;
                     }
                     finally
@@ -128,44 +128,43 @@ namespace AccountingImmersiveAnalytics.Documents
             if (!Supported || bytes == null) return null;
             string scratch = System.IO.Path.Combine(Application.temporaryCachePath, $"document-{Guid.NewGuid():N}.pdf");
             var pages = new PdfPages();
-            bool opened;
+            bool opened = false;
             try
             {
                 opened = await Run(() => pages.OpenHere(bytes, scratch));
+                return opened ? pages : null;
             }
-            catch
+            finally
             {
-                pages.Dispose();
-                throw;
+                if (!opened) pages.Dispose();
             }
-            if (opened) return pages;
-            pages.Dispose();
-            return null;
         }
 
         public Task<PagePixels> Render(int index, int width, int height) =>
             Run(() => _closed || index < 0 || index >= Count ? null : RenderHere(index, width, height));
 
-        public static Vector2Int PixelsFor(double pageWidth, double pageHeight)
+        public static Vector2Int PixelsFor(double pageWidth, double pageHeight, double share = 1)
         {
-            double scale = LongestSide / Math.Max(1.0, Math.Max(pageWidth, pageHeight));
+            double scale = LongestSide * share / Math.Max(1.0, Math.Max(pageWidth, pageHeight));
             return new Vector2Int(Math.Max(1, (int)Math.Round(pageWidth * scale)), Math.Max(1, (int)Math.Round(pageHeight * scale)));
         }
 
         public static Texture2D MakeTexture(PagePixels pixels, float cornerPixels = 0f)
         {
             if (pixels == null) return null;
-            RoundCorners(pixels, cornerPixels);
-            var texture = new Texture2D(pixels.Width, pixels.Height, TextureFormat.RGBA32, true, false)
+            using (pixels)
             {
-                wrapMode = TextureWrapMode.Clamp,
-                filterMode = FilterMode.Trilinear,
-                anisoLevel = 4
-            };
-            texture.SetPixelData(pixels.Native, 0);
-            pixels.Native.Dispose();
-            texture.Apply(true, true);
-            return texture;
+                RoundCorners(pixels, cornerPixels);
+                var texture = new Texture2D(pixels.Width, pixels.Height, TextureFormat.RGBA32, true, false)
+                {
+                    wrapMode = TextureWrapMode.Clamp,
+                    filterMode = FilterMode.Trilinear,
+                    anisoLevel = 4
+                };
+                texture.SetPixelData(pixels.Native, 0);
+                texture.Apply(true, true);
+                return texture;
+            }
         }
 
         private static void RoundCorners(PagePixels pixels, float radius)
@@ -196,11 +195,6 @@ namespace AccountingImmersiveAnalytics.Documents
         {
             int at = (y * width + x) * 4 + 3;
             bytes[at] = (byte)Mathf.RoundToInt(bytes[at] * cover);
-        }
-
-        public static void Discard(PagePixels pixels)
-        {
-            if (pixels != null && pixels.Native.IsCreated) pixels.Native.Dispose();
         }
 
         public void Dispose()

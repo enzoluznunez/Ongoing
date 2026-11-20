@@ -22,13 +22,10 @@ namespace AccountingImmersiveAnalytics.App
             _hasHome = false;
         }
 
-        public static void NoteHome()
+        private static void NoteHome(Vector3 head, float yaw)
         {
-            if (_hasHome) return;
-            Transform cam = CameraRig.MainTransform;
-            if (cam == null) return;
-            _homePos = cam.position;
-            _homeYaw = YawOf(cam);
+            _homePos = head;
+            _homeYaw = yaw;
             _hasHome = true;
         }
 
@@ -63,21 +60,24 @@ namespace AccountingImmersiveAnalytics.App
 
         private void LateUpdate()
         {
-            if (!_hasHome && LoadingPhase.Done && CameraRig.TryGetBasis(out _, out _)) NoteHome();
-            if (!_pending || !_hasHome) return;
-            if (!CameraRig.TryGetBasis(out _, out _)) return;
+            if (!CameraRig.TryGetBasis(out Vector3 head, out Quaternion basis)) return;
+            float yaw = basis.eulerAngles.y;
+            if (!_hasHome)
+            {
+                if (LoadingPhase.Done) NoteHome(head, yaw);
+                return;
+            }
+            if (!_pending) return;
             _pending = false;
-            Apply();
+            Apply(head, yaw);
         }
 
-        private static void Apply()
+        private static void Apply(Vector3 head, float yaw)
         {
-            Transform cam = CameraRig.MainTransform;
-            Transform rig = RigRoot(cam);
-            if (cam == null || rig == null) return;
+            Transform rig = RigRoot(CameraRig.MainTransform);
+            if (rig == null) return;
 
-            Vector3 head = cam.position;
-            Quaternion turn = Quaternion.AngleAxis(Mathf.DeltaAngle(YawOf(cam), _homeYaw), Vector3.up);
+            Quaternion turn = Quaternion.AngleAxis(Mathf.DeltaAngle(yaw, _homeYaw), Vector3.up);
             rig.SetPositionAndRotation(_homePos + turn * (rig.position - head), turn * rig.rotation);
         }
 
@@ -87,8 +87,5 @@ namespace AccountingImmersiveAnalytics.App
             if (rig != null) return rig.transform;
             return cam != null && cam.parent != null ? cam.parent.parent : null;
         }
-
-        private static float YawOf(Transform t) =>
-            Quaternion.LookRotation(CameraRig.Flatten(t.forward, Vector3.forward), Vector3.up).eulerAngles.y;
     }
 }

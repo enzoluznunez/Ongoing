@@ -10,20 +10,19 @@ namespace AccountingImmersiveAnalytics.Text
         private const float HeldSeconds = LoadingDots.Most * LoadingDots.TickSeconds;
 
         private static string _word;
-        private static string _language = Language.English;
         private static int _hold;
 
         public static bool Holding { get; private set; }
 
         public static string Original => Strings.Original(Key);
 
-        public static string ShownLanguage => _language;
+        public static string ShownLanguage { get; private set; } = Language.English;
 
         public static void Leaving(string language)
         {
             if (!Translator.TryCached(Original, Language.English, language, out string word) || string.IsNullOrEmpty(word)) return;
             _word = word;
-            _language = language;
+            ShownLanguage = language;
         }
 
         public static async void Hold()
@@ -42,7 +41,7 @@ namespace AccountingImmersiveAnalytics.Text
 
         public static (string text, string language) Steady()
         {
-            string word = Word();
+            string word = _word ?? Original;
             int dots = LoadingDots.Count;
             if (dots != _steadyDots || !ReferenceEquals(word, _steadyWord))
             {
@@ -50,10 +49,8 @@ namespace AccountingImmersiveAnalytics.Text
                 _steadyDots = dots;
                 _steadyText = LoadingDots.Steady(word, dots);
             }
-            return (_steadyText, _language);
+            return (_steadyText, ShownLanguage);
         }
-
-        private static string Word() => _word ?? Original;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetStatics()
@@ -61,7 +58,7 @@ namespace AccountingImmersiveAnalytics.Text
             _word = null;
             _steadyWord = null;
             _steadyDots = -1;
-            _language = Language.English;
+            ShownLanguage = Language.English;
             _hold++;
             Holding = false;
         }

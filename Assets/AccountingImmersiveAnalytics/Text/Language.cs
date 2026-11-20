@@ -38,7 +38,7 @@ namespace AccountingImmersiveAnalytics.Text
 
         public static string Current { get; private set; } = English;
 
-        public static readonly IReadOnlyDictionary<string, string> Scripts = new Dictionary<string, string>
+        private static readonly IReadOnlyDictionary<string, string> Scripts = new Dictionary<string, string>
         {
             ["af"] = "Latin", ["ak"] = "Latin", ["sq"] = "Latin", ["am"] = "Ge'ez (Ethiopic)", ["ar"] = "Arabic",
             ["hy"] = "Armenian", ["as"] = "Bengali-Assamese", ["az"] = "Latin", ["eu"] = "Latin", ["be"] = "Cyrillic",
@@ -70,7 +70,7 @@ namespace AccountingImmersiveAnalytics.Text
             ["sw"] = "Standard Swahili", ["qu"] = "Southern Quechua"
         };
 
-        public static string ScriptOf(string code) => code != null && Scripts.TryGetValue(code, out string script) ? script : null;
+        private static string ScriptOf(string code) => code != null && Scripts.TryGetValue(code, out string script) ? script : null;
 
         public static string WritingOf(string code)
         {
@@ -81,20 +81,26 @@ namespace AccountingImmersiveAnalytics.Text
 
         public static string CurrentName => NameOf(Current);
 
-        public static bool RightToLeft => IsRightToLeft(Current);
-
-        public static bool IsRightToLeft(string code) => ScriptOf(code) is "Arabic" or "Hebrew";
+        public static bool RightToLeft => ScriptOf(Current) is "Arabic" or "Hebrew";
 
         public static string NameOf(string code) => code != null && Supported.TryGetValue(code, out string name) ? name : code;
 
         public static bool IsSupported(string code) => code != null && Supported.ContainsKey(code);
 
+        private static readonly Dictionary<string, string> SupportedIgnoringCase = BuildSupportedIgnoringCase();
+
+        private static Dictionary<string, string> BuildSupportedIgnoringCase()
+        {
+            var codes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (string code in Supported.Keys) codes[code] = code;
+            return codes;
+        }
+
         public static string Normalize(string tag)
         {
             if (string.IsNullOrWhiteSpace(tag)) return Unknown;
             string clean = tag.Trim().Replace('_', '-');
-            foreach (string code in Supported.Keys)
-                if (string.Equals(code, clean, StringComparison.OrdinalIgnoreCase)) return code;
+            if (SupportedIgnoringCase.TryGetValue(clean, out string exact)) return exact;
 
             string[] parts = clean.ToLowerInvariant().Split('-');
             string primary = parts[0];
@@ -108,7 +114,7 @@ namespace AccountingImmersiveAnalytics.Text
             return Supported.ContainsKey(primary) ? primary : Unknown;
         }
 
-        public static bool Same(string a, string b) => a != Unknown && b != Unknown && a == b;
+        public static bool Same(string a, string b) => a == b && a != Unknown;
 
         public static void Set(string code)
         {

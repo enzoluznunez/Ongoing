@@ -16,10 +16,8 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools.Chart
     public sealed class CallPlace : AssistantTool<CallPlace.Args>
     {
 
-        private const float DefaultDistance = 0.15f;
         private const float MinDistance = 0.001f;
         private const float MaxDistance = 100f;
-        private const float DefaultDegrees = 90f;
         private const float MaxDegrees = 3600f;
         private const float PanelMinDistance = 0.02f;
         private const float PanelMaxDistance = 1f;
@@ -35,17 +33,17 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools.Chart
                     "forward-left", "forward-right", "back-left", "back-right")]
             public string direction;
             [Doc("How far to slide, in meters: from a millimetre for the chart; from 0.02 to 1 for the panel, which also stays within reach."),
-             Limits(0.001, 100), DefaultsTo(0.15), Optional]
-            public float? distance;
+             Limits(MinDistance, MaxDistance), DefaultsTo(0.15f), Optional]
+            public float distance;
             [Doc("Which way to turn it about the upright axis, seen from above from the user's point of view; " +
                  "'right' is clockwise. Leave it out to only slide it."), Optional]
             [Values("left", "right")]
             public string turn;
             [Doc("How far to turn, in degrees. More than a full turn is reduced to the equivalent turn, so 730 becomes 10."),
-             Limits(1, 3600), DefaultsTo(90), Optional]
-            public float? degrees;
+             Limits(1, MaxDegrees), DefaultsTo(90f), Optional]
+            public float degrees;
             [Doc("false switches Place off, as pressing the lit button again does. Defaults to true."), DefaultsTo(true), Optional]
-            public bool? on;
+            public bool on;
         }
 
         protected override bool EditsAreOutcome => true;
@@ -63,23 +61,17 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools.Chart
 
         protected override void Run(Args args, Dictionary<string, object> result)
         {
-            bool panel = string.Equals(args.target?.Trim(), "documents", StringComparison.OrdinalIgnoreCase);
+            bool panel = args.target == "documents";
             if (!panel && SwitchedOff(ToolType.Place, args.on, result)) return;
 
             Vector3 way = Vector3.zero;
             if (args.direction != null && !TryWorldDirection(args.direction, out way))
             {
-                result["error"] = $"Unknown direction '{args.direction}'. Use left, right, forward, back, up, down, " +
-                                  "or a diagonal such as forward-left.";
+                result["error"] = "The user's head was not found, so there is no way to tell which way that is.";
                 return;
             }
-            float sign = 0f;
-            string turn = args.turn?.Trim().ToLowerInvariant();
-            if (turn != null && !TryTurnSign(turn, out sign))
-            {
-                NeedChoice(result, "turn", new List<string> { "left", "right" }, "Which way should it turn, left or right?");
-                return;
-            }
+            string turn = args.turn;
+            float sign = turn == "right" ? 1f : -1f;
 
             if (panel)
             {
@@ -87,23 +79,23 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools.Chart
                 return;
             }
 
-            if (!TryPinnedChart(result, "place", out var mgr, out var chart)) return;
+            if (!TryPinnedChart(result, "Only the pinned chart can be placed.", out ChartManager mgr)) return;
             if (!EnsureToolSelected(ToolType.Place, result)) return;
-            result["on"] = true;
 
             if (args.direction == null && turn == null) { result["ok"] = true; return; }
 
-            float asked = args.distance ?? DefaultDistance;
+            Transform chart = mgr.PinnedTransform;
+            float asked = args.distance;
             float distance = Mathf.Clamp(asked, MinDistance, MaxDistance);
             Vector3 delta = args.direction != null ? way * distance : Vector3.zero;
-            float askedDegrees = Mathf.Clamp(Math.Abs(args.degrees ?? DefaultDegrees), 0f, MaxDegrees);
+            float askedDegrees = AskedDegrees(args);
             float degrees = turn != null ? askedDegrees % 360f : 0f;
             bool turns = degrees >= 0.05f;
             if (turn != null && !turns)
             {
                 result["turnedDegrees"] = 0;
                 result["turnNote"] = askedDegrees >= 360f
-                    ? $"{Math.Round(askedDegrees, 1)} degrees is a whole number of full turns, so the chart ends facing as it was."
+                    ? $"{Round(askedDegrees)} degrees is a whole number of full turns, so the chart ends facing as it was."
                     : "That is too small a turn to see.";
                 if (args.direction == null) return;
             }
@@ -125,14 +117,17 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools.Chart
             if (turns)
             {
                 result["turned"] = turn;
-                result["turnedDegrees"] = Math.Round(degrees, 1);
+                result["turnedDegrees"] = Round(degrees);
             }
         }
 
+        private static float AskedDegrees(Args args) => Mathf.Clamp(Math.Abs(args.degrees), 0f, MaxDegrees);
+
         private static void PlacePanel(Args args, Vector3 way, string turn, float sign, Dictionary<string, object> result)
         {
-            if (!TryDocumentsPanel(result, out ModularPanel panel, out string name)) return;
-            if (args.on == false)
+            if (!TryDocumentsPanel(result, out DocumentsPanel panel)) return;
+            const string name = DocumentsPanelName;
+            if (!args.on)
             {
                 panel.SetPlace(false);
                 result["on"] = false;
@@ -154,7 +149,7 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools.Chart
             Transform t = panel.transform;
             if (args.direction != null)
             {
-                float distance = Mathf.Clamp(args.distance ?? DefaultDistance, PanelMinDistance, PanelMaxDistance);
+                float distance = Mathf.Clamp(args.distance, PanelMinDistance, PanelMaxDistance);
                 Vector3 before = t.position;
                 t.position = PanelPlacement.Reachable(before + way * distance, out bool limited);
                 float actual = (t.position - before).magnitude;
@@ -165,12 +160,12 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools.Chart
             }
             if (turn != null)
             {
-                float degrees = Mathf.Clamp(Math.Abs(args.degrees ?? DefaultDegrees), 0f, MaxDegrees) % 360f;
+                float degrees = AskedDegrees(args) % 360f;
                 RectTransform body = panel.PrimaryRect;
                 Vector3 centre = body != null ? body.TransformPoint(body.rect.center) : t.position;
                 t.RotateAround(centre, Vector3.up, sign * degrees);
                 result["turned"] = turn;
-                result["turnedDegrees"] = Math.Round(degrees, 1);
+                result["turnedDegrees"] = Round(degrees);
                 ActivityFeed.Record($"turned the {name} {degrees:0} degrees {turn}");
             }
         }

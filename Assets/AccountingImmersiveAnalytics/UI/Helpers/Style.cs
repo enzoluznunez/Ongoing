@@ -43,6 +43,8 @@ namespace AccountingImmersiveAnalytics.UI.Helpers
 
         public static float Descent(float size) => size * InkDescent;
 
+        public static float CentredBaseline(float middle, float size) => middle + Ascent(size) * 0.5f;
+
         public static float InkHeight(float size) => size * (InkAscent + InkDescent);
 
         public static readonly TextDecoration Outline = new TextDecoration

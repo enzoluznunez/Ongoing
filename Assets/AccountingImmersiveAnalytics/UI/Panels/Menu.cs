@@ -184,12 +184,11 @@ namespace AccountingImmersiveAnalytics.UI.Panels
         private static float MenuWidth()
         {
             float documents = ChartText.Width(Strings.Get("panel.documents"), Style.MediumText);
-            float connecting = ChartText.Width(Strings.Get("assistant.connecting") + MaxDots, Style.MediumText);
+            float connecting = ChartText.Width(Strings.Get("assistant.connecting") + new string('.', LoadingDots.Most), Style.MediumText);
             float label = Mathf.Ceil(Mathf.Max(documents, connecting)) + Style.MediumPad * 2f;
             return Mathf.Max(ButtonSize * 2f + ButtonGap, label);
         }
 
-        private const string MaxDots = "...";
 
         private static void PlaceButton(ButtonFactory.Handle button, float x, float y, float width)
         {

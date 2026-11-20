@@ -80,8 +80,7 @@ namespace AccountingImmersiveAnalytics.UI.Charts.View
 
         public void SetMode(ToolType tool)
         {
-            ToolType mode = tool == ToolType.Place ? ToolType.Place
-                : tool == ToolType.Scale ? ToolType.Scale : ToolType.None;
+            ToolType mode = ToolManager.IsGrabTool(tool) ? tool : ToolType.None;
             if (mode == _mode) return;
             _mode = mode;
             Apply();
@@ -114,13 +113,12 @@ namespace AccountingImmersiveAnalytics.UI.Charts.View
             }
             ChartManager charts = ChartManager.Instance;
             if (charts == null) return;
-            bool moved = (t.localPosition - _prePos).sqrMagnitude > 1e-8f;
-            bool turned = Quaternion.Angle(t.localRotation, _preRot) > 0.01f;
-            bool resized = (t.localScale - _preScale).sqrMagnitude > 1e-8f;
-            if (resized) charts.NotifyMoveCommitted(t, _prePos, _preRot, _preScale, EditKind.Scale, "Resized the chart");
-            else if (moved && turned) charts.NotifyMoveCommitted(t, _prePos, _preRot, _preScale, EditKind.Move, "Moved and turned the chart");
-            else if (turned) charts.NotifyMoveCommitted(t, _prePos, _preRot, _preScale, EditKind.Rotate, "Turned the chart");
-            else if (moved) charts.NotifyMoveCommitted(t, _prePos, _preRot, _preScale, EditKind.Move, "Moved the chart");
+            bool moved = MoveRecord.Moved(t.localPosition, _prePos);
+            bool turned = MoveRecord.Turned(t.localRotation, _preRot);
+            if (MoveRecord.Moved(t.localScale, _preScale)) charts.NotifyMoveCommitted(t, _prePos, _preRot, _preScale, EditKind.Scale);
+            else if (moved || turned)
+                charts.NotifyMoveCommitted(t, _prePos, _preRot, _preScale, moved ? EditKind.Move : EditKind.Rotate,
+                    moved && turned ? "Moved and turned the chart" : null);
         }
     }
 }

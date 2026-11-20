@@ -8,11 +8,11 @@ namespace AccountingImmersiveAnalytics.Assistant.Voice
 {
     public static class ContextBudget
     {
-        public const long WindowTokens = 131072;
+        private const long WindowTokens = 131072;
         public const long ServerTrimTrigger = 48000;
         public const long ServerTrimTarget = 24000;
         public const long CeilingTokens = WindowTokens / 2;
-        public const long WarningTokens = CeilingTokens - 6000;
+        private const long WarningTokens = CeilingTokens - 6000;
 
         private const long TrimNoticedTokens = 2000;
 

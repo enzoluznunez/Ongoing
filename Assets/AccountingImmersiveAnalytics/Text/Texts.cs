@@ -92,16 +92,7 @@ namespace AccountingImmersiveAnalytics.Text
                 binding.Surface = surface;
             }
 
-            if (surface != null)
-            {
-                if (binding.Wait != null) binding.Wait.End();
-                EndLoading(binding);
-                surface.SetWaiting(binding.Label, waiting);
-                binding.Apply(text);
-                return;
-            }
-
-            if (waiting)
+            if (surface == null && waiting)
             {
                 StartLoading(binding);
                 if (binding.Wait == null) binding.Wait = LayoutTools.Ensure<TranslationWait>(binding.Label.gameObject);
@@ -111,6 +102,7 @@ namespace AccountingImmersiveAnalytics.Text
 
             if (binding.Wait != null) binding.Wait.End();
             EndLoading(binding);
+            if (surface != null) surface.SetWaiting(binding.Label, waiting);
             binding.Apply(text);
         }
 

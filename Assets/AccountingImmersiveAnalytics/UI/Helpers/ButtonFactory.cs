@@ -119,15 +119,6 @@ namespace AccountingImmersiveAnalytics.UI.Helpers
             if (h.Text != null) h.Text.color = textColor;
         }
 
-        public static void SetPalette(Handle h, Color rest, Color select, Color restText, Color selectText)
-        {
-            if (h == null) return;
-            h.RestFill = rest;
-            h.SelectFill = select;
-            h.RestText = restText;
-            h.SelectText = selectText;
-        }
-
         public static void SetBorderless(Handle h)
         {
             if (h == null || h.Borderless) return;
@@ -156,18 +147,6 @@ namespace AccountingImmersiveAnalytics.UI.Helpers
         {
             if (h == null || h.Text == null) return;
             h.Text.AutoSize = false;
-        }
-
-        private static void SetStateTarget(Handle h, Graphic target,
-            Color rest, Color select, Color restText, Color selectText)
-        {
-            SetPalette(h, rest, select, restText, selectText);
-            if (h.Highlight == null) return;
-
-            h.Highlight.Target = target;
-            if (h.Text != null) h.Highlight.SetTextTarget(h.Text);
-            h.Highlight.SetState(rest, select, restText, selectText);
-            target.color = rest;
         }
 
         private static void Build(Handle h, string label, float radius)
@@ -214,7 +193,14 @@ namespace AccountingImmersiveAnalytics.UI.Helpers
             hl.SetLiftTarget(root.transform);
             h.Highlight = hl;
 
-            SetStateTarget(h, inner, Style.Card, Style.Ink, Style.Ink, Style.Card);
+            h.RestFill = Style.Card;
+            h.SelectFill = Style.Ink;
+            h.RestText = Style.Ink;
+            h.SelectText = Style.Card;
+            hl.Target = inner;
+            hl.SetTextTarget(text);
+            hl.SetState(h.RestFill, h.SelectFill, h.RestText, h.SelectText);
+            inner.color = h.RestFill;
 
             if (root.transform.Find("ButtonBack") != null) AddBack(h);
         }

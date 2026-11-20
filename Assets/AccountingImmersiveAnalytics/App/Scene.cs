@@ -29,6 +29,15 @@ namespace AccountingImmersiveAnalytics.App
             }
         }
 
+        public static bool ToolSelected
+        {
+            get
+            {
+                ToolManager tools = Tools;
+                return tools != null && tools.SelectedTool != ToolType.None;
+            }
+        }
+
         private static T Resolve<T>(ref T cached) where T : Object
         {
             if (cached == null) cached = Object.FindAnyObjectByType<T>();

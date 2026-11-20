@@ -22,11 +22,16 @@ namespace AccountingImmersiveAnalytics.UI.Charts.Spec
         public static bool Offered(ChartSpec spec) =>
             spec != null && (spec.Kind == ChartKind.Scatter || spec.Kind == ChartKind.Bubble);
 
-        public static TrendFit Fit(ChartSpec spec, CsvTable table, ChartShaping shaping, TrendKind kind)
+        public static TrendFit Fit(ChartSpec spec, CsvTable table, ChartShaping shaping, TrendKind kind) =>
+            Evaluate(spec, table, shaping, kind, out _);
+
+        public static TrendFit Evaluate(ChartSpec spec, CsvTable table, ChartShaping shaping, TrendKind kind, out string why)
         {
+            why = null;
             if (!Offered(spec) || table == null || kind == TrendKind.None) return null;
             List<(double X, double Y)> points = Points(spec, table, shaping);
-            if (!Fits(kind, points)) return null;
+            why = Problem(spec, kind, points);
+            if (why != null) return null;
 
             double low = points.Min(p => p.X), high = points.Max(p => p.X);
             string x = Prose(spec.TitleFor(Role.X)), y = Prose(spec.TitleFor(Role.Y));
@@ -97,29 +102,9 @@ namespace AccountingImmersiveAnalytics.UI.Charts.Spec
                 double w = at(v);
                 if (!double.IsNaN(w) && !double.IsInfinity(w)) fit.Curve.Add((v, w));
             }
-            return fit.Curve.Count > 1 ? fit : null;
-        }
-
-        public static bool Fits(ChartSpec spec, CsvTable table, ChartShaping shaping, TrendKind kind) =>
-            kind == TrendKind.None ? Offered(spec) : Fit(spec, table, shaping, kind) != null;
-
-        public static string WhyNot(ChartSpec spec, CsvTable table, ChartShaping shaping, TrendKind kind)
-        {
-            if (!Offered(spec) || table == null || kind == TrendKind.None) return null;
-            List<(double X, double Y)> points = Points(spec, table, shaping);
-            string name = Strings.Get("trend." + kind), x = spec.TitleFor(Role.X), y = spec.TitleFor(Role.Y);
-            if (Fits(kind, points)) return Fit(spec, table, shaping, kind) != null ? null : Strings.Format("trend.noCurve", name);
-            int needed = kind == TrendKind.Polynomial ? 3 : 2;
-            int distinct = DistinctX(points, needed);
-            if (kind == TrendKind.Smooth && points.Count < SmoothFewest) return Strings.Format("trend.needsPoints", name, SmoothFewest);
-            if (distinct < needed) return Strings.Format("trend.needsMore", name, needed, Numbers.Text(x));
-            switch (kind)
-            {
-                case TrendKind.Exponential: return Strings.Format("trend.needsAbove", name, Numbers.Text(y));
-                case TrendKind.Logarithmic: return Strings.Format("trend.needsAbove", name, Numbers.Text(x));
-                case TrendKind.Power: return Strings.Format("trend.needsBoth", name, Numbers.Text(x), Numbers.Text(y));
-                default: return null;
-            }
+            if (fit.Curve.Count > 1) return fit;
+            why = Strings.Format("trend.noCurve", Strings.Get("trend." + kind));
+            return null;
         }
 
         private static int DistinctX(List<(double X, double Y)> points, int enough)
@@ -130,18 +115,22 @@ namespace AccountingImmersiveAnalytics.UI.Charts.Spec
             return seen.Count;
         }
 
-        private static bool Fits(TrendKind kind, List<(double X, double Y)> points)
+        private static string Problem(ChartSpec spec, TrendKind kind, List<(double X, double Y)> points)
         {
-            int distinct = DistinctX(points, 3);
+            string name = Strings.Get("trend." + kind);
+            if (kind == TrendKind.Smooth && points.Count < SmoothFewest) return Strings.Format("trend.needsPoints", name, SmoothFewest);
+            int needed = kind == TrendKind.Polynomial ? 3 : 2;
+            if (DistinctX(points, needed) < needed) return Strings.Format("trend.needsMore", name, needed, Numbers.Text(spec.TitleFor(Role.X)));
             switch (kind)
             {
-                case TrendKind.Linear: return distinct >= 2;
-                case TrendKind.Exponential: return distinct >= 2 && points.All(p => p.Y > 0d);
-                case TrendKind.Logarithmic: return distinct >= 2 && points.All(p => p.X > 0d);
-                case TrendKind.Polynomial: return distinct >= 3;
-                case TrendKind.Power: return distinct >= 2 && points.All(p => p.X > 0d && p.Y > 0d);
-                case TrendKind.Smooth: return points.Count >= SmoothFewest && distinct >= 2;
-                default: return true;
+                case TrendKind.Exponential:
+                    return points.All(p => p.Y > 0d) ? null : Strings.Format("trend.needsAbove", name, Numbers.Text(spec.TitleFor(Role.Y)));
+                case TrendKind.Logarithmic:
+                    return points.All(p => p.X > 0d) ? null : Strings.Format("trend.needsAbove", name, Numbers.Text(spec.TitleFor(Role.X)));
+                case TrendKind.Power:
+                    return points.All(p => p.X > 0d && p.Y > 0d) ? null
+                        : Strings.Format("trend.needsBoth", name, Numbers.Text(spec.TitleFor(Role.X)), Numbers.Text(spec.TitleFor(Role.Y)));
+                default: return null;
             }
         }
 
@@ -213,15 +202,22 @@ namespace AccountingImmersiveAnalytics.UI.Charts.Spec
 
         private static double Lowess(List<(double X, double Y)> sorted, double at)
         {
-            int count = Math.Max(2, (int)Math.Ceiling(sorted.Count * SmoothSpan));
-            List<(double X, double Y, double D)> near = sorted
-                .Select(p => (p.X, p.Y, D: Math.Abs(p.X - at)))
-                .OrderBy(p => p.D).Take(count).ToList();
-            double reach = Math.Max(near[near.Count - 1].D, 1e-12) * 1.000001d;
-            double sw = 0, sx = 0, sy = 0, sxx = 0, sxy = 0;
-            foreach ((double px, double py, double pd) in near)
+            int n = sorted.Count;
+            int count = Math.Min(n, Math.Max(2, (int)Math.Ceiling(n * SmoothSpan)));
+            int from = FirstAtOrAbove(sorted, at), to = from;
+            while (to - from < count)
             {
-                double u = pd / reach;
+                if (from == 0) to++;
+                else if (to == n) from--;
+                else if (at - sorted[from - 1].X <= sorted[to].X - at) from--;
+                else to++;
+            }
+            double reach = Math.Max(Math.Max(at - sorted[from].X, sorted[to - 1].X - at), 1e-12) * 1.000001d;
+            double sw = 0, sx = 0, sy = 0, sxx = 0, sxy = 0;
+            for (int i = from; i < to; i++)
+            {
+                (double px, double py) = sorted[i];
+                double u = Math.Abs(px - at) / reach;
                 double w = Math.Pow(1d - u * u * u, 3d);
                 sw += w; sx += w * px; sy += w * py; sxx += w * px * px; sxy += w * px * py;
             }
@@ -230,6 +226,18 @@ namespace AccountingImmersiveAnalytics.UI.Charts.Spec
             double vx = sxx / sw - mx * mx;
             double b = vx > 1e-12 ? (sxy / sw - mx * my) / vx : 0d;
             return my + b * (at - mx);
+        }
+
+        private static int FirstAtOrAbove(List<(double X, double Y)> sorted, double at)
+        {
+            int low = 0, high = sorted.Count;
+            while (low < high)
+            {
+                int mid = (low + high) / 2;
+                if (sorted[mid].X < at) low = mid + 1;
+                else high = mid;
+            }
+            return low;
         }
 
         private static double Step(double low, double high)

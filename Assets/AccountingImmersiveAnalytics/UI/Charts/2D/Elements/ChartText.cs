@@ -69,8 +69,17 @@ namespace AccountingImmersiveAnalytics.UI.Charts.TwoD.Elements
             Boundaries.Clear();
             OneText.Unicode.TextSegmenter.GraphemeBoundaries(cut, Boundaries);
             int last = Boundaries.Count - 1;
-            while (last > 1 && Boundaries[last] > 0 && Width(Whole(cut, Boundaries[last]) + Ellipsis, size, weight) > room) last--;
-            cut = last >= 1 ? Whole(cut, Boundaries[last]) : cut;
+            if (last >= 1)
+            {
+                int low = 1;
+                while (low < last)
+                {
+                    int mid = (low + last + 1) / 2;
+                    if (Width(Whole(cut, Boundaries[mid]) + Ellipsis, size, weight) <= room) low = mid;
+                    else last = mid - 1;
+                }
+                cut = Whole(cut, Boundaries[low]);
+            }
             return cut.TrimEnd() + Ellipsis;
         }
 

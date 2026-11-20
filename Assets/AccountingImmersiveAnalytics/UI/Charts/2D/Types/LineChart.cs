@@ -58,8 +58,7 @@ namespace AccountingImmersiveAnalytics.UI.Charts.TwoD.Types
             }
 
             if (group != null)
-                d.Key.Add(KeySection.Groups(d.Spec.TitleFor(Role.Group), Names(group, groups), KeyShape.Line,
-                    i => ChartStyle.Group(ColourOf(group, allGroups, groups, groups[i]))));
+                GroupKey(d, Role.Group, group, allGroups, groups, KeyShape.Line);
             d.Finish();
         }
 

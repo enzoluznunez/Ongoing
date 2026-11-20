@@ -21,10 +21,9 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools.Chart
             [Doc("'ascending' or 'descending' orders the categories by value (bars, donut slices, heatmap rows; box plots by median). " +
                  "On a line, scatter or bubble chart 'descending' flips the x axis. 'none' returns to the data's own order. " +
                  "Leave it out to only open the Sort panel."), Optional]
-            [Values("ascending", "descending", "none")]
-            public string order;
+            public SortOrder? order;
             [Doc("false switches the button off, as pressing it again does. Defaults to true."), DefaultsTo(true), Optional]
-            public bool? on;
+            public bool on;
         }
 
         protected override bool EditsAreOutcome => true;
@@ -46,7 +45,6 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools.Chart
                 return;
             }
             if (!EnsureToolSelected(ToolType.Sort, result)) return;
-            result["on"] = true;
             if (args.order == null)
             {
                 result["chart"] = entry.Title;
@@ -54,13 +52,12 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools.Chart
                 result["ok"] = true;
                 return;
             }
-            SortOrder order = args.order == "descending" ? SortOrder.Descending
-                : args.order == "ascending" ? SortOrder.Ascending : SortOrder.None;
+            SortOrder order = args.order.Value;
             ChartShaping next = entry.Shaping.Copy();
             next.Sort = order;
             string label = order == SortOrder.None ? "Put the chart back in data order"
                 : $"Sorted the chart, {(order == SortOrder.Ascending ? "lowest" : "highest")} first";
-            Scene.Charts.Reshape(entry, next, EditKind.Sort, $"sorted \"{entry.Title}\" {args.order}", label);
+            Scene.Charts.Reshape(entry, next, EditKind.Sort, $"sorted \"{entry.Title}\" {order.ToString().ToLowerInvariant()}", label);
             result["chart"] = entry.Title;
             result["order"] = entry.Shaping.Sort.ToString().ToLowerInvariant();
         }

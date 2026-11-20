@@ -59,7 +59,7 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools
                 try
                 {
                     AssistantTurn.NoteToolCall();
-                    editsBefore = ChartManager.ActiveEdits != null ? ChartManager.ActiveEdits.Count : 0;
+                    editsBefore = ChartManager.ActiveEdits.Count;
                     act(result);
                 }
                 catch (Exception e)
@@ -69,7 +69,7 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools
                 }
                 finally
                 {
-                    editsAfter = ChartManager.ActiveEdits != null ? ChartManager.ActiveEdits.Count : 0;
+                    editsAfter = ChartManager.ActiveEdits.Count;
                     ActivityFeed.InAssistantCall = false;
                     string did = ActivityFeed.TakeAssistantBatch();
                     if (!string.IsNullOrEmpty(did)) result["did"] = did;

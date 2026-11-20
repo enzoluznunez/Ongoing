@@ -38,6 +38,7 @@ namespace AccountingImmersiveAnalytics.UI.Helpers
         private void Apply()
         {
             _waiting.RemoveWhere(label => label == null);
+            enabled = _waiting.Count > 0;
             bool show = false;
             foreach (Component label in _waiting)
                 if (label.gameObject.activeInHierarchy) { show = true; break; }

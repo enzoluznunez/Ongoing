@@ -19,10 +19,9 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools.Chart
             public string chart;
             [Doc("The trend to draw, as the Trend button on the pinned chart's Trendline panel offers them, or 'none' to turn it off. " +
                  "Leave it out to only open the Trendline panel."), Optional]
-            [Values("none", "linear", "exponential", "logarithmic", "polynomial", "power", "smooth")]
-            public string trend;
+            public TrendKind? trend;
             [Doc("false switches the button off, as pressing it again does. Defaults to true."), DefaultsTo(true), Optional]
-            public bool? on;
+            public bool on;
         }
 
         protected override bool EditsAreOutcome => true;
@@ -47,7 +46,6 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools.Chart
                 return;
             }
             if (!EnsureToolSelected(ToolType.Trendline, result)) return;
-            result["on"] = true;
             if (args.trend == null)
             {
                 result["chart"] = entry.Title;
@@ -55,12 +53,7 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools.Chart
                 result["ok"] = true;
                 return;
             }
-            if (!System.Enum.TryParse(args.trend, true, out TrendKind trend) || !System.Enum.IsDefined(typeof(TrendKind), trend))
-            {
-                result["error"] = $"Unknown trend '{args.trend}'. Use none, linear, exponential, logarithmic, polynomial, power or smooth.";
-                return;
-            }
-            Scene.Charts.SetTrend(entry, trend);
+            Scene.Charts.SetTrend(entry, args.trend.Value);
             result["chart"] = entry.Title;
             result["trend"] = entry.Shaping.Trend.ToString().ToLowerInvariant();
             if (entry.Shaping.Trend == TrendKind.None) return;

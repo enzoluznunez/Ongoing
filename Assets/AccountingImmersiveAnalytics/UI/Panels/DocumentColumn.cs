@@ -16,8 +16,8 @@ namespace AccountingImmersiveAnalytics.UI.Panels
 {
     public sealed class DocumentColumn
     {
-        private const float Radius = Style.LargeRadius * ChartStyle.PreviewScale;
-        private static float PanelUnitsPerPoint => Style.Panel.x / (float)DocumentEntry.LetterWidth;
+        private const float Radius = ChartStyle.PreviewRadius;
+        public static float PanelUnitsPerPoint => Style.Panel.x / (float)DocumentEntry.LetterWidth;
         private static float UnitsPerPoint => PanelUnitsPerPoint * ChartStyle.PreviewScale;
 
         public static float WidthFor(IReadOnlyList<DocumentEntry> entries)
@@ -109,10 +109,9 @@ namespace AccountingImmersiveAnalytics.UI.Panels
             return rt;
         }
 
-        private void AddMessage(RectTransform page)
+        public static void AddMessage(RectTransform page)
         {
             OneTextLabel label = LabelFactory.Make(page, "Message", Style.Ink, LabelAnchor.Center, TextOverflow.Overflow, bold: true, wrap: true);
-            label.raycastTarget = false;
             LayoutTools.Stretch(label.rectTransform, Style.LargePad);
             Texts.Bind(label, () => Strings.Get("documents.display"));
         }
@@ -136,11 +135,11 @@ namespace AccountingImmersiveAnalytics.UI.Panels
                     if (_disposed) return;
                     pages = await PdfPages.Open(bytes);
                     if (_disposed || pages == null) continue;
-                    Vector2Int pixels = Pixels(slot.Entry);
+                    Vector2Int pixels = PdfPages.PixelsFor(slot.Entry.PageWidth, slot.Entry.PageHeight, ChartStyle.PreviewScale);
                     PagePixels drawn = await pages.Render(0, pixels.x, pixels.y);
                     if (_disposed || slot.Picture == null)
                     {
-                        PdfPages.Discard(drawn);
+                        drawn?.Dispose();
                         return;
                     }
                     if (drawn == null) continue;
@@ -158,13 +157,6 @@ namespace AccountingImmersiveAnalytics.UI.Panels
                     pages?.Dispose();
                 }
             }
-        }
-
-        private Vector2Int Pixels(DocumentEntry entry)
-        {
-            Vector2Int full = PdfPages.PixelsFor(entry.PageWidth, entry.PageHeight);
-            float share = ChartStyle.PreviewScale;
-            return new Vector2Int(Mathf.Max(1, Mathf.RoundToInt(full.x * share)), Mathf.Max(1, Mathf.RoundToInt(full.y * share)));
         }
 
         public void Dispose()

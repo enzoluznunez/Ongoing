@@ -39,24 +39,29 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools
             return false;
         }
 
-        public static bool TryTurnSign(string direction, out float sign)
-        {
-            sign = direction == "right" ? 1f : direction == "left" ? -1f : 0f;
-            return sign != 0f;
-        }
+        public const string DocumentsPanelName = "Documents panel";
 
-        public static bool TryPinnedChart(Dictionary<string, object> result, string verb, out ChartManager charts, out Transform chart)
+        public static bool TryCharts(Dictionary<string, object> result, out ChartManager charts)
         {
             charts = Scene.Charts;
-            chart = charts != null ? charts.PinnedTransform : null;
-            if (charts == null) { result["error"] = "The chart manager was not found in the scene."; return false; }
-            if (chart == null)
-            {
-                Refuse(result, "pinned chart",
-                    $"Only the pinned chart can be {verb}d. Pin one with CallPin first, then call again.");
-                return false;
-            }
-            return true;
+            if (charts != null) return true;
+            result["error"] = "The chart manager was not found in the scene.";
+            return false;
+        }
+
+        public static List<string> ShownTitles(ChartManager charts)
+        {
+            var titles = new List<string>();
+            foreach (ChartEntry shown in charts.Shown) titles.Add(shown.Title);
+            return titles;
+        }
+
+        public static bool TryPinnedChart(Dictionary<string, object> result, string refusal, out ChartManager charts)
+        {
+            if (!TryCharts(result, out charts)) return false;
+            if (charts.PinnedTransform != null) return true;
+            Refuse(result, "pinned chart", refusal + " Pin one with CallPin first, then call again.");
+            return false;
         }
 
         public static ChartPose ChangeChartPose(ChartManager charts, Transform chart, EditKind kind, Action<Transform> change)
@@ -72,12 +77,10 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools
         public static bool TryChart(string query, Dictionary<string, object> result, out ChartEntry entry)
         {
             entry = null;
-            ChartManager charts = Scene.Charts;
-            if (charts == null) { result["error"] = "The chart manager was not found in the scene."; return false; }
+            if (!TryCharts(result, out ChartManager charts)) return false;
             entry = charts.Find(query);
             if (entry != null) return true;
-            var titles = new List<string>();
-            foreach (ChartEntry shown in charts.Shown) titles.Add(shown.Title);
+            List<string> titles = ShownTitles(charts);
             if (titles.Count == 0)
             {
                 Refuse(result, "charts shown", "No charts are shown. Open a document with SetDocument first.");
@@ -114,12 +117,13 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools
                 result["error"] = $"The {tool} tool could not be selected.";
                 return false;
             }
+            result["on"] = true;
             return true;
         }
 
-        public static bool SwitchedOff(ToolType tool, bool? on, Dictionary<string, object> result)
+        public static bool SwitchedOff(ToolType tool, bool on, Dictionary<string, object> result)
         {
-            if (on != false) return false;
+            if (on) return false;
             ToolManager tools = Scene.Tools;
             if (tools == null) { result["error"] = "The tool manager was not found in the scene."; return true; }
             if (tools.SelectedTool == tool) tools.DeselectTool();
@@ -128,18 +132,12 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools
             return true;
         }
 
-        public static bool TryShapingChart(ToolType tool, string chart, Dictionary<string, object> result, out ChartEntry entry)
+        public static bool TryDocumentsPanel(Dictionary<string, object> result, out DocumentsPanel panel)
         {
-            if (!TryChart(chart, result, out entry)) return false;
-            return EnsureToolSelected(tool, result);
-        }
-
-        public static bool TryDocumentsPanel(Dictionary<string, object> result, out ModularPanel panel, out string name)
-        {
-            name = "Documents panel";
             panel = Scene.Documents;
-            if (panel == null) { result["error"] = $"The {name} was not found in the scene."; return false; }
-            return true;
+            if (panel != null) return true;
+            result["error"] = $"The {DocumentsPanelName} was not found in the scene.";
+            return false;
         }
     }
 }

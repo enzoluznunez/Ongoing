@@ -117,13 +117,6 @@ namespace AccountingImmersiveAnalytics.UI.Panels
             LayoutRebuilder.MarkLayoutForRebuild((RectTransform)_titleBar);
         }
 
-        protected void RefreshTitleIcon(ButtonFactory.Handle button, bool selected, bool enabled = true)
-        {
-            if (button == null) return;
-            ButtonFactory.SetSelected(button, selected);
-            ButtonFactory.SetEnabled(button, enabled);
-        }
-
         private void BuildGrabSurface()
         {
             RectTransform canvas = CanvasRect;
@@ -162,7 +155,7 @@ namespace AccountingImmersiveAnalytics.UI.Panels
             RefreshPlacementIcons();
         }
 
-        protected void RefreshPlacementIcons() => RefreshTitleIcon(_moveButton, GrabMode == GrabMode.Move);
+        protected void RefreshPlacementIcons() => ButtonFactory.SetSelected(_moveButton, GrabMode == GrabMode.Move);
 
         protected override void OnLineupChanged() => QueueSettle();
 

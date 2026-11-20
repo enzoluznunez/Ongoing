@@ -1,3 +1,4 @@
+using AccountingImmersiveAnalytics.Documents;
 using AccountingImmersiveAnalytics.UI.Panels;
 using UnityEngine;
 
@@ -36,9 +37,9 @@ namespace AccountingImmersiveAnalytics.App
             {
                 Done = true;
                 _banner.Hide();
-                float took = _elapsed;
-                if (timedOut) Debug.LogWarning($"[LoadingPhase] Gave up waiting after {took:F1} s, at: {stage}");
-                else Debug.Log($"[LoadingPhase] Loaded in {took:F1} s.");
+                enabled = false;
+                if (timedOut) Debug.LogWarning($"[LoadingPhase] Gave up waiting after {_elapsed:F1} s, at: {stage}");
+                else Debug.Log($"[LoadingPhase] Loaded in {_elapsed:F1} s.");
                 return;
             }
 
@@ -47,7 +48,7 @@ namespace AccountingImmersiveAnalytics.App
 
         private string Stage()
         {
-            if (Scene.Charts != null && !AccountingImmersiveAnalytics.Documents.DocumentLibrary.Ready) return ListingStage;
+            if (Scene.Charts != null && !DocumentLibrary.Ready) return ListingStage;
             if (!GraphicsWarm.Step()) return "loading.graphics";
             return null;
         }

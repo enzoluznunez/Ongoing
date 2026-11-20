@@ -11,11 +11,10 @@ namespace AccountingImmersiveAnalytics.Documents
     {
         public const string Folder = "Documents";
         public const string IndexFile = Folder + "/index.json";
-        public const string Extension = ".pdf";
-        public const string CsvExtension = DocumentEntry.CsvExtension;
+        private const string Extension = ".pdf";
 
         public static bool Listed(string name) =>
-            name.EndsWith(Extension, StringComparison.OrdinalIgnoreCase) || name.EndsWith(CsvExtension, StringComparison.OrdinalIgnoreCase);
+            name.EndsWith(Extension, StringComparison.OrdinalIgnoreCase) || DocumentEntry.IsCsvName(name);
 
         private static readonly List<DocumentEntry> Entries = new List<DocumentEntry>();
         private static Task _loading;
@@ -24,27 +23,24 @@ namespace AccountingImmersiveAnalytics.Documents
 
         public static bool Ready { get; private set; }
 
-        public static event Action Changed;
-
         public static Task Load() => _loading ??= LoadAsync();
 
         private static async Task LoadAsync()
         {
             Entries.Clear();
             var reads = new List<Task<DocumentEntry>>();
-            foreach (string name in await FileNames())
+            foreach (string name in await StreamingFiles.List(Folder, IndexFile))
                 if (Listed(name)) reads.Add(EntryFor(name));
             Entries.AddRange(await Task.WhenAll(reads));
             if (Entries.Count == 0) Debug.LogWarning($"[DocumentLibrary] No PDF or CSV files were found in StreamingAssets/{Folder}.");
             Ready = true;
-            Changed?.Invoke();
         }
 
         private static async Task<DocumentEntry> EntryFor(string name)
         {
             string id = System.IO.Path.GetFileNameWithoutExtension(name);
             string file = $"{Folder}/{name}";
-            if (name.EndsWith(CsvExtension, StringComparison.OrdinalIgnoreCase))
+            if (DocumentEntry.IsCsvName(name))
                 return new DocumentEntry { Id = id, Title = id, File = file };
             byte[] bytes = await StreamingFiles.ReadBytes(file);
             var peek = bytes != null ? await Task.Run(() => PdfDocumentReader.Peek(bytes)) : null;
@@ -58,8 +54,6 @@ namespace AccountingImmersiveAnalytics.Documents
             }
             return entry;
         }
-
-        private static Task<List<string>> FileNames() => StreamingFiles.List(Folder, "", IndexFile);
 
         public static DocumentEntry Find(string wanted)
         {
@@ -79,8 +73,6 @@ namespace AccountingImmersiveAnalytics.Documents
             return hits == 1 ? only : null;
         }
 
-        public static int IndexOf(DocumentEntry entry) => entry == null ? -1 : Entries.IndexOf(entry);
-
         public static string ForPrompt()
         {
             if (Entries.Count == 0) return "none yet";
@@ -99,7 +91,6 @@ namespace AccountingImmersiveAnalytics.Documents
             Entries.Clear();
             _loading = null;
             Ready = false;
-            Changed = null;
         }
     }
 }

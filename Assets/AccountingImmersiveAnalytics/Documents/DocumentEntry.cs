@@ -14,6 +14,8 @@ namespace AccountingImmersiveAnalytics.Documents
         public const string CsvExtension = ".csv";
         public const double LetterWidth = 612, LetterHeight = 792;
 
-        public bool IsCsv => File != null && File.EndsWith(CsvExtension, StringComparison.OrdinalIgnoreCase);
+        public bool IsCsv => File != null && IsCsvName(File);
+
+        public static bool IsCsvName(string name) => name.EndsWith(CsvExtension, StringComparison.OrdinalIgnoreCase);
     }
 }

@@ -1,5 +1,5 @@
 using System.Collections.Generic;
-using System.Text;
+using System.Linq;
 using UnityEngine;
 
 namespace AccountingImmersiveAnalytics.UI.Charts.TwoD.Layout
@@ -60,23 +60,14 @@ namespace AccountingImmersiveAnalytics.UI.Charts.TwoD.Layout
             }
         }
 
-        public string Body
-        {
-            get
-            {
-                var text = new StringBuilder();
-                foreach (var pair in Values) text.Append(text.Length > 0 ? "\n" : "").Append(pair.Key).Append(": ").Append(pair.Value);
-                return text.ToString();
-            }
-        }
+        public string Body => string.Join("; ", Values.Select(pair => $"{pair.Key}: {pair.Value}"));
 
         public List<KeyValuePair<string, string>> Rows
         {
             get
             {
                 var rows = new List<KeyValuePair<string, string>>();
-                bool listed = false;
-                foreach (var pair in Values) listed |= pair.Value == Title;
+                bool listed = Values.Exists(pair => pair.Value == Title);
                 if (!string.IsNullOrEmpty(TitleField) && !string.IsNullOrEmpty(Title) && !listed)
                     rows.Add(new KeyValuePair<string, string>(TitleField, Title));
                 rows.AddRange(Values);
@@ -86,9 +77,9 @@ namespace AccountingImmersiveAnalytics.UI.Charts.TwoD.Layout
 
         public string Describe()
         {
-            var text = new StringBuilder(Title ?? "");
-            foreach (var pair in Values) text.Append(text.Length > 0 ? "; " : "").Append(pair.Key).Append(": ").Append(pair.Value);
-            return text.ToString();
+            string body = Body;
+            if (string.IsNullOrEmpty(Title)) return body;
+            return body.Length > 0 ? $"{Title}; {body}" : Title;
         }
     }
 }

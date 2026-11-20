@@ -18,7 +18,10 @@ namespace AccountingImmersiveAnalytics.Assistant.Voice
 
         public static void Start() => _wanted = new SemaphoreSlim(0);
 
-        public static void Request() => _wanted?.Release();
+        public static void Request()
+        {
+            if (_wanted != null && _wanted.CurrentCount == 0) _wanted.Release();
+        }
 
         private static bool Idle() => VoiceSession.KeepAlive && VoiceSession.Ready && !VoiceSession.Busy;
 

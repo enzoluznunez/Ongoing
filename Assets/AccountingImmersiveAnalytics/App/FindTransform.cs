@@ -5,16 +5,18 @@ namespace AccountingImmersiveAnalytics.App
 {
     public static class FindTransform
     {
-        public static List<Transform> FindAllDeep(Transform parent, string name, List<Transform> results = null)
+        public static List<Transform> FindAllDeep(Transform parent, string name)
         {
-            results = results ?? new List<Transform>();
-            if (parent == null) return results;
-
-            if (parent.name == name) results.Add(parent);
-            for (int i = 0; i < parent.childCount; i++)
-                FindAllDeep(parent.GetChild(i), name, results);
-
+            var results = new List<Transform>();
+            if (parent != null) CollectDeep(parent, name, results);
             return results;
+        }
+
+        private static void CollectDeep(Transform t, string name, List<Transform> into)
+        {
+            if (t.name == name) into.Add(t);
+            for (int i = 0; i < t.childCount; i++)
+                CollectDeep(t.GetChild(i), name, into);
         }
 
         public static Transform EnsureChild(Transform parent, string name)

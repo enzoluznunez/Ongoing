@@ -10,18 +10,23 @@ namespace AccountingImmersiveAnalytics.Text
 {
     public static class Numbers
     {
+        private static readonly Dictionary<string, double> SuffixSizes = BuildSuffixSizes();
+
+        private static readonly string SuffixClass = "[" + Regex.Escape(string.Concat(SuffixSizes.Keys)) + "]";
+
         private static readonly Regex Token = new Regex(
-            @"(?<![\p{L}\p{N}_.,])(-?)(\d{1,3}(?:,\d{3})+|\d+)(\.\d+)?([kMBT])?(%)?(?![\p{L}\p{N}_])", RegexOptions.CultureInvariant);
+            @"(?<![\p{L}\p{N}_.,])(-?)(\d{1,3}(?:,\d{3})+|\d+)(\.\d+)?(" + SuffixClass + @")?(%)?(?![\p{L}\p{N}_])", RegexOptions.CultureInvariant);
 
         private static readonly Regex OnlyNumber = new Regex(
-            @"^\s*-?(\d{1,3}(?:,\d{3})+|\d+)(\.\d+)?[kMBT]?%?\s*$", RegexOptions.CultureInvariant);
+            @"^\s*-?(\d{1,3}(?:,\d{3})+|\d+)(\.\d+)?" + SuffixClass + @"?%?\s*$", RegexOptions.CultureInvariant);
 
         private static readonly Dictionary<string, (string template, string[] tokens)> Templates =
             new Dictionary<string, (string, string[])>();
 
-        public static NumberStyle Style =>
-            NumberFormats.ByLanguage.TryGetValue(Language.Current, out NumberStyle style) ? style
-            : NumberFormats.ByLanguage.TryGetValue(Language.English, out NumberStyle english) ? english : NumberStyle.Invariant;
+        public static NumberStyle Style => StyleOf(Language.Current);
+
+        public static NumberStyle StyleOf(string code) =>
+            code != null && NumberFormats.ByLanguage.TryGetValue(code, out NumberStyle style) ? style : NumberStyle.Invariant;
 
         public static string Shown(double value, double step) => AxisFormat.Number(value, step, Style);
 
@@ -70,7 +75,7 @@ namespace AccountingImmersiveAnalytics.Text
         {
             NumberStyle style = Style;
             string sign = m.Groups[1].Value, digits = m.Groups[2].Value, fraction = m.Groups[3].Value, suffix = m.Groups[4].Value;
-            bool percent = m.Groups[5].Success && m.Groups[5].Value.Length > 0;
+            bool percent = m.Groups[5].Success;
             string shown;
             if (digits.IndexOf(',') < 0 && fraction.Length == 0 && suffix.Length == 0)
             {
@@ -80,13 +85,20 @@ namespace AccountingImmersiveAnalytics.Text
             {
                 if (!double.TryParse(digits.Replace(",", "") + fraction, NumberStyles.Float, CultureInfo.InvariantCulture, out double number))
                     return m.Value;
-                double size = suffix == "k" ? 1e3 : suffix == "M" ? 1e6 : suffix == "B" ? 1e9 : suffix == "T" ? 1e12 : 1d;
+                double size = suffix.Length > 0 ? SuffixSizes[suffix] : 1d;
                 int decimals = fraction.Length > 0 ? fraction.Length - 1 : 0;
                 double value = (sign.Length > 0 ? -number : number) * size;
                 double step = Math.Pow(10d, -decimals) * size;
                 shown = suffix.Length > 0 ? AxisFormat.Number(value, step, style) : AxisFormat.Plain(value, step, style);
             }
             return percent ? style.Percent(shown) : shown;
+        }
+
+        private static Dictionary<string, double> BuildSuffixSizes()
+        {
+            var sizes = new Dictionary<string, double>();
+            foreach (NumberUnit unit in NumberStyle.Invariant.Units) sizes[unit.Suffix] = unit.Divisor;
+            return sizes;
         }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]

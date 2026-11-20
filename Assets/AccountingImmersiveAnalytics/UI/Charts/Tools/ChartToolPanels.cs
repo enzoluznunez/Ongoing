@@ -23,20 +23,17 @@ namespace AccountingImmersiveAnalytics.UI.Charts.Tools
 
         private static readonly SortOrder[] SortCycle = { SortOrder.None, SortOrder.Ascending, SortOrder.Descending };
 
-        public static bool Build(PanelCard card, ToolType tool, ChartEntry entry, ChartCard view, ChartManager charts)
+        public static void Build(PanelCard card, ToolType tool, ChartEntry entry, ChartCard view, ChartManager charts)
         {
             switch (tool)
             {
-                case ToolType.Sort: Sort(card, entry, charts); return true;
-                case ToolType.Filter: Filter(card, entry, charts); return true;
-                case ToolType.Trendline: Trend(card, entry, charts); return true;
-                case ToolType.Key: Key(card, view); return true;
-                case ToolType.Edits: Edits(card, entry, charts); return true;
-                default: return false;
+                case ToolType.Sort: Sort(card, entry, charts); break;
+                case ToolType.Filter: Filter(card, entry, charts); break;
+                case ToolType.Trendline: Trend(card, entry, charts); break;
+                case ToolType.Key: Key(card, view); break;
+                case ToolType.Edits: Edits(card, entry, charts); break;
             }
         }
-
-        private static string Data(string text) => Numbers.Text(text ?? "");
 
         private static Role SortRole(ChartSpec spec)
         {
@@ -50,17 +47,14 @@ namespace AccountingImmersiveAnalytics.UI.Charts.Tools
             }
         }
 
-        private static bool SortsByValue(ChartSpec spec) =>
-            spec.Kind == ChartKind.Bar || spec.Kind == ChartKind.Pie || spec.Kind == ChartKind.BoxPlot || spec.Kind == ChartKind.Heatmap;
-
         private static void Sort(PanelCard card, ChartEntry entry, ChartManager charts)
         {
             ChartSpec spec = entry.Spec;
             string field = spec.TitleFor(SortRole(spec));
             SortOrder now = entry.Shaping.Sort;
-            card.Wide(() => Data(field), () => Strings.Get("sort." + now.ToString().ToLowerInvariant()), true, false, true, () =>
+            card.Wide(() => ChartText.Shown(field), () => Strings.Get("sort." + now.ToString().ToLowerInvariant()), true, false, true, () =>
             {
-                if (ActivityFeed.UserDriven) AssistantTurn.UserTookControl();
+                AssistantTurn.UserActed();
                 SortOrder next = SortCycle[(Array.IndexOf(SortCycle, entry.Shaping.Sort) + 1) % SortCycle.Length];
                 ChartShaping shaping = entry.Shaping.Copy();
                 shaping.Sort = next;
@@ -69,10 +63,10 @@ namespace AccountingImmersiveAnalytics.UI.Charts.Tools
                     : $"Sorted {field}, {(next == SortOrder.Ascending ? "lowest" : "highest")} first";
                 charts.Reshape(entry, shaping, EditKind.Sort, $"sorted \"{entry.Title}\" {next.ToString().ToLowerInvariant()}", label);
             });
-            if (SortsByValue(spec))
+            if (Aggregates(spec.Kind))
             {
                 string by = spec.TitleFor(Role.Value);
-                card.Line(() => Strings.Format("sort.by", Data(by)));
+                card.Line(() => Strings.Format("sort.by", ChartText.Shown(by)));
             }
         }
 
@@ -95,10 +89,10 @@ namespace AccountingImmersiveAnalytics.UI.Charts.Tools
                 {
                     string c = category;
                     bool hidden = entry.Shaping.Hidden.TryGetValue(field.Name, out HashSet<string> set) && set.Contains(c);
-                    chips.Add((() => Data(c), !hidden, () => ToggleCategory(entry, field, c, charts)));
+                    chips.Add((() => ChartText.Shown(c), !hidden, () => ToggleCategory(entry, field, c, charts)));
                     described.Add($"'{c}' ({(hidden ? "hidden" : "shown")})");
                 }
-                card.Chips(() => Data(field.Name), chips, $"filter {field.Name}", i => described[i]);
+                card.Chips(() => ChartText.Shown(field.Name), chips, $"filter {field.Name}", i => described[i]);
             }
 
             bool aggregates = Aggregates(entry.Spec.Kind);
@@ -108,7 +102,7 @@ namespace AccountingImmersiveAnalytics.UI.Charts.Tools
                 bool plotted = used.Exists(n => string.Equals(n, field.Name, StringComparison.OrdinalIgnoreCase));
                 if (aggregates == plotted) continue;
                 (double low, double high) = entry.Shaping.Ranges.TryGetValue(field.Name, out var range) ? range : (field.Min, field.Max);
-                RangeSlider slider = card.Range(() => Data(field.Name), field.Min, field.Max, low, high, Whole(field));
+                RangeSlider slider = card.Range(() => ChartText.Shown(field.Name), field.Min, field.Max, low, high, Whole(field));
                 ChartShaping before = null;
                 slider.Changed += (a, b) =>
                 {
@@ -119,7 +113,7 @@ namespace AccountingImmersiveAnalytics.UI.Charts.Tools
                 slider.Released += (a, b) =>
                 {
                     if (before == null) return;
-                    if (ActivityFeed.UserDriven) AssistantTurn.UserTookControl();
+                    AssistantTurn.UserActed();
                     bool full = a <= field.Min && b >= field.Max;
                     string label = full ? $"Showed all {field.Name}" : $"Kept {field.Name} from {Scales.AxisFormat.Value(a)} to {Scales.AxisFormat.Value(b)}";
                     charts.Commit(entry, before, EditKind.Filter, $"filtered \"{entry.Title}\" by '{field.Name}'", label);
@@ -130,7 +124,7 @@ namespace AccountingImmersiveAnalytics.UI.Charts.Tools
             if (entry.LeftOut.Count > 0)
             {
                 string names = string.Join(", ", entry.LeftOut);
-                card.Line(() => Strings.Format("filter.leftOut", Data(names)));
+                card.Line(() => Strings.Format("filter.leftOut", ChartText.Shown(names)));
             }
             count = card.Line(CountText(entry));
         }
@@ -170,7 +164,7 @@ namespace AccountingImmersiveAnalytics.UI.Charts.Tools
                 next.Hidden[field.Name] = hidden = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             bool hide = !hidden.Contains(category);
             if (hide && hidden.Count >= field.Categories.Count - 1) return;
-            if (ActivityFeed.UserDriven) AssistantTurn.UserTookControl();
+            AssistantTurn.UserActed();
             if (hide) hidden.Add(category);
             else hidden.Remove(category);
             if (hidden.Count == 0) next.Hidden.Remove(field.Name);
@@ -181,20 +175,19 @@ namespace AccountingImmersiveAnalytics.UI.Charts.Tools
         private static void Trend(PanelCard card, ChartEntry entry, ChartManager charts)
         {
             TrendKind now = entry.Shaping.Trend;
-            bool fits = TrendFitter.Fits(entry.Spec, entry.Table, entry.Shaping, now);
+            TrendFit fit = TrendFitter.Evaluate(entry.Spec, entry.Table, entry.Shaping, now, out string why);
+            bool fits = now == TrendKind.None ? TrendFitter.Offered(entry.Spec) : fit != null;
             card.Wide(() => Strings.Get("trend.name"), () => Strings.Get("trend." + now), true, !fits, true, () =>
             {
-                if (ActivityFeed.UserDriven) AssistantTurn.UserTookControl();
+                AssistantTurn.UserActed();
                 TrendKind next = TrendFitter.Order[(Array.IndexOf(TrendFitter.Order, entry.Shaping.Trend) + 1) % TrendFitter.Order.Length];
                 charts.SetTrend(entry, next);
             });
             if (!fits)
             {
-                string why = TrendFitter.WhyNot(entry.Spec, entry.Table, entry.Shaping, now);
                 if (why != null) card.Line(() => why);
                 return;
             }
-            TrendFit fit = TrendFitter.Fit(entry.Spec, entry.Table, entry.Shaping, now);
             if (fit != null) card.Line(() => Numbers.Text(fit.Meaning));
         }
 
@@ -208,8 +201,8 @@ namespace AccountingImmersiveAnalytics.UI.Charts.Tools
                 {
                     var ramp = s.RampLabels.ConvertAll(Numbers.Text);
                     float labels = Style.InkHeight(Style.MediumText);
-                    RectTransform rampRow = card.Row(card.NameRow(() => Data(s.Title)));
-                    card.Name(rampRow, () => Data(s.Title));
+                    RectTransform rampRow = card.Row(card.NameRow(() => ChartText.Shown(s.Title)));
+                    card.Name(rampRow, () => ChartText.Shown(s.Title));
                     float barTop = (PanelCard.RowHeight - ChartStyle.RampHeight - Style.SmallPad - labels) * 0.5f;
                     RectTransform area = card.PlaceIn(LayoutTools.EnsureChild(card.Centred(rampRow, PanelCard.RowHeight), "Ramp"), card.Half - PanelCard.Inset, 0f, card.ControlWidth, PanelCard.RowHeight);
                     MarkSurface marks = LayoutTools.Ensure<MarkSurface>(area.gameObject);
@@ -230,15 +223,15 @@ namespace AccountingImmersiveAnalytics.UI.Charts.Tools
                 }
 
                 float tall = s.Shape == KeyShape.Size ? Mathf.Max(PanelCard.RowHeight, s.LargestRadius * 2f) : PanelCard.RowHeight;
-                RectTransform row = card.Row(Mathf.Max(tall, card.NameRow(() => Data(s.Title))));
-                card.Name(row, () => Data(s.Title));
+                RectTransform row = card.Row(Mathf.Max(tall, card.NameRow(() => ChartText.Shown(s.Title))));
+                card.Name(row, () => ChartText.Shown(s.Title));
                 var items = new List<(float, Action<RectTransform>)>();
                 var names = new List<string>();
                 foreach (KeyEntry entry in s.Entries)
                 {
                     KeyEntry e = entry;
                     float swatch = s.Shape == KeyShape.Size ? e.Radius * 2f : KeySwatch;
-                    string name = Data(e.Name);
+                    string name = ChartText.Shown(e.Name);
                     names.Add(e.Name);
                     float wide = swatch + Style.SmallPad + Mathf.Ceil(ChartText.Width(name, Style.MediumText));
                     items.Add((wide, holder => Swatch(holder, s.Shape, e, swatch, name, tall, card.Mirrored)));
@@ -287,7 +280,7 @@ namespace AccountingImmersiveAnalytics.UI.Charts.Tools
             var text = new ChartText(words);
             text.Begin();
             float textAt = mirrored ? holder.rect.width - size - Style.SmallPad : size + Style.SmallPad;
-            text.Put(name, Style.MediumText, Style.NormalWeight, textAt, middle + Style.Ascent(Style.MediumText) * 0.5f, mirrored ? Align.End : Align.Start);
+            text.Put(name, Style.MediumText, Style.NormalWeight, textAt, Style.CentredBaseline(middle, Style.MediumText), mirrored ? Align.End : Align.Start);
             text.End();
         }
 
@@ -302,10 +295,10 @@ namespace AccountingImmersiveAnalytics.UI.Charts.Tools
                 card.Pair(() => Numbers.Text(e.What ?? Edit.KindName(e.Kind)),
                     () => Strings.Get(e.ByAssistant ? "assistant" : "edits.you"), true);
             }
-            card.EndList("edits", "edit", i => $"{edits[i].What ?? Edit.KindName(edits[i].Kind)} ({(edits[i].ByAssistant ? "Assistant" : "You")})");
+            card.EndList("edits", "edit", i => edits[i].Describe());
             card.Wide(null, () => Strings.Get("edits.undo"), false, false, edits.Count > 0, () =>
             {
-                if (ActivityFeed.UserDriven) AssistantTurn.UserTookControl();
+                AssistantTurn.UserActed();
                 charts.UndoNewest(entry);
             }, PanelCard.ListGap);
         }

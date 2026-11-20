@@ -14,8 +14,7 @@ namespace AccountingImmersiveAnalytics.App
         private const float SummarySeconds = 10f;
         private const int TimingDepth = 4;
 
-        private static HitchLog _instance;
-        private static readonly List<(float at, string what)> Notes = new List<(float, string)>();
+        private readonly List<(float at, string what)> _notes = new List<(float, string)>();
 
         private readonly FrameTiming[] _timings = new FrameTiming[TimingDepth];
         private readonly StringBuilder _line = new StringBuilder(256);
@@ -31,30 +30,22 @@ namespace AccountingImmersiveAnalytics.App
         private int _frames, _hitches;
         private float _totalMs, _worstMs;
 
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-        private static void ResetStatics()
-        {
-            _instance = null;
-            Notes.Clear();
-        }
-
         private void Awake()
         {
-            _instance = this;
             Application.SetStackTraceLogType(LogType.Log, StackTraceLogType.None);
         }
 
-        public static void Note(string what)
+        private void Note(string what)
         {
-            if (_instance == null) return;
-            Notes.Add((Time.unscaledTime, what));
-            if (Notes.Count > 32) Notes.RemoveAt(0);
+            _notes.Add((Time.unscaledTime, what));
+            if (_notes.Count > 32) _notes.RemoveAt(0);
         }
 
         private void Start()
         {
             _gcCount = System.GC.CollectionCount(0);
             _summaryStart = Time.unscaledTime;
+            _chart = Scene.ChartLabel;
             Debug.Log($"[Hitch] Logging frames past {HitchShare:0.#}x the display's frame time.");
         }
 
@@ -86,11 +77,8 @@ namespace AccountingImmersiveAnalytics.App
             if (Time.unscaledTime - _summaryStart >= SummarySeconds) LogSummary(refresh);
         }
 
-        private static float DisplayHz()
-        {
-            try { return OVRPlugin.systemDisplayFrequency; }
-            catch { return 0f; }
-        }
+        private static float DisplayHz() =>
+            OVRManager.OVRManagerinitialized ? OVRPlugin.systemDisplayFrequency : 0f;
 
         private void WatchState()
         {
@@ -99,13 +87,7 @@ namespace AccountingImmersiveAnalytics.App
             if (tool != _tool) { _tool = tool; Note($"tool -> {tool}"); }
 
             string chart = Scene.ChartLabel;
-            if (chart != _chart)
-            {
-                bool first = _chart == null;
-                _chart = chart;
-                if (!first) Note($"chart -> {chart}");
-            }
-
+            if (chart != _chart) { _chart = chart; Note($"chart -> {chart}"); }
 
             bool assistant = ActivityFeed.InAssistantCall;
             if (assistant != _assistant) { _assistant = assistant; Note(assistant ? "assistant call started" : "assistant call ended"); }
@@ -127,10 +109,10 @@ namespace AccountingImmersiveAnalytics.App
 
             float now = Time.unscaledTime;
             bool any = false;
-            for (int i = 0; i < Notes.Count; i++)
+            for (int i = 0; i < _notes.Count; i++)
             {
-                if (now - Notes[i].at > NoteWindow) continue;
-                _line.Append(any ? "; " : " | just before: ").Append(Notes[i].what);
+                if (now - _notes[i].at > NoteWindow) continue;
+                _line.Append(any ? "; " : " | just before: ").Append(_notes[i].what);
                 any = true;
             }
 

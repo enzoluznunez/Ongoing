@@ -12,9 +12,6 @@ namespace AccountingImmersiveAnalytics.UI.Charts.TwoD.Layout
     {
         private const float E = Style.LargePad;
 
-        private readonly float W;
-        private readonly float H;
-
         public readonly ChartSpec Spec;
         public readonly CsvTable Table;
         public readonly ChartShaping Shaping;
@@ -29,19 +26,20 @@ namespace AccountingImmersiveAnalytics.UI.Charts.TwoD.Layout
         public AxisSpec Y { get; private set; }
         public string Notice;
         public float Grow { get; private set; } = 1f;
-        public float Width => W;
-        public float Height => H;
+        public float Width { get; }
+        public float Height { get; }
 
         private bool _outlined;
 
         public ChartDrawing(ChartSpec spec, CsvTable table, ChartShaping shaping, MarkSurface marks, ChartText text,
             float width = ChartStyle.CardWidth)
         {
-            W = width;
-            H = ChartStyle.HeightFor(width);
+            Width = width;
+            Height = ChartStyle.HeightFor(width);
             Spec = spec;
             Table = table;
             Shaping = shaping ?? new ChartShaping();
+            _titleField = TitleField;
             Marks = marks;
             Text = text;
         }
@@ -53,16 +51,16 @@ namespace AccountingImmersiveAnalytics.UI.Charts.TwoD.Layout
         private void Card()
         {
             Marks.ClipTo(null);
-            Marks.Box(new Rect(0f, 0f, W, H), Style.Card, Style.LargeRadius);
+            Marks.Box(new Rect(0f, 0f, Width, Height), Style.Card, Style.LargeRadius);
             Text.Put(TitleText(), Style.ChartTitle, Style.BoldWeight,
-                W * 0.5f, Style.LargePad + ChartStyle.TitleRow * 0.5f + Style.Ascent(Style.ChartTitle) * 0.5f, Align.Middle);
+                Width * 0.5f, Style.CentredBaseline(Style.LargePad + ChartStyle.TitleRow * 0.5f, Style.ChartTitle), Align.Middle);
         }
 
         private string TitleText()
         {
             string shown = ChartText.Shown(Spec.Title);
             if (!ChartText.Uncut) shown = ChartText.CapAt(shown, ChartStyle.PinnedChars);
-            return ChartText.Clip(shown, Style.ChartTitle, W - E * 2f, Style.BoldWeight);
+            return ChartText.Clip(shown, Style.ChartTitle, Width - E * 2f, Style.BoldWeight);
         }
 
         public void Axes(AxisSpec x, AxisSpec y, bool grid = true)
@@ -78,9 +76,9 @@ namespace AccountingImmersiveAnalytics.UI.Charts.TwoD.Layout
             foreach (string label in yLabels) yTickWidth = Mathf.Max(yTickWidth, ChartText.Width(label, Style.SmallText));
 
             float left = E + AxisBand + E + yTickWidth + Style.SmallPad;
-            float right = W - E;
+            float right = Width - E;
             float top = PlotTop;
-            float bottom = H - E - AxisBand - E - TickBand - Style.SmallPad;
+            float bottom = Height - E - AxisBand - E - TickBand - Style.SmallPad;
             Plot = Rect.MinMaxRect(left, top, right, bottom);
             string xTitle = ChartText.Heading(ChartText.Shown(x.Title), Style.MediumText, Plot.width);
             string yTitle = ChartText.Heading(ChartText.Shown(y.Title), Style.MediumText, Plot.height);
@@ -134,7 +132,7 @@ namespace AccountingImmersiveAnalytics.UI.Charts.TwoD.Layout
             }
 
             Text.Put(xTitle, Style.MediumText, Style.BoldWeight, Plot.center.x,
-                H - E - Style.Descent(Style.MediumText), Align.Middle);
+                Height - E - Style.Descent(Style.MediumText), Align.Middle);
             Text.Put(yTitle, Style.MediumText, Style.BoldWeight,
                 E + Style.Ascent(Style.MediumText), Plot.center.y, Align.Middle, rising: true);
 
@@ -147,7 +145,7 @@ namespace AccountingImmersiveAnalytics.UI.Charts.TwoD.Layout
             X = null;
             Y = null;
             Card();
-            Plot = Rect.MinMaxRect(E, PlotTop, W - E, H - E);
+            Plot = Rect.MinMaxRect(E, PlotTop, Width - E, Height - E);
             _outlined = framed;
             Marks.ClipTo(framed ? Plot : (Rect?)null);
         }
@@ -160,21 +158,21 @@ namespace AccountingImmersiveAnalytics.UI.Charts.TwoD.Layout
         private void NeedRoom(List<string> xLabels, bool categories)
         {
             float fewest = (ChartStyle.CardWidth - Style.LargePad * 2f) * ChartStyle.FewestPlotShare;
-            if (Plot.width < fewest) NeedScale((W + fewest - Plot.width) / W);
+            if (Plot.width < fewest) NeedScale((Width + fewest - Plot.width) / Width);
             if (!categories || xLabels.Count == 0) return;
             float widest = 0f;
             foreach (string label in xLabels) widest = Mathf.Max(widest, ChartText.Width(label, Style.SmallText));
             float band = Plot.width / xLabels.Count;
             float need = widest + ChartStyle.LabelRoom;
-            if (need > band) NeedScale((W + (need - band) * xLabels.Count) / W);
+            if (need > band) NeedScale((Width + (need - band) * xLabels.Count) / Width);
         }
 
         private void NeedTitleRoom(string xTitle, string yTitle)
         {
             float across = ChartText.Width(xTitle, Style.MediumText, Style.BoldWeight);
-            if (across > Plot.width) NeedScale((W + across - Plot.width) / W);
+            if (across > Plot.width) NeedScale((Width + across - Plot.width) / Width);
             float up = ChartText.Width(yTitle, Style.MediumText, Style.BoldWeight);
-            if (up > Plot.height) NeedScale((H + up - Plot.height) / H);
+            if (up > Plot.height) NeedScale((Height + up - Plot.height) / Height);
         }
 
         private void DrawTrend()
@@ -195,7 +193,7 @@ namespace AccountingImmersiveAnalytics.UI.Charts.TwoD.Layout
             if (_outlined) Marks.Box(Plot, Style.Ink, Style.MediumRadius, Style.Stroke);
             if (Notice != null)
                 Text.Put(ChartText.Shown(Notice), Style.SmallText, Style.NormalWeight, Plot.center.x,
-                    Plot.center.y + Style.Ascent(Style.SmallText) * 0.5f, Align.Middle);
+                    Style.CentredBaseline(Plot.center.y, Style.SmallText), Align.Middle);
             Marks.Commit();
         }
 
@@ -217,18 +215,12 @@ namespace AccountingImmersiveAnalytics.UI.Charts.TwoD.Layout
         public MarkInfo Hit(int shape, string title)
         {
             if (shape < 0) return new MarkInfo();
-            if (!_titleFieldKnown)
-            {
-                _titleField = TitleField;
-                _titleFieldKnown = true;
-            }
             var info = new MarkInfo { Id = Hits.Count, Shape = shape, Title = title, TitleField = _titleField };
             Hits.Add(info);
             return info;
         }
 
-        private string _titleField;
-        private bool _titleFieldKnown;
+        private readonly string _titleField;
 
         private string TitleField
         {

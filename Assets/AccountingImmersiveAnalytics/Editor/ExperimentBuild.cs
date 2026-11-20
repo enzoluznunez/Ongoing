@@ -16,8 +16,7 @@ namespace AccountingImmersiveAnalytics.Editor
             BuildReport report = BuildPipeline.BuildPlayer(new BuildPlayerWithProfileOptions
             {
                 buildProfile = profile,
-                locationPathName = ApkPath,
-                options = BuildOptions.None
+                locationPathName = ApkPath
             });
             Debug.Log($"[ExperimentBuild] {report.summary.result}, {report.summary.totalErrors} errors, {report.summary.outputPath}");
             EditorApplication.Exit(report.summary.result == BuildResult.Succeeded ? 0 : 1);

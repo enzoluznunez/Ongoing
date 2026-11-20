@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using AccountingImmersiveAnalytics.App;
 using AccountingImmersiveAnalytics.Assistant.Live;
 using AccountingImmersiveAnalytics.Assistant.Tools.Arguments;
 using AccountingImmersiveAnalytics.UI.Charts;
@@ -33,8 +32,7 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools.Chart
 
         protected override void Run(Args args, Dictionary<string, object> result)
         {
-            ChartManager charts = Scene.Charts;
-            if (charts == null) { result["error"] = "The chart manager was not found in the scene."; return; }
+            if (!ToolTargets.TryCharts(result, out ChartManager charts)) return;
 
             var shown = new List<object>();
             foreach (ChartEntry entry in charts.Shown)
@@ -78,13 +76,13 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools.Chart
 
             var tools = new List<object>();
             foreach (ToolType tool in ToolManager.ChartTools)
-                if ((tool != ToolType.Sort || ChartKinds.Sorts(spec.Kind)) && (tool != ToolType.Trendline || TrendFitter.Offered(spec)))
+                if (ToolManager.Offered(tool, spec, entry == charts.Pinned ? charts.PinnedCard : null))
                     tools.Add(tool.ToString());
             result["tools"] = tools;
 
             var edits = new List<object>();
             foreach (Edit edit in ChartManager.ActiveEdits.For(entry.Id))
-                edits.Add($"{edit.What} ({(edit.ByAssistant ? "Assistant" : "You")})");
+                edits.Add(edit.Describe());
             result["edits"] = edits;
             if (TrendFitter.Offered(spec))
             {

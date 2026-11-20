@@ -1,6 +1,5 @@
 using System;
 using AccountingImmersiveAnalytics.Text;
-using OneText;
 using OneText.UGUI;
 using UnityEngine;
 
@@ -23,14 +22,6 @@ namespace AccountingImmersiveAnalytics.UI.Helpers
         }
 
         public static void Bind(OneTextLabel label, Func<string> word, bool counting)
-        {
-            if (label == null) return;
-            label.RichText = counting;
-            if (counting) Texts.Bind(label, () => Steady(word()));
-            else Texts.Bind(label, word);
-        }
-
-        public static void Bind(OneTextMesh label, Func<string> word, bool counting)
         {
             if (label == null) return;
             label.RichText = counting;

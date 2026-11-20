@@ -31,25 +31,24 @@ namespace AccountingImmersiveAnalytics.Documents
 
         public static DocumentFile Read(byte[] bytes, DocumentEntry entry)
         {
-            var file = new DocumentFile { Entry = entry, Title = entry.Title };
+            var file = new DocumentFile { Entry = entry };
             using (PdfDocument pdf = PdfDocument.Open(bytes))
             {
                 foreach (Page page in pdf.GetPages())
                 {
                     int index = file.Pages.Count;
                     file.Pages.Add(new DocumentPage { Width = page.Width, Height = page.Height });
-                    foreach (DocumentPassage passage in Passages(page, index)) file.Passages.Add(passage);
-                    file.Tables.AddRange(PdfTables.Find(page, index));
+                    List<Word> words = NearestNeighbourWordExtractor.Instance.GetWords(page.Letters)
+                        .Where(word => !string.IsNullOrWhiteSpace(word.Text) && word.Letters.Count > 0).ToList();
+                    file.Passages.AddRange(Passages(words, index));
+                    file.Tables.AddRange(PdfTables.Find(words, index));
                 }
             }
-            file.Finish();
             return file;
         }
 
-        private static IEnumerable<DocumentPassage> Passages(Page page, int index)
+        private static IEnumerable<DocumentPassage> Passages(List<Word> words, int index)
         {
-            List<Word> words = NearestNeighbourWordExtractor.Instance.GetWords(page.Letters)
-                .Where(word => !string.IsNullOrWhiteSpace(word.Text)).ToList();
             if (words.Count == 0) yield break;
 
             IReadOnlyList<TextBlock> blocks = DocstrumBoundingBoxes.Instance.GetBlocks(words);
@@ -57,8 +56,7 @@ namespace AccountingImmersiveAnalytics.Documents
             {
                 string text = Join(block.TextLines.Select(line => line.Text));
                 if (!text.Any(char.IsLetterOrDigit)) continue;
-                double top = page.Height > 0 ? (page.Height - block.BoundingBox.Top) / page.Height : 0;
-                yield return new DocumentPassage { Text = text, Page = index, Top = System.Math.Max(0, System.Math.Min(1, top)) };
+                yield return new DocumentPassage { Text = text, Page = index };
             }
         }
 

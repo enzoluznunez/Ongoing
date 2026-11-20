@@ -298,8 +298,6 @@ namespace AccountingImmersiveAnalytics.UI.Panels
 
         public bool GrabArmed => GrabMode != GrabMode.None;
 
-        public virtual bool TakesPress(Vector3 point) => false;
-
         protected void SetPlacementIcons(params RectTransform[] icons) => _placementIcons = icons;
 
         public bool IsPlacementIcon(Vector3 point)
@@ -410,24 +408,18 @@ namespace AccountingImmersiveAnalytics.UI.Panels
 
         public static void ApplyPanelSprites(Transform root)
         {
-            ApplyTo(root, "PanelBorder", Style.LargeRadius);
-            HideBorders(root);
-            ApplyTo(root, "PanelRoot", Style.LargeRadius);
-            EnsurePanelBacks(root);
-            foreach (Transform surface in FindTransform.FindAllDeep(root, "PanelRoot"))
-                TranslationSurface.Add(surface as RectTransform);
-        }
-
-        private static void HideBorders(Transform root)
-        {
             foreach (Transform border in FindTransform.FindAllDeep(root, "PanelBorder"))
-                if (border.TryGetComponent(out Image image)) image.color = Style.Faded(image.color, 0f);
-        }
-
-        private static void EnsurePanelBacks(Transform root)
-        {
-            List<Transform> borders = FindTransform.FindAllDeep(root, "PanelBorder");
-            for (int i = 0; i < borders.Count; i++) EnsurePanelBack(borders[i]);
+            {
+                Image image = border.GetComponent<Image>();
+                RoundedSprite.Apply(image, Style.LargeRadius);
+                if (image != null) image.color = Style.Faded(image.color, 0f);
+                EnsurePanelBack(border);
+            }
+            foreach (Transform surface in FindTransform.FindAllDeep(root, "PanelRoot"))
+            {
+                RoundedSprite.Apply(surface.GetComponent<Image>(), Style.LargeRadius);
+                TranslationSurface.Add(surface as RectTransform);
+            }
         }
 
         private static void EnsurePanelBack(Transform border)
@@ -457,13 +449,6 @@ namespace AccountingImmersiveAnalytics.UI.Panels
 
             Material mat = FrontMaterial;
             if (mat != null) image.material = mat;
-        }
-
-        private static void ApplyTo(Transform root, string name, float radius)
-        {
-            List<Transform> found = FindTransform.FindAllDeep(root, name);
-            for (int i = 0; i < found.Count; i++)
-                RoundedSprite.Apply(found[i].GetComponent<Image>(), radius);
         }
 
         public static void ApplyPanelBorders(Transform root)

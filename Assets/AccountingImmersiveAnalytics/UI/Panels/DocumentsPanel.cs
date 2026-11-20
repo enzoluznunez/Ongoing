@@ -17,13 +17,11 @@ namespace AccountingImmersiveAnalytics.UI.Panels
 {
     public class DocumentsPanel : ModularPanel
     {
-        private const float LetterWidthPoints = 612f, LetterHeightPoints = 792f;
-        private static float UnitsPerPoint => Style.Panel.x / LetterWidthPoints;
+        private static float UnitsPerPoint => DocumentColumn.PanelUnitsPerPoint;
         private static float LetterWidth => Style.Panel.x;
-        private static float LetterBody => Mathf.Ceil(LetterHeightPoints * UnitsPerPoint);
-        private float _bodyWidth = Style.Panel.x;
-        private float _bodyHeight = Mathf.Ceil(LetterHeightPoints * Style.Panel.x / LetterWidthPoints);
-        private float BodyHeight => _bodyHeight;
+        private static float LetterBody => Mathf.Ceil((float)DocumentEntry.LetterHeight * UnitsPerPoint);
+        private float _bodyWidth = LetterWidth;
+        private float _bodyHeight = LetterBody;
         protected override float PanelWidth => _bodyWidth;
         private const float PageGap = Style.SmallPad;
         private const int VisibilityEveryFrames = 8;
@@ -42,7 +40,7 @@ namespace AccountingImmersiveAnalytics.UI.Panels
             public bool Failed;
         }
 
-        protected override float PanelHeight => Panel.TitleBarHeight + Panel.SplitGap + BodyHeight;
+        protected override float PanelHeight => Panel.TitleBarHeight + Panel.SplitGap + _bodyHeight;
 
         private OneTextLabel _message;
         private string _messageKey;
@@ -63,7 +61,6 @@ namespace AccountingImmersiveAnalytics.UI.Panels
         private readonly List<Image> _bodyFills = new List<Image>();
 
         private DocumentFile _page;
-        private DocumentEntry _csv;
         private PdfPages _renderer;
         private DocumentEntry _opening;
         private DocumentEntry _shown;
@@ -72,11 +69,7 @@ namespace AccountingImmersiveAnalytics.UI.Panels
 
         private const string LibraryName = "DocumentColumn";
 
-        public DocumentFile Page => _page;
-
         public DocumentEntry Shown => _shown;
-
-
 
         public bool IsLoading => _opening != null;
 
@@ -104,7 +97,7 @@ namespace AccountingImmersiveAnalytics.UI.Panels
             await DocumentLibrary.Load();
             if (this == null) return;
             BuildLibrary();
-            if (_page != null || _opening != null || _csv != null) return;
+            if (_page != null || _opening != null || _shown?.IsCsv == true) return;
             IReadOnlyList<DocumentEntry> all = DocumentLibrary.All;
             if (all.Count > 0) await Open(all[0], false);
             else ShowCleared("documents.select");
@@ -161,7 +154,7 @@ namespace AccountingImmersiveAnalytics.UI.Panels
             LayoutTools.Ensure<LayoutElement>(rt.gameObject).ignoreLayout = true;
             rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0f, 1f);
             rt.anchoredPosition = new Vector2(0f, -(Panel.TitleBarHeight + Panel.SplitGap));
-            rt.sizeDelta = new Vector2(PanelWidth, BodyHeight);
+            rt.sizeDelta = new Vector2(PanelWidth, _bodyHeight);
             rt.SetAsLastSibling();
             return rt;
         }
@@ -284,7 +277,6 @@ namespace AccountingImmersiveAnalytics.UI.Panels
             SetTitle(() => Numbers.Text(entry.Title));
             if (entry.IsCsv)
             {
-                _csv = entry;
                 return await OpenCsv(entry, outcome);
             }
             _opening = entry;
@@ -341,20 +333,22 @@ namespace AccountingImmersiveAnalytics.UI.Panels
             {
                 renderer?.Dispose();
                 outcome.Failure = $"\"{entry.Title}\" could not be shown: {problem ?? "The reason is unknown."}";
-                if (page == null)
-                {
-                    ShowMessage(shownKey);
-                    return outcome;
-                }
-                ShowBlankPage();
-                SetMeta(page);
-                if (page.HasText) WriteSummary(() => PageSummary.Write(page), ticket);
-                await OpenCharts(entry, page, outcome, ticket);
+            }
+            if (page == null)
+            {
+                ShowMessage(shownKey);
                 return outcome;
             }
-
-            outcome.Page = page;
-            ShowPages(page, renderer);
+            if (renderer == null)
+            {
+                ShowBlankPage();
+                SetMeta(page);
+            }
+            else
+            {
+                outcome.Page = page;
+                ShowPages(page, renderer);
+            }
             if (page.HasText) WriteSummary(() => PageSummary.Write(page), ticket);
             await OpenCharts(entry, page, outcome, ticket);
             return outcome;
@@ -372,7 +366,6 @@ namespace AccountingImmersiveAnalytics.UI.Panels
 
         private void Clear()
         {
-            _csv = null;
             _page = null;
             _opening = null;
             ForgetPages();
@@ -392,10 +385,7 @@ namespace AccountingImmersiveAnalytics.UI.Panels
         private void ShowBlankPage()
         {
             Sheet sheet = MakeSheet(0, LetterWidth, LetterBody);
-            OneTextLabel label = LabelFactory.Make(sheet.Card.transform, "Message", Style.Ink, LabelAnchor.Center, TextOverflow.Overflow, bold: true, wrap: true);
-            label.raycastTarget = false;
-            LayoutTools.Stretch(label.rectTransform, Style.LargePad);
-            Texts.Bind(label, () => Strings.Get("documents.display"));
+            DocumentColumn.AddMessage(sheet.Card.rectTransform);
             _sheets.Add(sheet);
             SetBodySize(LetterWidth, LetterBody);
             Show(View.Pages);
@@ -495,7 +485,7 @@ namespace AccountingImmersiveAnalytics.UI.Panels
         {
             base.LateUpdate();
             if (!IsVisible || _renderer == null || Time.frameCount % VisibilityEveryFrames != 0) return;
-            float view = BodyHeight;
+            float view = _bodyHeight;
             float y = _content.anchoredPosition.y;
             bool loading = false;
             foreach (Sheet sheet in _sheets) loading |= sheet.Loading;
@@ -537,7 +527,7 @@ namespace AccountingImmersiveAnalytics.UI.Panels
             }
             if (this == null || ticket != _ticket)
             {
-                PdfPages.Discard(drawn);
+                drawn?.Dispose();
                 return;
             }
             sheet.Loading = false;
@@ -553,7 +543,6 @@ namespace AccountingImmersiveAnalytics.UI.Panels
             catch (System.Exception e)
             {
                 Debug.LogWarning($"[DocumentsPanel] Page {index + 1} could not be shown: {e.Message}");
-                PdfPages.Discard(drawn);
                 sheet.Failed = true;
                 return;
             }
@@ -597,10 +586,10 @@ namespace AccountingImmersiveAnalytics.UI.Panels
             return roots;
         }
 
-        private async void WriteSummary(System.Func<Task<PageSummary>> write, int ticket)
+        private async void WriteSummary(System.Func<Task<string>> write, int ticket)
         {
             SetSummary(true, null);
-            PageSummary summary = null;
+            string summary = null;
             try
             {
                 summary = await write();
@@ -610,7 +599,7 @@ namespace AccountingImmersiveAnalytics.UI.Panels
                 Debug.LogWarning($"[DocumentsPanel] The summary could not be written: {e.Message}");
             }
             if (this == null || ticket != _ticket) return;
-            SetSummary(false, summary?.Summary);
+            SetSummary(false, summary);
         }
 
         private void SetSummary(bool writing, string summary)

@@ -105,14 +105,8 @@ namespace AccountingImmersiveAnalytics.UI.Panels
             _root.localScale = Vector3.one * units / Mathf.Max(1e-6f, _root.parent != null ? _root.parent.lossyScale.x : 1f);
         }
 
-        private static float MarkTop(MarkInfo mark)
-        {
-            switch (mark.Area)
-            {
-                case HitShape.Box: return mark.Box.yMin;
-                default: return mark.Centre.y - mark.Outer;
-            }
-        }
+        private static float MarkTop(MarkInfo mark) =>
+            mark.Area == HitShape.Box ? mark.Box.yMin : mark.Centre.y - mark.Outer;
 
         public void Hide() => _canvas.enabled = false;
     }

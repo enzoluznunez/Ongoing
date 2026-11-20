@@ -18,7 +18,8 @@ namespace AccountingImmersiveAnalytics.App
         private static readonly List<Draw> Meshes = new List<Draw>();
         private static readonly HashSet<(EntityId, MeshTopology, int, ShadowCastingMode, bool, int)> SeenKinds =
             new HashSet<(EntityId, MeshTopology, int, ShadowCastingMode, bool, int)>();
-        private static readonly HashSet<EntityId> SeenMeshes = new HashSet<EntityId>();
+        private static readonly Dictionary<EntityId, (int layout, float size)> SeenMeshes =
+            new Dictionary<EntityId, (int layout, float size)>();
         private static readonly List<Material> Materials = new List<Material>();
         private static readonly List<VertexAttributeDescriptor> Attributes = new List<VertexAttributeDescriptor>();
 
@@ -46,15 +47,10 @@ namespace AccountingImmersiveAnalytics.App
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void ResetStatics()
         {
-            Kinds.Clear();
-            Meshes.Clear();
-            SeenKinds.Clear();
-            SeenMeshes.Clear();
-            _renderers = null;
+            ReleaseScan();
             _scanned = 0;
             _kindFrames = 0;
             _drawn = 0;
-            _batch = FirstBatch;
             _settleFrames = 0;
             _frames = 0;
             _done = false;
@@ -111,12 +107,17 @@ namespace AccountingImmersiveAnalytics.App
             _done = true;
             Debug.Log($"[GraphicsWarm] Drew {Meshes.Count} meshes in {_frames} frames, " +
                       $"{Time.unscaledTime - _started:F1} s.");
+            ReleaseScan();
+            return true;
+        }
+
+        private static void ReleaseScan()
+        {
             _renderers = null;
             Kinds.Clear();
             Meshes.Clear();
             SeenKinds.Clear();
             SeenMeshes.Clear();
-            return true;
         }
 
         private static void Render(Draw d, Vector3 at, Quaternion facing)
@@ -128,43 +129,43 @@ namespace AccountingImmersiveAnalytics.App
         private static void Collect(MeshRenderer r)
         {
             if (r == null) return;
-            MeshFilter filter = r.GetComponent<MeshFilter>();
-            Mesh mesh = filter != null ? filter.sharedMesh : null;
+            Mesh mesh = r.TryGetComponent(out MeshFilter filter) ? filter.sharedMesh : null;
             if (mesh == null || mesh.vertexCount == 0) return;
 
             r.GetSharedMaterials(Materials);
             int submeshes = Mathf.Min(Materials.Count, mesh.subMeshCount);
             if (submeshes == 0) return;
 
-            mesh.GetVertexAttributes(Attributes);
-            int layout = 17;
-            for (int i = 0; i < Attributes.Count; i++)
+            EntityId meshId = mesh.GetEntityId();
+            bool newMesh = !SeenMeshes.TryGetValue(meshId, out (int layout, float size) info);
+            if (newMesh)
             {
-                VertexAttributeDescriptor a = Attributes[i];
-                layout = layout * 31 + ((int)a.attribute << 16 | (int)a.format << 8 | a.dimension << 4 | a.stream);
+                info = (LayoutOf(mesh), Width / Mathf.Max(mesh.bounds.size.magnitude, 1e-4f));
+                SeenMeshes.Add(meshId, info);
             }
 
-            float size = Width / Mathf.Max(mesh.bounds.size.magnitude, 1e-4f);
-            bool newMesh = SeenMeshes.Add(mesh.GetEntityId());
+            int layer = r.gameObject.layer;
+            ShadowCastingMode shadows = r.shadowCastingMode;
+            bool receive = r.receiveShadows;
             for (int s = 0; s < submeshes; s++)
             {
                 Material material = Materials[s];
                 if (material == null) continue;
 
-                bool newKind = SeenKinds.Add((material.GetEntityId(), mesh.GetTopology(s), r.gameObject.layer,
-                                              r.shadowCastingMode, r.receiveShadows, layout));
+                bool newKind = SeenKinds.Add((material.GetEntityId(), mesh.GetTopology(s), layer,
+                                              shadows, receive, info.layout));
                 if (!newKind && !newMesh) continue;
 
                 var draw = new Draw
                 {
                     mesh = mesh,
                     submesh = s,
-                    size = size,
+                    size = info.size,
                     parameters = new RenderParams(material)
                     {
-                        layer = r.gameObject.layer,
-                        shadowCastingMode = r.shadowCastingMode,
-                        receiveShadows = r.receiveShadows,
+                        layer = layer,
+                        shadowCastingMode = shadows,
+                        receiveShadows = receive,
                         renderingLayerMask = r.renderingLayerMask
                     }
                 };
@@ -175,6 +176,18 @@ namespace AccountingImmersiveAnalytics.App
                     newMesh = false;
                 }
             }
+        }
+
+        private static int LayoutOf(Mesh mesh)
+        {
+            mesh.GetVertexAttributes(Attributes);
+            int layout = 17;
+            for (int i = 0; i < Attributes.Count; i++)
+            {
+                VertexAttributeDescriptor a = Attributes[i];
+                layout = layout * 31 + ((int)a.attribute << 16 | (int)a.format << 8 | a.dimension << 4 | a.stream);
+            }
+            return layout;
         }
     }
 }

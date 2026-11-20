@@ -3,7 +3,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using UglyToad.PdfPig.Content;
-using UglyToad.PdfPig.DocumentLayoutAnalysis.WordExtractor;
 
 namespace AccountingImmersiveAnalytics.Documents
 {
@@ -22,13 +21,13 @@ namespace AccountingImmersiveAnalytics.Documents
             public double Size;
             public readonly List<Word> Words = new List<Word>();
             public List<string> Cells;
-            public string Text => string.Join(" ", Cells);
+            public string Text;
         }
 
-        public static List<PdfTable> Find(Page page, int index)
+        public static List<PdfTable> Find(IEnumerable<Word> words, int index)
         {
             var tables = new List<PdfTable>();
-            List<Line> lines = Lines(page);
+            List<Line> lines = Lines(words);
             int at = 0;
             while (at < lines.Count)
             {
@@ -67,7 +66,7 @@ namespace AccountingImmersiveAnalytics.Documents
             if (end >= lines.Count || end < 1) return null;
             Line first = lines[end];
             if (lines[end - 1].Baseline - first.Baseline > first.Size * CaptionReach) return null;
-            if (!first.Text.TrimStart().StartsWith("Table", StringComparison.OrdinalIgnoreCase)) return null;
+            if (!first.Text.StartsWith("Table", StringComparison.OrdinalIgnoreCase)) return null;
             var caption = new StringBuilder(first.Text);
             for (int i = end + 1; i < lines.Count && lines[i].Cells.Count == 1; i++)
             {
@@ -77,25 +76,26 @@ namespace AccountingImmersiveAnalytics.Documents
             return caption.ToString();
         }
 
-        private static List<Line> Lines(Page page)
+        private static List<Line> Lines(IEnumerable<Word> words)
         {
             var lines = new List<Line>();
-            IEnumerable<Word> words = NearestNeighbourWordExtractor.Instance.GetWords(page.Letters)
-                .Where(word => !string.IsNullOrWhiteSpace(word.Text) && word.Letters.Count > 0)
-                .OrderByDescending(Baseline).ThenBy(word => word.BoundingBox.Left);
-            foreach (Word word in words)
+            foreach (Word word in words.OrderByDescending(Baseline).ThenBy(word => word.BoundingBox.Left))
             {
-                double size = Size(word);
+                double size = Size(word), baseline = Baseline(word);
                 Line line = lines.Count > 0 ? lines[lines.Count - 1] : null;
-                if (line == null || Math.Abs(line.Baseline - Baseline(word)) > Math.Max(line.Size, size) * SameLine)
+                if (line == null || Math.Abs(line.Baseline - baseline) > Math.Max(line.Size, size) * SameLine)
                 {
-                    line = new Line { Baseline = Baseline(word), Size = size };
+                    line = new Line { Baseline = baseline, Size = size };
                     lines.Add(line);
                 }
                 line.Size = Math.Max(line.Size, size);
                 line.Words.Add(word);
             }
-            foreach (Line line in lines) line.Cells = Cells(line);
+            foreach (Line line in lines)
+            {
+                line.Cells = Cells(line);
+                line.Text = string.Join(" ", line.Cells);
+            }
             return lines;
         }
 
@@ -126,7 +126,8 @@ namespace AccountingImmersiveAnalytics.Documents
 
         private static double Size(Word word)
         {
-            double size = word.Letters.Max(letter => letter.PointSize);
+            double size = 0;
+            foreach (Letter letter in word.Letters) size = Math.Max(size, letter.PointSize);
             return size > 1 ? size : Math.Max(1, word.BoundingBox.Height);
         }
     }

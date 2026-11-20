@@ -42,8 +42,6 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools
                 }
             }
 
-            result = Sanitize(result) as Dictionary<string, object> ?? result;
-
             if (ToolCallTracker.ConsumeCancelled(call.Id))
             {
                 Debug.LogWarning($"[ToolRegistry] {call.Name} id={call.Id} was cancelled by the server (turn interrupted); suppressing its tool response.");
@@ -66,7 +64,7 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools
                     await Respond(session, call, new Dictionary<string, object>
                     {
                         { "error", "The tool result could not be delivered. The action may still have applied; " +
-                                   "verify with ReadChart before retrying." }
+                                   "check the current state before retrying." }
                     }).ConfigureAwait(false);
                 }
                 catch (Exception fallback)
@@ -98,22 +96,6 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools
                     new FunctionResponse { Id = call.Id, Name = call.Name, Response = result }
                 }
             });
-        }
-
-        private static object Sanitize(object value)
-        {
-            switch (value)
-            {
-                case double d when double.IsNaN(d) || double.IsInfinity(d): return null;
-                case float f when float.IsNaN(f) || float.IsInfinity(f): return null;
-                case Dictionary<string, object> map:
-                    foreach (string key in map.Keys.ToList()) map[key] = Sanitize(map[key]);
-                    return map;
-                case List<object> list:
-                    for (int i = 0; i < list.Count; i++) list[i] = Sanitize(list[i]);
-                    return list;
-                default: return value;
-            }
         }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]

@@ -47,8 +47,7 @@ namespace AccountingImmersiveAnalytics.Assistant.FlashLite
         {
             if (_loading != null) return _loading;
             _file = Path.Combine(Application.persistentDataPath, FileName);
-            string file = _file;
-            _loading = ReadInto(file);
+            _loading = ReadInto(_file);
             return _loading;
         }
 

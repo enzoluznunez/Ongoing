@@ -43,40 +43,41 @@ namespace AccountingImmersiveAnalytics.Editor
 
             OneFontAsset main;
             var onDemand = new List<OneFontReference>();
-            long bytes = 0;
+            var paths = new List<string>();
             try
             {
-                main = MakeFont(DefaultFamily, 0, ref bytes);
+                main = MakeFont(DefaultFamily, 0, paths);
                 for (int i = 0; i < OnDemandFamilies.Length; i++)
                 {
-                    OneFontAsset asset = MakeFont(OnDemandFamilies[i], (i + 1f) / (OnDemandFamilies.Length + 1), ref bytes);
-                    if (asset == null) continue;
-                    AssetDatabase.SaveAssets();
-                    LanguageOf.TryGetValue(OnDemandFamilies[i], out string language);
-                    onDemand.Add(OneFontReferences.Make(asset, OneFontSourceKind.Resources, language));
+                    OneFontAsset asset = MakeFont(OnDemandFamilies[i], (i + 1f) / (OnDemandFamilies.Length + 1), paths);
+                    if (asset != null) onDemand.Add(OneFontReferences.Make(asset, OneFontSourceKind.Resources));
                 }
-                MakeFont(MonospaceFamily, 1f, ref bytes);
+                MakeFont(MonospaceFamily, 1f, paths);
             }
             finally
             {
                 EditorUtility.ClearProgressBar();
+                AssetDatabase.SaveAssets();
             }
             if (main == null) return;
+
+            long bytes = 0;
+            foreach (string path in paths) bytes += new FileInfo(path).Length;
 
             List<OneTextDictionary> dictionaries = InstallDictionaries();
 
             OneTextSettings settings = OneTextSettingsProvider.GetOrCreate();
             var serialized = new SerializedObject(settings);
             serialized.FindProperty("_systemFontFallback").boolValue = false;
-            serialized.FindProperty("_fontSource").intValue = (int)OneFontSourceKind.Resources;
-            serialized.FindProperty("_loadOnDemand").boolValue = true;
             SerializedProperty list = serialized.FindProperty("_dictionaries");
             list.arraySize = dictionaries.Count;
             for (int i = 0; i < dictionaries.Count; i++) list.GetArrayElementAtIndex(i).objectReferenceValue = dictionaries[i];
             serialized.ApplyModifiedPropertiesWithoutUndo();
 
             settings.DefaultFont = main;
-            settings.SetFallbackFonts(new OneFontAsset[0]);
+            settings.FontSource = OneFontSourceKind.Resources;
+            settings.LoadOnDemand = true;
+            settings.SetFallbackFonts(System.Array.Empty<OneFontAsset>());
             settings.SetOnDemandFonts(onDemand);
             EditorUtility.SetDirty(settings);
             AssetDatabase.SaveAssets();
@@ -86,7 +87,7 @@ namespace AccountingImmersiveAnalytics.Editor
                       $"{dictionaries.Count} word lists, system fonts off. Font assets total {bytes / 1048576f:F1} MB.");
         }
 
-        private static OneFontAsset MakeFont(string family, float progress, ref long bytes)
+        private static OneFontAsset MakeFont(string family, float progress, List<string> paths)
         {
             EditorUtility.DisplayProgressBar("Building Noto fonts", family, progress);
             string source = $"{SourceFolder}/{family}.ttf";
@@ -111,8 +112,7 @@ namespace AccountingImmersiveAnalytics.Editor
             if (LanguageOf.TryGetValue(family, out string language)) asset.Language = language;
             if (isNew) AssetDatabase.CreateAsset(asset, path);
             else EditorUtility.SetDirty(asset);
-            AssetDatabase.SaveAssets();
-            bytes += new FileInfo(path).Length;
+            paths.Add(path);
             return asset;
         }
 

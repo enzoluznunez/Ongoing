@@ -31,6 +31,7 @@ namespace AccountingImmersiveAnalytics.UI.Charts
         public const float RampHeight = Style.TrackHeight;
 
         public const float PreviewScale = 0.5f;
+        public const float PreviewRadius = Style.LargeRadius * PreviewScale;
         public const float PinnedScale = 1f;
         public const float PinnedLift = 0.1f;
 

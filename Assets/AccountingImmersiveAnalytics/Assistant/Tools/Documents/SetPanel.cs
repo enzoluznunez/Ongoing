@@ -27,16 +27,15 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools.Documents
 
         protected override void Run(Args args, Dictionary<string, object> result)
         {
-            if (!TryDocumentsPanel(result, out ModularPanel panel, out string name)) return;
+            if (!TryDocumentsPanel(result, out DocumentsPanel panel)) return;
             switch (args.state)
             {
                 case "open": if (!panel.IsVisible) panel.ShowPanel(); break;
                 case "close": if (panel.IsVisible) panel.HidePanel(); break;
-                case "toggle": panel.TogglePanel(); break;
-                default: result["error"] = "Say 'open', 'close' or 'toggle'."; return;
+                default: panel.TogglePanel(); break;
             }
             result["visible"] = panel.IsVisible;
-            result["did"] = panel.IsVisible ? $"the {name} is open" : $"the {name} is closed";
+            result["did"] = panel.IsVisible ? $"the {DocumentsPanelName} is open" : $"the {DocumentsPanelName} is closed";
         }
     }
 }

@@ -100,8 +100,7 @@ namespace AccountingImmersiveAnalytics.UI.Interactions
             handle.anchorMin = handle.anchorMax = new Vector2(0f, 0.5f);
             handle.pivot = new Vector2(0.5f, 0.5f);
             handle.sizeDelta = Vector2.one * HandleSize;
-            Ring(handle, HandleSize * 0.5f);
-            inner = handle.Find("Inner").GetComponent<Image>();
+            inner = Ring(handle, HandleSize * 0.5f);
             return handle;
         }
 

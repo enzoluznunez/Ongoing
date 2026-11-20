@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using AccountingImmersiveAnalytics.App;
 using AccountingImmersiveAnalytics.Assistant.Live;
 using AccountingImmersiveAnalytics.Assistant.Tools.Arguments;
 using AccountingImmersiveAnalytics.UI.Charts;
@@ -18,7 +17,7 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools.Chart
             [Optional]
             public string chart;
             [Doc("true pins the chart in front of the Documents panel, replacing any pinned chart; false unpins it."), DefaultsTo(true), Optional]
-            public bool? pin;
+            public bool pin;
         }
 
         protected override bool EditsAreOutcome => true;
@@ -34,9 +33,8 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools.Chart
 
         protected override void Run(Args args, Dictionary<string, object> result)
         {
-            ChartManager charts = Scene.Charts;
-            if (charts == null) { result["error"] = "The chart manager was not found in the scene."; return; }
-            if (args.pin == false)
+            if (!TryCharts(result, out ChartManager charts)) return;
+            if (!args.pin)
             {
                 charts.Pin(null);
                 result["pinned"] = null;
@@ -44,9 +42,7 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools.Chart
             }
             if (string.IsNullOrWhiteSpace(args.chart) && charts.Shown.Count != 1)
             {
-                var titles = new List<string>();
-                foreach (ChartEntry shown in charts.Shown) titles.Add(shown.Title);
-                NeedChoice(result, "chart", titles, "Name the chart to pin.");
+                NeedChoice(result, "chart", ShownTitles(charts), "Name the chart to pin.");
                 return;
             }
             if (!TryChart(args.chart, result, out ChartEntry entry)) return;

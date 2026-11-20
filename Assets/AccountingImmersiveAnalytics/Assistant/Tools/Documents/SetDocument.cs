@@ -8,6 +8,7 @@ using AccountingImmersiveAnalytics.Assistant.Tools.Arguments;
 using AccountingImmersiveAnalytics.Documents;
 using AccountingImmersiveAnalytics.UI.Charts.View;
 using AccountingImmersiveAnalytics.UI.Panels;
+using static AccountingImmersiveAnalytics.Assistant.Tools.ToolTargets;
 
 namespace AccountingImmersiveAnalytics.Assistant.Tools.Documents
 {
@@ -85,12 +86,7 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools.Documents
 
         private static void Close(Dictionary<string, object> result)
         {
-            DocumentsPanel documents = Scene.Documents;
-            if (documents == null)
-            {
-                result["error"] = "The Documents panel was not found in the scene.";
-                return;
-            }
+            if (!TryDocumentsPanel(result, out DocumentsPanel documents)) return;
             DocumentEntry shown = documents.Shown;
             if (shown == null)
             {

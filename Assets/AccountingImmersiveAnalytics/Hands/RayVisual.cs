@@ -16,18 +16,19 @@ namespace AccountingImmersiveAnalytics.Hands
 
         private readonly LineRenderer _line;
         private readonly LineRenderer _dot;
+        private bool _pressed;
 
         public RayVisual(Transform parent, string name)
         {
             Material material = AssetLibrary.Current != null ? AssetLibrary.Current.RayLine : null;
-            _line = MakeRenderer(parent, $"{name} Line", material, Style.Card);
+            _line = MakeRenderer(parent, $"{name} Line", material);
             _line.startWidth = LineStartWidth;
             _line.endWidth = LineEndWidth;
-            _dot = MakeRenderer(parent, $"{name} Dot", material, Style.Card);
+            _dot = MakeRenderer(parent, $"{name} Dot", material);
             Hide();
         }
 
-        private static LineRenderer MakeRenderer(Transform parent, string name, Material material, Color color)
+        private static LineRenderer MakeRenderer(Transform parent, string name, Material material)
         {
             GameObject go = FindTransform.EnsureChild(parent, name).gameObject;
             LineRenderer renderer = LayoutTools.Ensure<LineRenderer>(go);
@@ -38,8 +39,8 @@ namespace AccountingImmersiveAnalytics.Hands
             renderer.numCapVertices = RoundingVertices;
             renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             renderer.receiveShadows = false;
-            renderer.startColor = color;
-            renderer.endColor = color;
+            renderer.startColor = Style.Card;
+            renderer.endColor = Style.Card;
             return renderer;
         }
 
@@ -55,11 +56,15 @@ namespace AccountingImmersiveAnalytics.Hands
             _line.enabled = true;
 
             float width = Mathf.Max(DotMinimumWidth, distance * DotWidthPerMetre);
-            Color color = pressed ? Style.Ink : Style.Card;
             _dot.startWidth = width;
             _dot.endWidth = width;
-            _dot.startColor = color;
-            _dot.endColor = color;
+            if (pressed != _pressed)
+            {
+                _pressed = pressed;
+                Color color = pressed ? Style.Ink : Style.Card;
+                _dot.startColor = color;
+                _dot.endColor = color;
+            }
             _dot.SetPosition(0, dotCenter);
             _dot.SetPosition(1, dotCenter + toward * DotDepth);
             _dot.enabled = true;

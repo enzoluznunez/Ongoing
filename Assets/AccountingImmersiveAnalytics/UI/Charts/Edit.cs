@@ -17,5 +17,7 @@ namespace AccountingImmersiveAnalytics.UI.Charts
 
         public static string KindName(EditKind kind) =>
             kind == EditKind.Rotate ? "turn" : kind == EditKind.Scale ? "resize" : kind.ToString().ToLowerInvariant();
+
+        public string Describe() => $"{What ?? KindName(Kind)} ({(ByAssistant ? "Assistant" : "You")})";
     }
 }

@@ -9,6 +9,7 @@ using AccountingImmersiveAnalytics.UI.Charts.TwoD.View;
 using AccountingImmersiveAnalytics.UI.Charts.View;
 using AccountingImmersiveAnalytics.UI.Helpers;
 using AccountingImmersiveAnalytics.UI.Panels;
+using Oculus.Interaction.Input;
 using UnityEngine;
 
 namespace AccountingImmersiveAnalytics.Hands
@@ -23,11 +24,9 @@ namespace AccountingImmersiveAnalytics.Hands
 
         private HandRay _owner;
         private ChartCard _view;
-        private MarkInfo _markInfo;
-        private int _mark = -1;
+        private MarkInfo _mark;
+        private string _explanationKey;
         private float _lostAt = -1f;
-        private ChartEntry _entry;
-        private MarkInfo _detail;
         private Explanation? _explanation;
         private int _shownDots = -1;
 
@@ -38,31 +37,28 @@ namespace AccountingImmersiveAnalytics.Hands
             Current = this;
         }
 
-        public bool IsShowing => _mark >= 0 && _entry != null;
+        public void Dispose()
+        {
+            Clear();
+            Texts.Refreshed -= OnTextsRefreshed;
+            if (Current == this) Current = null;
+        }
 
         public string Describe()
         {
-            if (!IsShowing) return null;
+            if (_mark == null) return null;
             var text = new System.Text.StringBuilder();
-            text.Append("on the chart '").Append(_entry.Title).Append("', the shape ").Append(_detail.Title);
-            if (!string.IsNullOrEmpty(_detail.Body)) text.Append(" (").Append(_detail.Body.Replace("\n", "; ")).Append(')');
+            text.Append("on the chart '").Append(_view.Entry.Title).Append("', the shape ").Append(_mark.Title);
+            if (!string.IsNullOrEmpty(_mark.Body)) text.Append(" (").Append(_mark.Body).Append(')');
             if (_explanation.HasValue)
                 text.Append(". Its tooltip explains: ").Append(_explanation.Value.Text);
             return text.ToString();
         }
 
-        public void Tick<T>(Dictionary<T, HandRay>.ValueCollection rays)
+        public void Tick(Dictionary<IHand, HandRay>.ValueCollection rays)
         {
-            if (!HandRay.ToolSelected)
-            {
-                PickOwner(rays);
-            }
-            else
-            {
-                _owner = null;
-            }
-
-            if (_owner == null || !_owner.HasMark)
+            PickOwner(rays);
+            if (_owner == null)
             {
                 Lost();
                 return;
@@ -72,14 +68,12 @@ namespace AccountingImmersiveAnalytics.Hands
             _lostAt = -1f;
 
             if (hit.Card != _view) Clear();
-
-            bool pinched = _owner.PinchedMark;
-            if (hit.Mark.Id != _mark) Show(hit.Card, hit.Mark);
-            if (pinched && _mark >= 0) Explain();
-            if (_mark >= 0) TickPulse();
+            if (hit.Mark.Id != _mark?.Id) Show(hit.Card, hit.Mark);
+            if (_owner.PinchedMark) Explain();
+            TickPulse();
         }
 
-        private void PickOwner<T>(Dictionary<T, HandRay>.ValueCollection rays)
+        private void PickOwner(Dictionary<IHand, HandRay>.ValueCollection rays)
         {
             if (_owner != null && _owner.HasMark) return;
             _owner = null;
@@ -93,51 +87,38 @@ namespace AccountingImmersiveAnalytics.Hands
 
         private void Lost()
         {
-            if (_mark < 0) return;
+            if (_mark == null) return;
 
-            bool stale = HandRay.ToolSelected || _view == null || !_view.Shown || _view.Mark(_mark) != _markInfo;
-            if (stale)
-            {
-                Clear();
-                return;
-            }
-
+            bool stale = Scene.ToolSelected || !_view.Shown || _view.Mark(_mark.Id) != _mark;
             if (_lostAt < 0f) _lostAt = Time.unscaledTime;
-            if (Time.unscaledTime - _lostAt >= GraceSeconds)
-            {
-                Clear();
-            }
+            if (stale || Time.unscaledTime - _lostAt >= GraceSeconds) Clear();
         }
 
         private void Show(ChartCard view, MarkInfo mark)
         {
-            if (_view != null && _view != view) _view.ClearHighlight();
-
             _view = view;
-            _markInfo = mark;
-            _mark = mark.Id;
-            _entry = view.Entry;
+            _mark = mark;
             view.Highlight(mark);
-
-            _detail = mark;
-            _explanation = MarkExplainer.TryCached(_entry, mark, out Explanation cached) ? cached : (Explanation?)null;
+            _explanationKey = MarkExplainer.KeyFor(view.Entry, mark);
+            _explanation = MarkExplainer.TryCached(view.Entry, mark, out Explanation cached) ? cached : (Explanation?)null;
             Render();
         }
 
-        private bool Waiting => _explanation == null && _entry != null && MarkExplainer.IsWriting(_entry, _markInfo);
+        private bool Waiting => _explanation == null && MarkExplainer.IsWriting(_explanationKey);
 
         private void Render()
         {
-            string waiting = Waiting ? (MarkExplainer.Reached ? "loading" : "assistant.connecting") : null;
-            _shownDots = Waiting ? LoadingDots.Count : -1;
-            _tooltip.Show(_detail, _explanation?.Lines, waiting, _view);
+            bool waiting = Waiting;
+            _shownDots = waiting ? LoadingDots.Count : -1;
+            string status = waiting ? (FlashLiteClient.Reached ? "loading" : "assistant.connecting") : null;
+            _tooltip.Show(_mark, _explanation?.Lines, status, _view);
             ChartManager charts = Scene.Charts;
-            _tooltip.Place(_view, _markInfo, charts != null ? charts.PinnedButtonSize : Style.ButtonSize);
+            _tooltip.Place(_view, _mark, charts != null ? charts.PinnedButtonSize : Style.ButtonSize);
         }
 
         private void OnTextsRefreshed()
         {
-            if (_mark >= 0 && _view != null && _detail != null) Render();
+            if (_mark != null) Render();
         }
 
         private void TickPulse()
@@ -147,18 +128,17 @@ namespace AccountingImmersiveAnalytics.Hands
 
         private void Explain()
         {
-            if (_entry == null || _markInfo == null) return;
             if (_explanation.HasValue)
             {
                 TellAssistant();
                 return;
             }
 
-            ChartEntry entry = _entry;
-            MarkInfo mark = _markInfo;
-            MarkExplainer.Request(entry, mark, _detail, result =>
+            ChartEntry entry = _view.Entry;
+            MarkInfo mark = _mark;
+            MarkExplainer.Request(entry, mark, result =>
             {
-                if (_entry != entry || _markInfo != mark) return;
+                if (_view == null || _view.Entry != entry || _mark != mark) return;
                 _explanation = result;
                 Render();
                 if (result.HasValue) TellAssistant();
@@ -177,10 +157,9 @@ namespace AccountingImmersiveAnalytics.Hands
             if (_view != null) _view.ClearHighlight();
             _tooltip.Hide();
             _view = null;
-            _markInfo = null;
-            _entry = null;
+            _mark = null;
             _explanation = null;
-            _mark = -1;
+            _shownDots = -1;
             _lostAt = -1f;
         }
     }

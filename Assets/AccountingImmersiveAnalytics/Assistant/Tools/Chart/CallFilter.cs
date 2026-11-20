@@ -28,7 +28,7 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools.Chart
             [Doc("For a text column: the categories to keep showing, named exactly as ReadChart lists them. At least one must stay."), Optional]
             public List<string> categories;
             [Doc("false switches the button off, as pressing it again does. Defaults to true."), DefaultsTo(true), Optional]
-            public bool? on;
+            public bool on;
         }
 
         protected override bool EditsAreOutcome => true;
@@ -45,8 +45,8 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools.Chart
         protected override void Run(Args args, Dictionary<string, object> result)
         {
             if (SwitchedOff(ToolType.Filter, args.on, result)) return;
-            if (!TryShapingChart(ToolType.Filter, args.chart, result, out ChartEntry entry)) return;
-            result["on"] = true;
+            if (!TryChart(args.chart, result, out ChartEntry entry)) return;
+            if (!EnsureToolSelected(ToolType.Filter, result)) return;
             if (string.IsNullOrWhiteSpace(args.column))
             {
                 result["chart"] = entry.Title;

@@ -10,13 +10,13 @@ namespace AccountingImmersiveAnalytics.Documents
         private const int CharactersPerWordUnspaced = 2;
 
         public DocumentEntry Entry;
-        public string Title;
+        public string Title => Entry.Title;
         public readonly List<DocumentPage> Pages = new List<DocumentPage>();
         public readonly List<DocumentPassage> Passages = new List<DocumentPassage>();
         public readonly List<PdfTable> Tables = new List<PdfTable>();
-        private int _words;
+        private int? _words;
 
-        public int Minutes => Math.Max(1, (int)Math.Round(_words / (double)WordsPerMinute));
+        public int Minutes => Math.Max(1, (int)Math.Round((_words ??= CountWords(Passages)) / (double)WordsPerMinute));
 
         public bool HasText => Passages.Count > 0;
 
@@ -30,18 +30,6 @@ namespace AccountingImmersiveAnalytics.Documents
             }
             return text.ToString();
         }
-
-        public DocumentPassage Find(string quote)
-        {
-            string wanted = quote?.Trim();
-            if (string.IsNullOrEmpty(wanted)) return null;
-            foreach (StringComparison comparison in new[] { StringComparison.Ordinal, StringComparison.OrdinalIgnoreCase })
-                foreach (DocumentPassage passage in Passages)
-                    if (passage.Text.IndexOf(wanted, comparison) >= 0) return passage;
-            return null;
-        }
-
-        public void Finish() => _words = CountWords(Passages);
 
         private static int CountWords(List<DocumentPassage> passages)
         {
