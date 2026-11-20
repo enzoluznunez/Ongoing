@@ -1,0 +1,24 @@
+{
+    "name": "AccountingImmersiveAnalytics",
+    "rootNamespace": "AccountingImmersiveAnalytics",
+    "references": [
+        "Oculus.VR",
+        "Oculus.Interaction",
+        "Unity.Burst",
+        "Unity.Collections",
+        "Unity.Mathematics",
+        "UnityEngine.UI",
+        "OneText",
+        "OneText.UGUI",
+        "OneText.Mesh"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
