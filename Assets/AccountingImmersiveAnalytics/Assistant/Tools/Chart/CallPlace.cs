@@ -155,6 +155,7 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools.Chart
                 float actual = (t.position - before).magnitude;
                 result["moved"] = args.direction;
                 result["actualMeters"] = Round(actual);
+                if (actual > 0f) result["changed"] = true;
                 if (limited) result["note"] = "The panel was kept within the user's reach and moved less than asked.";
                 ActivityFeed.Record($"moved the {name} {actual:0.00}m {args.direction}");
             }
@@ -166,6 +167,7 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools.Chart
                 t.RotateAround(centre, Vector3.up, sign * degrees);
                 result["turned"] = turn;
                 result["turnedDegrees"] = Round(degrees);
+                if (degrees > 0f) result["changed"] = true;
                 ActivityFeed.Record($"turned the {name} {degrees:0} degrees {turn}");
             }
         }

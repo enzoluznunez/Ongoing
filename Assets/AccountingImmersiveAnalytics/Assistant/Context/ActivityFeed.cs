@@ -1,4 +1,7 @@
+using System;
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 using AccountingImmersiveAnalytics.Assistant.Voice;
 
 namespace AccountingImmersiveAnalytics.Assistant.Context
@@ -7,7 +10,20 @@ namespace AccountingImmersiveAnalytics.Assistant.Context
     {
         private const int MaxUserQueue = 40;
 
-        public static bool InAssistantCall { get; set; }
+        private static bool _inCall;
+        private static readonly AsyncLocal<bool> _assistantFlow = new AsyncLocal<bool>();
+
+        public static bool InAssistantCall
+        {
+            get => _inCall || _assistantFlow.Value;
+            set => _inCall = value;
+        }
+
+        public static async Task<T> AsAssistant<T>(Func<Task<T>> work)
+        {
+            _assistantFlow.Value = true;
+            return await work();
+        }
 
         private static readonly List<string> _assistantBatch = new List<string>();
         private static readonly List<string> _userQueue = new List<string>();

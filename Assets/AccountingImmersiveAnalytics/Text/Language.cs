@@ -106,7 +106,7 @@ namespace AccountingImmersiveAnalytics.Text
             string primary = parts[0];
             if (primary == "zh")
                 return Array.Exists(parts, part => part == "hant" || part == "tw" || part == "hk" || part == "mo") ? "zh-Hant" : "zh-Hans";
-            if (primary == "pt") return Array.IndexOf(parts, "pt", 1) >= 0 ? "pt-PT" : "pt-BR";
+            if (primary == "pt") return Array.FindIndex(parts, 1, part => part is "pt" or "ao" or "mz" or "cv" or "gw" or "st" or "tl" or "lu" or "ch") >= 0 ? "pt-PT" : "pt-BR";
             if (primary == "nb" || primary == "nn") return "no";
             if (primary == "tl") return "fil";
             if (primary == "iw") return "he";

@@ -96,6 +96,26 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools
             return false;
         }
 
+        public static bool TryShownChart(string query, Dictionary<string, object> result, out ChartEntry entry)
+        {
+            if (!TryChart(query, result, out entry)) return false;
+            ChartManager charts = Scene.Charts;
+            if (entry == charts.Pinned) return true;
+            foreach (ChartEntry shown in charts.Shown)
+                if (shown == entry) return true;
+            Refuse(result, "chart shown",
+                $"\"{entry.Title}\" belongs to \"{entry.Source}\", which is not open, so it is not shown. Open it with SetDocument first.");
+            entry = null;
+            return false;
+        }
+
+        public static bool EnsureToolFor(ToolType tool, ChartEntry entry, Dictionary<string, object> result)
+        {
+            if (entry == Scene.Charts?.Pinned) return EnsureToolSelected(tool, result);
+            result["panel"] = $"\"{entry.Title}\" is not pinned, so no {tool} panel opens; the change shows on its card in the chart column.";
+            return true;
+        }
+
         public static bool EnsureToolSelected(ToolType tool, Dictionary<string, object> result)
         {
             ToolManager tools = Scene.Tools;

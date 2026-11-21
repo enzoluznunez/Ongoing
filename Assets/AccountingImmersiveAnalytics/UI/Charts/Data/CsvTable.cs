@@ -21,7 +21,7 @@ namespace AccountingImmersiveAnalytics.UI.Charts.Data
             string head = text.TrimStart();
             if (head.StartsWith("<") || head.StartsWith("{") || head.StartsWith("[") || head.StartsWith("%PDF")) return false;
             int line = head.IndexOf('\n');
-            return line > 0 && head.Substring(0, line).Contains(",") && head.IndexOf('\n', line + 1) > 0;
+            return line > 0 && head.Substring(0, line).Contains(",") && head.Substring(line + 1).Trim().Length > 0;
         }
 
         public static CsvTable Parse(string text) => FromRows(SplitRows(text));

@@ -1,26 +1,28 @@
 using System;
 using System.Runtime.InteropServices;
 using AOT;
+using UnityEngine;
 
 namespace AccountingImmersiveAnalytics.Audio
 {
     public static class Voip
     {
-        public static event Action<byte[]> FrameCaptured;
-
 #if UNITY_ANDROID && !UNITY_EDITOR
+
+        public static event Action<byte[]> FrameCaptured;
 
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         private delegate void FrameCallback(
             [MarshalAs(UnmanagedType.LPArray, SizeParamIndex = 1)]
             byte[] data,
-            int numFrames
+            int length
         );
 
         [MonoPInvokeCallback(typeof(FrameCallback))]
-        private static void OnFrame(byte[] data, int numFrames)
+        private static void OnFrame(byte[] data, int length)
         {
-            FrameCaptured?.Invoke(data);
+            try { FrameCaptured?.Invoke(data); }
+            catch (Exception e) { Debug.LogException(e); }
         }
 
         private static readonly FrameCallback _onFrame = OnFrame;
@@ -43,6 +45,8 @@ namespace AccountingImmersiveAnalytics.Audio
         public static extern void Stop();
 
 #else
+
+        public static event Action<byte[]> FrameCaptured { add { } remove { } }
 
         public static void Init() { }
         public static void Destroy() { }

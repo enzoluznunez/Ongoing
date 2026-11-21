@@ -25,7 +25,12 @@ namespace AccountingImmersiveAnalytics.Documents
             var text = new StringBuilder();
             foreach (DocumentPassage passage in Passages)
             {
-                if (text.Length + passage.Text.Length > most) break;
+                int room = most - text.Length;
+                if (passage.Text.Length + 2 > room)
+                {
+                    if (text.Length == 0 && room > 0) text.Append(passage.Text, 0, Math.Min(passage.Text.Length, room));
+                    break;
+                }
                 text.Append(passage.Text).Append("\n\n");
             }
             return text.ToString();

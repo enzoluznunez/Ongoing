@@ -6,11 +6,14 @@ namespace AccountingImmersiveAnalytics.Audio
     {
 #if UNITY_ANDROID && !UNITY_EDITOR
 
+        private static readonly object _gate = new object();
+        private static bool _ready;
+
         [DllImport("spkr", EntryPoint = "init")]
-        public static extern void Init();
+        private static extern void NativeInit();
 
         [DllImport("spkr", EntryPoint = "destroy")]
-        public static extern void Destroy();
+        private static extern void NativeDestroy();
 
         [DllImport("spkr", EntryPoint = "start")]
         public static extern void Start();
@@ -28,16 +31,39 @@ namespace AccountingImmersiveAnalytics.Audio
             int arrLength
         );
 
+        public static void Init()
+        {
+            lock (_gate)
+            {
+                NativeInit();
+                _ready = true;
+            }
+        }
+
+        public static void Destroy()
+        {
+            lock (_gate)
+            {
+                _ready = false;
+                NativeDestroy();
+            }
+        }
+
         public static void Write(byte[] data)
         {
+            if (data == null || data.Length == 0) return;
             Play(data, data.Length);
         }
 
         public static void Flush()
         {
-            Stop();
-            Clear();
-            Start();
+            lock (_gate)
+            {
+                if (!_ready) return;
+                Stop();
+                Clear();
+                Start();
+            }
         }
 
 #else

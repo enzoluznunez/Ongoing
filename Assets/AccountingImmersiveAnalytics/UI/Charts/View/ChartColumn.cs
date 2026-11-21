@@ -62,7 +62,11 @@ namespace AccountingImmersiveAnalytics.UI.Charts.View
         public void Clear()
         {
             foreach (Slot slot in _slots)
-                if (slot.Root != null) UnityEngine.Object.Destroy(slot.Root.gameObject);
+            {
+                if (slot.Root == null) continue;
+                slot.Root.SetParent(null, false);
+                UnityEngine.Object.Destroy(slot.Root.gameObject);
+            }
             _slots.Clear();
             ShowStatus(null);
             _scroll.verticalNormalizedPosition = 1f;
@@ -124,7 +128,11 @@ namespace AccountingImmersiveAnalytics.UI.Charts.View
             _statusMessage = message;
             if (string.IsNullOrEmpty(message))
             {
-                if (_status != null) UnityEngine.Object.Destroy(_status.gameObject);
+                if (_status != null)
+                {
+                    _status.SetParent(null, false);
+                    UnityEngine.Object.Destroy(_status.gameObject);
+                }
                 _status = null;
                 _statusText = null;
                 return;

@@ -25,25 +25,41 @@ namespace AccountingImmersiveAnalytics.Editor
         [MenuItem(MenuPath)]
         private static void Capture()
         {
-            var holder = new GameObject("PanelCapture") { hideFlags = HideFlags.DontSave };
+            var holder = new GameObject("PanelCapture");
             PanelCapture capture = holder.AddComponent<PanelCapture>();
             capture.StartCoroutine(capture.Run());
         }
 
         private IEnumerator Run()
         {
-            Directory.CreateDirectory(OutputDirectory);
-
-            DocumentsPanel documents = Scene.Documents;
-            if (documents != null)
+            try
             {
-                documents.ShowPanel();
-                yield return Shoot(documents, "documents");
-                documents.HidePanel();
-            }
+                Directory.CreateDirectory(OutputDirectory);
 
-            Debug.Log($"[PanelCapture] Wrote the panel images to {Path.GetFullPath(OutputDirectory)}.");
-            Destroy(gameObject);
+                DocumentsPanel documents = Scene.Documents;
+                if (documents == null)
+                {
+                    Debug.LogWarning("[PanelCapture] No Documents panel was found, so nothing was captured.");
+                    yield break;
+                }
+
+                bool wasVisible = documents.IsVisible;
+                if (!wasVisible) documents.ShowPanel();
+                try
+                {
+                    yield return Shoot(documents, "documents");
+                }
+                finally
+                {
+                    if (!wasVisible) documents.HidePanel();
+                }
+
+                Debug.Log($"[PanelCapture] Wrote the panel images to {Path.GetFullPath(OutputDirectory)}.");
+            }
+            finally
+            {
+                Destroy(gameObject);
+            }
         }
 
         private static IEnumerator Shoot(Panel panel, string name)
@@ -51,7 +67,14 @@ namespace AccountingImmersiveAnalytics.Editor
             for (int i = 0; i < SettleFrames; i++) yield return null;
             yield return new WaitForSecondsRealtime(SettleSeconds);
 
-            RectTransform canvas = panel.GetComponentInChildren<Canvas>(true).transform as RectTransform;
+            Canvas found = panel.GetComponentInChildren<Canvas>(true);
+            if (found == null)
+            {
+                Debug.LogWarning($"[PanelCapture] {panel.name} has no canvas, so {name}.png was not written.");
+                yield break;
+            }
+
+            RectTransform canvas = found.transform as RectTransform;
             var corners = new Vector3[4];
             canvas.GetWorldCorners(corners);
             Vector3 centre = (corners[0] + corners[2]) * 0.5f;
@@ -61,32 +84,39 @@ namespace AccountingImmersiveAnalytics.Editor
             int height = Mathf.RoundToInt(canvas.rect.height * PixelsPerUnit);
             RenderTexture target = RenderTexture.GetTemporary(width, height, 24, RenderTextureFormat.ARGB32);
 
-            var holder = new GameObject("PanelCaptureCamera") { hideFlags = HideFlags.DontSave };
-            Camera camera = holder.AddComponent<Camera>();
-            camera.orthographic = true;
-            camera.orthographicSize = worldHeight * 0.5f * Margin;
-            camera.clearFlags = CameraClearFlags.SolidColor;
-            camera.backgroundColor = Backdrop;
-            camera.cullingMask = 1 << canvas.gameObject.layer;
-            camera.nearClipPlane = CameraGap * 0.5f;
-            camera.farClipPlane = CameraGap * 1.5f;
-            camera.targetTexture = target;
-            camera.stereoTargetEye = StereoTargetEyeMask.None;
-            holder.transform.SetPositionAndRotation(centre - panel.transform.forward * CameraGap, panel.transform.rotation);
-            camera.Render();
-
+            var holder = new GameObject("PanelCaptureCamera");
+            Texture2D image = null;
             RenderTexture previous = RenderTexture.active;
-            RenderTexture.active = target;
-            var image = new Texture2D(width, height, TextureFormat.RGB24, false);
-            image.ReadPixels(new Rect(0, 0, width, height), 0, 0);
-            RenderTexture.active = previous;
+            try
+            {
+                Camera camera = holder.AddComponent<Camera>();
+                camera.orthographic = true;
+                camera.orthographicSize = worldHeight * 0.5f * Margin;
+                camera.clearFlags = CameraClearFlags.SolidColor;
+                camera.backgroundColor = Backdrop;
+                camera.cullingMask = 1 << canvas.gameObject.layer;
+                camera.nearClipPlane = CameraGap * 0.5f;
+                camera.farClipPlane = CameraGap * 1.5f;
+                camera.targetTexture = target;
+                camera.stereoTargetEye = StereoTargetEyeMask.None;
+                holder.transform.SetPositionAndRotation(centre - panel.transform.forward * CameraGap, panel.transform.rotation);
+                camera.Render();
 
-            File.WriteAllBytes(Path.Combine(OutputDirectory, name + ".png"), image.EncodeToPNG());
+                RenderTexture.active = target;
+                image = new Texture2D(width, height, TextureFormat.RGB24, false);
+                image.ReadPixels(new Rect(0, 0, width, height), 0, 0);
+                RenderTexture.active = previous;
 
-            Destroy(image);
-            camera.targetTexture = null;
-            Destroy(holder);
-            RenderTexture.ReleaseTemporary(target);
+                File.WriteAllBytes(Path.Combine(OutputDirectory, name + ".png"), image.EncodeToPNG());
+            }
+            finally
+            {
+                RenderTexture.active = previous;
+                if (image != null) Destroy(image);
+                holder.SetActive(false);
+                Destroy(holder);
+                RenderTexture.ReleaseTemporary(target);
+            }
         }
     }
 }

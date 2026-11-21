@@ -81,7 +81,11 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools
             total.Stop();
 
             bool changed = editsAfter != editsBefore;
-            if (EditsAreOutcome) result["changed"] = changed;
+            if (EditsAreOutcome)
+            {
+                if (result.TryGetValue("changed", out object stated) && stated is bool told) changed = told;
+                result["changed"] = changed;
+            }
 
             if (!ToolResult.IsRefusal(result) && !result.ContainsKey("ok"))
             {

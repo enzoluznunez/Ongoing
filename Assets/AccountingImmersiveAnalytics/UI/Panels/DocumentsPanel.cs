@@ -136,6 +136,7 @@ namespace AccountingImmersiveAnalytics.UI.Panels
         public void CloseDocument()
         {
             Clear();
+            Scene.Charts?.UnpinUnless(null);
             Scene.Charts?.CloseColumn();
             ShowMessage("documents.select");
             ActivityFeed.RecordState("documentsPanel", "the Documents panel has no document open and asks the user to select one from the documents column on its left");
@@ -257,6 +258,7 @@ namespace AccountingImmersiveAnalytics.UI.Panels
             var (made, failure, unreadable) = await charts.OpenCsv(entry);
             outcome.Charts = made;
             outcome.Failure = failure;
+            if (this == null || ticket != _ticket) return outcome;
             if (unreadable)
             {
                 ShowMessage("documents.failed");
@@ -272,6 +274,7 @@ namespace AccountingImmersiveAnalytics.UI.Panels
             var outcome = new DocumentOutcome();
             if (reveal && !CanvasShown) ShowPanel();
             Clear();
+            Scene.Charts?.UnpinUnless(entry.File);
             MarkShown(entry);
             int ticket = ++_ticket;
             SetTitle(() => Numbers.Text(entry.Title));
@@ -466,7 +469,9 @@ namespace AccountingImmersiveAnalytics.UI.Panels
             foreach (Sheet sheet in _sheets)
             {
                 if (sheet.Texture != null) Destroy(sheet.Texture);
-                if (sheet.Root != null) Destroy(sheet.Root.gameObject);
+                if (sheet.Root == null) continue;
+                sheet.Root.SetParent(null, false);
+                Destroy(sheet.Root.gameObject);
             }
             _sheets.Clear();
             _renderer?.Dispose();

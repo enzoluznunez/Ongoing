@@ -57,7 +57,7 @@ namespace AccountingImmersiveAnalytics.Hands
         private void RescanCanvases()
         {
             bool added = _pinnedVersion != PinnedChart.CanvasVersion;
-            if (!added && _canvases.Count >= ExpectedCanvases && !_canvases.Contains(null)) return;
+            if (!added && _canvases.Count >= ExpectedCanvases && !_canvases.Exists(canvas => canvas == null)) return;
             if (!added && Time.unscaledTime < _nextCanvasScan) return;
             _pinnedVersion = PinnedChart.CanvasVersion;
             _nextCanvasScan = Time.unscaledTime + CanvasRescanSeconds;

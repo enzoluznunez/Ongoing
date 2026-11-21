@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
 using AccountingImmersiveAnalytics.App;
+using AccountingImmersiveAnalytics.Assistant.Context;
 using AccountingImmersiveAnalytics.Assistant.Live;
 using AccountingImmersiveAnalytics.Assistant.Tools.Arguments;
 using AccountingImmersiveAnalytics.Documents;
@@ -64,7 +65,7 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools.Documents
                 DocumentsPanel documents = Scene.Documents;
                 if (documents == null) problem = "The Documents panel was not found in the scene.";
                 else if (entry == null) problem = $"There is no single document matching '{args.title}'. The documents are: {DocumentLibrary.ForPrompt()}.";
-                else opening = documents.Open(entry);
+                else opening = ActivityFeed.AsAssistant(() => documents.Open(entry));
             }).ConfigureAwait(false);
             if (problem != null) return problem;
             DocumentOutcome outcome = await opening.ConfigureAwait(false);

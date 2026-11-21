@@ -31,20 +31,20 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools.Chart
         public override FunctionDeclaration Declaration => new FunctionDeclaration
         {
             Name = "CallSort",
-            Description = "Press the pinned chart's Sort button, which opens its Sort panel, and sort the chart or clear its sort. Histograms and treemaps cannot be sorted: their order is fixed by their bins or their layout.",
+            Description = "Press the pinned chart's Sort button, which opens its Sort panel, and sort the chart or clear its sort. Histograms and treemaps cannot be sorted: their order is fixed by their bins or their layout. A chart in the column that is not pinned changes on its card, and no panel opens.",
             Parameters = ParametersFor(typeof(Args))
         };
 
         protected override void Run(Args args, Dictionary<string, object> result)
         {
             if (SwitchedOff(ToolType.Sort, args.on, result)) return;
-            if (!TryChart(args.chart, result, out ChartEntry entry)) return;
+            if (!TryShownChart(args.chart, result, out ChartEntry entry)) return;
             if (!ChartKinds.Sorts(entry.Spec.Kind))
             {
                 Refuse(result, "sortable chart", $"A {entry.Spec.Describe()} has no Sort: its order is fixed. Say so to the user.");
                 return;
             }
-            if (!EnsureToolSelected(ToolType.Sort, result)) return;
+            if (!EnsureToolFor(ToolType.Sort, entry, result)) return;
             if (args.order == null)
             {
                 result["chart"] = entry.Title;

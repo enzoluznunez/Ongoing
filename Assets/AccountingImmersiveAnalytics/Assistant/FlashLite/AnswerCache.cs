@@ -17,6 +17,7 @@ namespace AccountingImmersiveAnalytics.Assistant.FlashLite
         private static readonly Dictionary<string, string> Answers = new Dictionary<string, string>();
         private static Task _loading;
         private static bool _saving;
+        private static bool _dirty;
         private static string _file;
 
         public static string KeyFor(string request)
@@ -40,6 +41,7 @@ namespace AccountingImmersiveAnalytics.Assistant.FlashLite
         {
             if (string.IsNullOrEmpty(answer)) return;
             Answers[key] = answer;
+            _dirty = true;
             SaveSoon();
         }
 
@@ -76,20 +78,24 @@ namespace AccountingImmersiveAnalytics.Assistant.FlashLite
             _saving = true;
             try
             {
-                await Task.Delay(SaveDelayMilliseconds);
-                var snapshot = new Dictionary<string, string>(Answers);
-                string file = _file;
-                await Task.Run(() =>
+                while (_dirty)
                 {
-                    try
+                    await Task.Delay(SaveDelayMilliseconds);
+                    _dirty = false;
+                    var snapshot = new Dictionary<string, string>(Answers);
+                    string file = _file;
+                    await Task.Run(() =>
                     {
-                        File.WriteAllText(file, JsonConvert.SerializeObject(snapshot));
-                    }
-                    catch (Exception e)
-                    {
-                        Debug.LogWarning($"[AnswerCache] Could not save answers to {file}: {e.Message}");
-                    }
-                });
+                        try
+                        {
+                            File.WriteAllText(file, JsonConvert.SerializeObject(snapshot));
+                        }
+                        catch (Exception e)
+                        {
+                            Debug.LogWarning($"[AnswerCache] Could not save answers to {file}: {e.Message}");
+                        }
+                    });
+                }
             }
             catch (Exception e)
             {

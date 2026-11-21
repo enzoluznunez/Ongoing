@@ -19,6 +19,8 @@ namespace AccountingImmersiveAnalytics.Assistant.FlashLite
         private static readonly Dictionary<string, List<Action<Explanation?>>> Waiting =
             new Dictionary<string, List<Action<Explanation?>>>();
 
+        private static readonly char[] CsvSpecials = { ',', '"', '\n', '\r' };
+
         private static readonly JObject AnswerSchema = FlashLiteClient.Schema(("lines", "STRING_LIST"));
 
         public static bool TryCached(ChartEntry entry, MarkInfo mark, out Explanation explanation) =>
@@ -159,7 +161,7 @@ namespace AccountingImmersiveAnalytics.Assistant.FlashLite
             for (int c = 0; c < table.Fields.Count; c++)
             {
                 if (c > 0) text.Append(',');
-                text.Append(table.Fields[c].Name);
+                text.Append(CsvCell(table.Fields[c].Name));
             }
             text.Append('\n');
             for (int r = 0; r < table.RowCount; r++)
@@ -167,10 +169,16 @@ namespace AccountingImmersiveAnalytics.Assistant.FlashLite
                 for (int c = 0; c < table.Fields.Count; c++)
                 {
                     if (c > 0) text.Append(',');
-                    text.Append(table.Fields[c].TextAt(r));
+                    text.Append(CsvCell(table.Fields[c].TextAt(r)));
                 }
                 text.Append('\n');
             }
+        }
+
+        private static string CsvCell(string value)
+        {
+            if (string.IsNullOrEmpty(value) || value.IndexOfAny(CsvSpecials) < 0) return value;
+            return "\"" + value.Replace("\"", "\"\"") + "\"";
         }
 
         private static string Number(double value) =>

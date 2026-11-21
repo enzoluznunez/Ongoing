@@ -15,7 +15,6 @@ namespace AccountingImmersiveAnalytics.Editor
         private const string AssetFolder = "Assets/Resources/Fonts/Noto";
         private const string DictionaryFolder = "Assets/AccountingImmersiveAnalytics/Text/Fonts/Dictionaries";
         private const string DefaultFamily = "NotoSans";
-        private const string MonospaceFamily = "NotoSansMono";
         private const float BaseWeight = 500f;
 
         private static readonly string[] OnDemandFamilies =
@@ -52,7 +51,6 @@ namespace AccountingImmersiveAnalytics.Editor
                     OneFontAsset asset = MakeFont(OnDemandFamilies[i], (i + 1f) / (OnDemandFamilies.Length + 1), paths);
                     if (asset != null) onDemand.Add(OneFontReferences.Make(asset, OneFontSourceKind.Resources));
                 }
-                MakeFont(MonospaceFamily, 1f, paths);
             }
             finally
             {
@@ -69,9 +67,12 @@ namespace AccountingImmersiveAnalytics.Editor
             OneTextSettings settings = OneTextSettingsProvider.GetOrCreate();
             var serialized = new SerializedObject(settings);
             serialized.FindProperty("_systemFontFallback").boolValue = false;
-            SerializedProperty list = serialized.FindProperty("_dictionaries");
-            list.arraySize = dictionaries.Count;
-            for (int i = 0; i < dictionaries.Count; i++) list.GetArrayElementAtIndex(i).objectReferenceValue = dictionaries[i];
+            if (dictionaries.Count > 0)
+            {
+                SerializedProperty list = serialized.FindProperty("_dictionaries");
+                list.arraySize = dictionaries.Count;
+                for (int i = 0; i < dictionaries.Count; i++) list.GetArrayElementAtIndex(i).objectReferenceValue = dictionaries[i];
+            }
             serialized.ApplyModifiedPropertiesWithoutUndo();
 
             settings.DefaultFont = main;

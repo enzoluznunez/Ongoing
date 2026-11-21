@@ -64,7 +64,6 @@ namespace AccountingImmersiveAnalytics.UI.Panels
             RoundedSprite.Apply(fill, Style.LargeRadius);
             fill.color = Style.Card;
             fill.raycastTarget = true;
-            BackFace.Add(Root, Style.LargeRadius);
             _watch = LayoutTools.Ensure<CardFit>(Root.gameObject);
             _watch.Refit = () => Refit(true);
             _width = width;
@@ -83,6 +82,7 @@ namespace AccountingImmersiveAnalytics.UI.Panels
             _width = width;
             Mirrored = Text.Language.RightToLeft;
             LayoutTools.Clear(Root);
+            BackFace.Add(Root, Style.LargeRadius);
             _y = Inset;
             _rows = 0;
             _list = null;

@@ -4,6 +4,7 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using Object = UnityEngine.Object;
 using UnityScene = UnityEngine.SceneManagement.Scene;
 
 namespace AccountingImmersiveAnalytics.Editor
@@ -25,8 +26,8 @@ namespace AccountingImmersiveAnalytics.Editor
         [Serializable]
         private class Node
         {
-            public string Path;
-            public string ParentPath;
+            public string ParentId;
+            public int ParentNode = -1;
             public string Name;
             public int Sibling;
             public int Layer;
@@ -50,10 +51,18 @@ namespace AccountingImmersiveAnalytics.Editor
         }
 
         [Serializable]
+        private class KnownObject
+        {
+            public string Id;
+            public string RootId;
+            public string Path;
+        }
+
+        [Serializable]
         private class SceneObjects
         {
             public string ScenePath;
-            public List<string> Paths = new List<string>();
+            public List<KnownObject> Objects = new List<KnownObject>();
         }
 
         static CopyRuntimeObjects() => EditorApplication.playModeStateChanged += OnPlayModeChanged;
@@ -72,22 +81,33 @@ namespace AccountingImmersiveAnalytics.Editor
                 return;
             }
 
-            var existing = new HashSet<string>(known.Paths);
-            var capture = new Capture { ScenePath = scene.path };
+            Dictionary<Transform, string> ids = Ids(scene);
+            var existing = new HashSet<string>();
+            foreach (KnownObject entry in known.Objects) existing.Add(entry.Id);
             var present = new HashSet<string>();
+            foreach (string id in ids.Values)
+                if (id != null && existing.Contains(id)) present.Add(id);
+            if (existing.Count > 0 && present.Count == 0)
+            {
+                Debug.LogError("[CopyRuntimeObjects] None of the scene's objects could be identified in Play mode, so nothing was copied.");
+                return;
+            }
+
+            var capture = new Capture { ScenePath = scene.path };
             var owned = new HashSet<string>();
             var skippedRoots = new List<string>();
 
-            foreach ((Transform root, string path) in Roots(scene))
+            foreach (GameObject root in scene.GetRootGameObjects())
             {
-                if (!existing.Contains(path))
+                string id = ids[root.transform];
+                if (id == null || !existing.Contains(id))
                 {
                     skippedRoots.Add(root.name);
                     continue;
                 }
-                if (!HoldsOwnCode(root.gameObject)) continue;
-                owned.Add(path);
-                Walk(root, path, existing, present, capture.Nodes);
+                if (!HoldsOwnCode(root)) continue;
+                owned.Add(id);
+                Walk(root.transform, id, -1, ids, existing, capture.Nodes);
             }
 
             SessionState.SetString(CapturedKey, JsonUtility.ToJson(capture));
@@ -97,33 +117,36 @@ namespace AccountingImmersiveAnalytics.Editor
                 Debug.Log("[CopyRuntimeObjects] Left out new root objects: " + string.Join(", ", skippedRoots));
 
             var gone = new List<string>();
-            foreach (string path in known.Paths)
-                if (!present.Contains(path) && owned.Contains(path.Split('/')[0])) gone.Add(path);
+            foreach (KnownObject entry in known.Objects)
+                if (owned.Contains(entry.RootId) && !present.Contains(entry.Id)) gone.Add(entry.Path);
             if (gone.Count > 0)
                 Debug.LogWarning("[CopyRuntimeObjects] These scene objects were gone at runtime; the code may have removed them:\n" + string.Join("\n", gone));
         }
 
-        private static void Walk(Transform t, string path, HashSet<string> existing, HashSet<string> present, List<Node> nodes)
+        private static void Walk(Transform t, string id, int node, Dictionary<Transform, string> ids, HashSet<string> existing, List<Node> nodes)
         {
-            present.Add(path);
             bool inPrefab = PrefabUtility.IsPartOfPrefabInstance(t.gameObject);
-            foreach ((Transform child, string childPath) in Children(t, path))
+            for (int i = 0; i < t.childCount; i++)
             {
-                if (!existing.Contains(childPath))
+                Transform child = t.GetChild(i);
+                string childId = ids[child];
+                int childNode = -1;
+                if (childId == null || !existing.Contains(childId))
                 {
                     if (inPrefab || IsData(child)) continue;
-                    nodes.Add(NodeFor(child, path, childPath));
+                    childNode = nodes.Count;
+                    nodes.Add(NodeFor(child, node < 0 ? id : null, node));
                 }
-                Walk(child, childPath, existing, present, nodes);
+                Walk(child, childId, childNode, ids, existing, nodes);
             }
         }
 
-        private static Node NodeFor(Transform t, string parentPath, string path)
+        private static Node NodeFor(Transform t, string parentId, int parentNode)
         {
             var node = new Node
             {
-                Path = path,
-                ParentPath = parentPath,
+                ParentId = parentId,
+                ParentNode = parentNode,
                 Name = t.name,
                 Sibling = t.GetSiblingIndex(),
                 Layer = t.gameObject.layer,
@@ -146,7 +169,7 @@ namespace AccountingImmersiveAnalytics.Editor
 
         private static bool IsData(Transform t)
         {
-            if ((t.gameObject.hideFlags & HideFlags.DontSave) != 0) return true;
+            if ((t.gameObject.hideFlags & HideFlags.DontSaveInEditor) != 0) return true;
             foreach (string prefix in DataPrefixes)
                 if (t.name.StartsWith(prefix, StringComparison.Ordinal)) return true;
             return false;
@@ -169,7 +192,12 @@ namespace AccountingImmersiveAnalytics.Editor
         {
             UnityScene scene = SceneManager.GetActiveScene();
             var known = new SceneObjects { ScenePath = scene.path };
-            known.Paths.AddRange(Index(scene).Keys);
+            Dictionary<Transform, string> ids = Ids(scene);
+            foreach (KeyValuePair<Transform, string> pair in ids)
+            {
+                if (pair.Value == null) continue;
+                known.Objects.Add(new KnownObject { Id = pair.Value, RootId = ids[pair.Key.root], Path = PathOf(pair.Key) });
+            }
             SessionState.SetString(SceneObjectsKey, JsonUtility.ToJson(known));
             SessionState.EraseString(CapturedKey);
         }
@@ -188,15 +216,19 @@ namespace AccountingImmersiveAnalytics.Editor
                 return;
             }
 
-            Dictionary<string, Transform> byPath = Index(scene);
+            Dictionary<string, Transform> parents = SceneParents(capture.Nodes);
+            var made = new Transform[capture.Nodes.Count];
 
             int added = 0;
-            foreach (Node node in capture.Nodes)
+            for (int i = 0; i < capture.Nodes.Count; i++)
             {
-                if (byPath.ContainsKey(node.Path)) continue;
-                if (!byPath.TryGetValue(node.ParentPath, out Transform parent))
+                Node node = capture.Nodes[i];
+                Transform parent = node.ParentNode >= 0
+                    ? made[node.ParentNode]
+                    : node.ParentId != null && parents.TryGetValue(node.ParentId, out Transform found) ? found : null;
+                if (parent == null || parent.gameObject.scene != scene)
                 {
-                    Debug.LogWarning($"[CopyRuntimeObjects] No parent at {node.ParentPath}; {node.Name} was not added.");
+                    Debug.LogWarning($"[CopyRuntimeObjects] The parent of {node.Name} is no longer in the scene; it was not added.");
                     continue;
                 }
 
@@ -217,7 +249,7 @@ namespace AccountingImmersiveAnalytics.Editor
                 go.layer = node.Layer;
                 go.SetActive(node.Active);
                 UnityEditor.Undo.RegisterCreatedObjectUndo(go, "Copy Runtime Objects Into Scene");
-                byPath[node.Path] = t;
+                made[i] = t;
                 added++;
             }
 
@@ -225,45 +257,49 @@ namespace AccountingImmersiveAnalytics.Editor
             Debug.Log($"[CopyRuntimeObjects] Added {added} objects to {scene.name}. Save the scene to keep them.");
         }
 
-        private static Dictionary<string, Transform> Index(UnityScene scene)
+        private static Dictionary<string, Transform> SceneParents(List<Node> nodes)
         {
-            var byPath = new Dictionary<string, Transform>();
-            foreach ((Transform root, string path) in Roots(scene)) Index(root, path, byPath);
-            return byPath;
-        }
-
-        private static void Index(Transform t, string path, Dictionary<string, Transform> byPath)
-        {
-            byPath[path] = t;
-            foreach ((Transform child, string childPath) in Children(t, path)) Index(child, childPath, byPath);
-        }
-
-        // A path part is the object's name, with #n added for the nth earlier sibling of the same name.
-        private static List<(Transform, string)> Roots(UnityScene scene)
-        {
-            var twins = new Dictionary<string, int>();
-            var roots = new List<(Transform, string)>();
-            foreach (GameObject root in scene.GetRootGameObjects()) roots.Add((root.transform, PartOf(root.name, twins)));
-            return roots;
-        }
-
-        private static List<(Transform, string)> Children(Transform t, string path)
-        {
-            var twins = new Dictionary<string, int>();
-            var children = new List<(Transform, string)>(t.childCount);
-            for (int i = 0; i < t.childCount; i++)
+            var wanted = new List<string>();
+            var parsed = new List<GlobalObjectId>();
+            var seen = new HashSet<string>();
+            foreach (Node node in nodes)
             {
-                Transform child = t.GetChild(i);
-                children.Add((child, path + "/" + PartOf(child.name, twins)));
+                if (node.ParentNode >= 0 || string.IsNullOrEmpty(node.ParentId) || !seen.Add(node.ParentId)) continue;
+                if (!GlobalObjectId.TryParse(node.ParentId, out GlobalObjectId id)) continue;
+                wanted.Add(node.ParentId);
+                parsed.Add(id);
             }
-            return children;
+
+            var objects = new Object[parsed.Count];
+            GlobalObjectId.GlobalObjectIdentifiersToObjectsSlow(parsed.ToArray(), objects);
+            var parents = new Dictionary<string, Transform>();
+            for (int i = 0; i < objects.Length; i++)
+                if (objects[i] is GameObject go) parents[wanted[i]] = go.transform;
+            return parents;
         }
 
-        private static string PartOf(string name, Dictionary<string, int> twins)
+        private static Dictionary<Transform, string> Ids(UnityScene scene)
         {
-            twins.TryGetValue(name, out int twin);
-            twins[name] = twin + 1;
-            return twin == 0 ? name : $"{name}#{twin}";
+            var transforms = new List<Transform>();
+            foreach (GameObject root in scene.GetRootGameObjects())
+                transforms.AddRange(root.GetComponentsInChildren<Transform>(true));
+
+            var objects = new Object[transforms.Count];
+            for (int i = 0; i < transforms.Count; i++) objects[i] = transforms[i].gameObject;
+            var gids = new GlobalObjectId[objects.Length];
+            GlobalObjectId.GetGlobalObjectIdsSlow(objects, gids);
+
+            var ids = new Dictionary<Transform, string>(transforms.Count);
+            for (int i = 0; i < transforms.Count; i++)
+                ids[transforms[i]] = gids[i].targetObjectId == 0 ? null : gids[i].ToString();
+            return ids;
+        }
+
+        private static string PathOf(Transform t)
+        {
+            string path = t.name;
+            for (Transform parent = t.parent; parent != null; parent = parent.parent) path = parent.name + "/" + path;
+            return path;
         }
     }
 }

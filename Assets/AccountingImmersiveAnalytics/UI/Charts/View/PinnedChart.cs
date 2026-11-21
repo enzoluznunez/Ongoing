@@ -214,7 +214,7 @@ namespace AccountingImmersiveAnalytics.UI.Charts.View
             float total = h;
             if (_panel != null && _panel.Root.gameObject.activeSelf)
             {
-                if (!Mathf.Approximately(_panel.Width, w)) RebuildPanel();
+                if (!Mathf.Approximately(_panel.Width, w) && !RangeSlider.AnyHeld) RebuildPanel();
                 DesignRect.Place(_panel.Root, 0f, h + gap, w, _panel.Height);
                 total += gap + _panel.Height;
             }

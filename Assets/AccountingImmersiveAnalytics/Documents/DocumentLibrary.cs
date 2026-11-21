@@ -28,12 +28,22 @@ namespace AccountingImmersiveAnalytics.Documents
         private static async Task LoadAsync()
         {
             Entries.Clear();
-            var reads = new List<Task<DocumentEntry>>();
-            foreach (string name in await StreamingFiles.List(Folder, IndexFile))
-                if (Listed(name)) reads.Add(EntryFor(name));
-            Entries.AddRange(await Task.WhenAll(reads));
-            if (Entries.Count == 0) Debug.LogWarning($"[DocumentLibrary] No PDF or CSV files were found in StreamingAssets/{Folder}.");
-            Ready = true;
+            try
+            {
+                var reads = new List<Task<DocumentEntry>>();
+                foreach (string name in await StreamingFiles.List(Folder, IndexFile))
+                    if (Listed(name)) reads.Add(EntryFor(name));
+                Entries.AddRange(await Task.WhenAll(reads));
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[DocumentLibrary] StreamingAssets/{Folder} could not be listed: {e.Message}");
+            }
+            finally
+            {
+                if (Entries.Count == 0) Debug.LogWarning($"[DocumentLibrary] No PDF or CSV files were found in StreamingAssets/{Folder}.");
+                Ready = true;
+            }
         }
 
         private static async Task<DocumentEntry> EntryFor(string name)
@@ -42,7 +52,15 @@ namespace AccountingImmersiveAnalytics.Documents
             string file = $"{Folder}/{name}";
             if (DocumentEntry.IsCsvName(name))
                 return new DocumentEntry { Id = id, Title = id, File = file };
-            byte[] bytes = await StreamingFiles.ReadBytes(file);
+            byte[] bytes = null;
+            try
+            {
+                bytes = await StreamingFiles.ReadBytes(file);
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[DocumentLibrary] StreamingAssets/{file} could not be read: {e.Message}");
+            }
             var peek = bytes != null ? await Task.Run(() => PdfDocumentReader.Peek(bytes)) : null;
             string title = peek?.Title;
             var entry = new DocumentEntry { Id = id, Title = string.IsNullOrWhiteSpace(title) ? id : title.Trim(), File = file };

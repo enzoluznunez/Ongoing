@@ -123,7 +123,8 @@ namespace AccountingImmersiveAnalytics.App
         private static void Render(Draw d, Vector3 at, Quaternion facing)
         {
             if (d.mesh == null || d.parameters.material == null) return;
-            Graphics.RenderMesh(d.parameters, d.mesh, d.submesh, Matrix4x4.TRS(at, facing, Vector3.one * d.size));
+            Matrix4x4 place = Matrix4x4.TRS(at, facing, Vector3.one * d.size) * Matrix4x4.Translate(-d.mesh.bounds.center);
+            Graphics.RenderMesh(d.parameters, d.mesh, d.submesh, place);
         }
 
         private static void Collect(MeshRenderer r)
@@ -138,11 +139,7 @@ namespace AccountingImmersiveAnalytics.App
 
             EntityId meshId = mesh.GetEntityId();
             bool newMesh = !SeenMeshes.TryGetValue(meshId, out (int layout, float size) info);
-            if (newMesh)
-            {
-                info = (LayoutOf(mesh), Width / Mathf.Max(mesh.bounds.size.magnitude, 1e-4f));
-                SeenMeshes.Add(meshId, info);
-            }
+            if (newMesh) info = (LayoutOf(mesh), Width / Mathf.Max(mesh.bounds.size.magnitude, 1e-4f));
 
             int layer = r.gameObject.layer;
             ShadowCastingMode shadows = r.shadowCastingMode;
@@ -173,6 +170,7 @@ namespace AccountingImmersiveAnalytics.App
                 if (newMesh)
                 {
                     Meshes.Add(draw);
+                    SeenMeshes.Add(meshId, info);
                     newMesh = false;
                 }
             }

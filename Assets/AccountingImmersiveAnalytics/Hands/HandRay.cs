@@ -269,7 +269,7 @@ namespace AccountingImmersiveAnalytics.Hands
         private void ContinueCanvas(Vector3 origin, Vector3 direction, bool pinching)
         {
             Canvas canvas = _heldCanvas != null ? _heldCanvas.Canvas : null;
-            if (canvas == null || !canvas.enabled)
+            if (canvas == null || !canvas.isActiveAndEnabled)
             {
                 if (_heldCanvas != null) Send(_heldCanvas, PointerEventType.Cancel, _end);
                 _hoveredCanvas = null;
@@ -295,6 +295,7 @@ namespace AccountingImmersiveAnalytics.Hands
         {
             if (_carried == null || !_carried.isActiveAndEnabled)
             {
+                if (_carried != null) Send(_carried, PointerEventType.Cancel, _end);
                 EndHold();
                 return;
             }
@@ -318,7 +319,7 @@ namespace AccountingImmersiveAnalytics.Hands
         {
             HasMark = false;
             PinchedMark = false;
-            _wasPinching = false;
+            _wasPinching = true;
             _visual.Hide();
 
             switch (_hold)

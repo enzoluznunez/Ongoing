@@ -68,7 +68,7 @@ namespace AccountingImmersiveAnalytics.Hands
             _lostAt = -1f;
 
             if (hit.Card != _view) Clear();
-            if (hit.Mark.Id != _mark?.Id) Show(hit.Card, hit.Mark);
+            if (hit.Mark != _mark) Show(hit.Card, hit.Mark);
             if (_owner.PinchedMark) Explain();
             TickPulse();
         }
@@ -89,7 +89,7 @@ namespace AccountingImmersiveAnalytics.Hands
         {
             if (_mark == null) return;
 
-            bool stale = Scene.ToolSelected || !_view.Shown || _view.Mark(_mark.Id) != _mark;
+            bool stale = Scene.ToolSelected || _view == null || !_view.Shown || _view.Mark(_mark.Id) != _mark;
             if (_lostAt < 0f) _lostAt = Time.unscaledTime;
             if (stale || Time.unscaledTime - _lostAt >= GraceSeconds) Clear();
         }
@@ -118,7 +118,9 @@ namespace AccountingImmersiveAnalytics.Hands
 
         private void OnTextsRefreshed()
         {
-            if (_mark != null) Render();
+            if (_mark == null) return;
+            if (_view == null) Clear();
+            else Render();
         }
 
         private void TickPulse()

@@ -46,10 +46,10 @@ namespace AccountingImmersiveAnalytics.Assistant
         private async Task ConnectNow()
         {
             await VoiceSetup.EnsureStarted(_webSearch);
-            if (this == null || !isActiveAndEnabled) return;
+            if (this == null || !isActiveAndEnabled || !_active) return;
 
             VoiceSession.Connect();
-            if (_active) VoiceSession.Listen();
+            VoiceSession.Listen();
         }
 
         public void SetActive(bool active)
@@ -80,6 +80,11 @@ namespace AccountingImmersiveAnalytics.Assistant
 
             if (ContextBudget.ConsumeWarning()) ContextWarning?.Invoke();
             if (ContextBudget.ConsumeEnded()) ContextExhausted?.Invoke();
+        }
+
+        private void OnEnable()
+        {
+            if (_ready && _active) _ = ConnectNow();
         }
 
         private void OnDisable()

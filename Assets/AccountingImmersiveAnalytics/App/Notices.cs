@@ -17,10 +17,9 @@ namespace AccountingImmersiveAnalytics.App
             ActivityFeed.Record(message);
 
             if (Time.frameCount == _lastToastFrame) return;
-            _lastToastFrame = Time.frameCount;
-
             Tooltip tooltip = Scene.Tooltip;
             if (tooltip == null || host == null || !host.isActiveAndEnabled) return;
+            _lastToastFrame = Time.frameCount;
 
             _generation++;
             tooltip.ShowNotice(message);

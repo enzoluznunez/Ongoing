@@ -36,7 +36,7 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools.Chart
         public override FunctionDeclaration Declaration => new FunctionDeclaration
         {
             Name = "CallFilter",
-            Description = "Press the pinned chart's Filter button, which opens its Filter panel, and filter the rows behind a chart by one of its columns, then the chart recalculates (bar heights, counts and boxes change). " +
+            Description = "Press the pinned chart's Filter button, which opens its Filter panel, and filter the rows behind a chart by one of its columns, then the chart recalculates (bar heights, counts and boxes change). A chart in the column that is not pinned changes on its card, and no panel opens. " +
                           "Axis ranges stay at the full data. Hidden categories close up on their axis, and hidden groups leave the key. " +
                           "Each column has its own filter; the others stay as they are.",
             Parameters = ParametersFor(typeof(Args))
@@ -45,8 +45,8 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools.Chart
         protected override void Run(Args args, Dictionary<string, object> result)
         {
             if (SwitchedOff(ToolType.Filter, args.on, result)) return;
-            if (!TryChart(args.chart, result, out ChartEntry entry)) return;
-            if (!EnsureToolSelected(ToolType.Filter, result)) return;
+            if (!TryShownChart(args.chart, result, out ChartEntry entry)) return;
+            if (!EnsureToolFor(ToolType.Filter, entry, result)) return;
             if (string.IsNullOrWhiteSpace(args.column))
             {
                 result["chart"] = entry.Title;

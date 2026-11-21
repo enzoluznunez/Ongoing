@@ -171,7 +171,8 @@ namespace AccountingImmersiveAnalytics.UI.Charts.Spec
                     string shown = Clean(chart[key + "Title"]);
                     if (shown != null) spec.Titles[role] = shown;
                 }
-                if (spec.Aggregate == Aggregate.Count) spec.Fields.Remove(Role.Value);
+                bool valueNeeded = ChartKinds.RulesFor(kind).Any(rule => rule.Role == Role.Value && rule.Required);
+                if (spec.Aggregate == Aggregate.Count && !valueNeeded) spec.Fields.Remove(Role.Value);
                 string problem = Fits(spec, table);
                 if (problem != null)
                 {

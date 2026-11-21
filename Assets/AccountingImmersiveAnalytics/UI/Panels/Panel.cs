@@ -117,12 +117,14 @@ namespace AccountingImmersiveAnalytics.UI.Panels
         private void SetShown(bool on)
         {
             _shown = on;
+            if (on) RestoreWarmAlpha();
             LayoutTools.ShowCanvas(_canvas, _pokes, on, _warming);
         }
 
         private bool _warming;
         private CanvasGroup _warmGroup;
         private float _warmAlpha;
+        private bool _warmHidden;
 
         public void PrewarmCanvas(bool on)
         {
@@ -133,9 +135,17 @@ namespace AccountingImmersiveAnalytics.UI.Panels
             {
                 _warmAlpha = _warmGroup.alpha;
                 _warmGroup.alpha = 0f;
+                _warmHidden = true;
             }
-            else if (!on && !_shown) _warmGroup.alpha = _warmAlpha;
+            else if (!on) RestoreWarmAlpha();
             _canvas.enabled = _shown || _warming;
+        }
+
+        private void RestoreWarmAlpha()
+        {
+            if (!_warmHidden || _warmGroup == null) return;
+            _warmGroup.alpha = _warmAlpha;
+            _warmHidden = false;
         }
 
         protected void ResolveLayoutNow()

@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Text;
 using AccountingImmersiveAnalytics.Documents;
 using UnityEditor;
 using UnityEditor.Build;
@@ -27,7 +28,17 @@ namespace AccountingImmersiveAnalytics.Editor
         private static bool IsDocument(string path) =>
             path.StartsWith(FolderAsset, StringComparison.Ordinal) && DocumentLibrary.Listed(path);
 
-        private static string Quote(string name) => "  \"" + name.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"";
+        private static string Quote(string name)
+        {
+            var quoted = new StringBuilder("  \"");
+            foreach (char c in name)
+            {
+                if (c == '"' || c == '\\') quoted.Append('\\').Append(c);
+                else if (c < ' ') quoted.Append("\\u").Append(((int)c).ToString("x4"));
+                else quoted.Append(c);
+            }
+            return quoted.Append('"').ToString();
+        }
 
         [MenuItem("Tools/Documents/Write Document Index")]
         public static void Write()

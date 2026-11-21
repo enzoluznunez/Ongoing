@@ -53,9 +53,10 @@ namespace AccountingImmersiveAnalytics.Documents
                         Width = width, Height = height,
                         Native = new NativeArray<byte>(width * height * 4, Allocator.Persistent, NativeArrayOptions.UninitializedMemory)
                     };
-                    IntPtr buffer = AndroidJNI.NewDirectByteBuffer(pixels.Native);
+                    IntPtr buffer = IntPtr.Zero;
                     try
                     {
+                        buffer = AndroidJNI.NewDirectByteBuffer(pixels.Native);
                         CallVoid(bitmap, "copyPixelsToBuffer", "(Ljava/nio/Buffer;)V", new jvalue { l = buffer });
                     }
                     catch
@@ -65,7 +66,7 @@ namespace AccountingImmersiveAnalytics.Documents
                     }
                     finally
                     {
-                        AndroidJNI.DeleteLocalRef(buffer);
+                        if (buffer != IntPtr.Zero) AndroidJNI.DeleteLocalRef(buffer);
                     }
                     return pixels;
                 }

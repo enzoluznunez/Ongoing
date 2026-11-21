@@ -29,14 +29,17 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools.Chart
             public string whereValue;
             [Doc("The column 'whereValue' is compared with."), Optional]
             public string whereColumn;
+            [Doc("true reads every row of the file, including rows the chart's filters hide. Defaults to false: only the rows the chart shows."), DefaultsTo(false), Optional]
+            public bool allRows;
         }
 
         public override FunctionDeclaration Declaration => new FunctionDeclaration
         {
             Name = "ReadData",
-            Description = "Read a chart's data (the whole CSV file behind it): a total, average, minimum, maximum or count of a column, " +
+            Description = "Read a chart's data (the CSV file behind it): a total, average, minimum, maximum or count of a column, " +
                           "optionally split by a category and limited to rows matching one value, or the matching rows " +
-                          "themselves. This is your only source of numbers.",
+                          "themselves. It reads the rows the chart shows, so a filtered chart gives filtered numbers; the result " +
+                          "says when filters apply, and allRows reads the whole file. This is your only source of numbers.",
             Parameters = ParametersFor(typeof(Args))
         };
 
@@ -44,6 +47,18 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools.Chart
         {
             if (!TryChart(args.chart, result, out ChartEntry entry)) return;
             CsvTable table = entry.Table;
+            Func<int, bool> keeps = null;
+            int kept = entry.Shaping.KeptCount(table);
+            if (kept < table.RowCount)
+            {
+                string filters = entry.Shaping.Summary(entry.Spec);
+                if (args.allRows) result["filters"] = $"ignored ({filters}); all {table.RowCount} rows of the file were read";
+                else
+                {
+                    keeps = entry.Shaping.Keeper(table);
+                    result["filters"] = $"{filters}; only the {kept} of {table.RowCount} rows the chart shows were read";
+                }
+            }
 
             CsvField where = null;
             if (args.whereColumn != null || args.whereValue != null)
@@ -59,7 +74,7 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools.Chart
 
             if (args.read == "rows")
             {
-                ReadRows(table, where, args.whereValue, result);
+                ReadRows(table, keeps, where, args.whereValue, result);
                 return;
             }
 
@@ -90,7 +105,7 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools.Chart
             var order = new List<string>();
             for (int r = 0; r < table.RowCount; r++)
             {
-                if (!Matches(where, args.whereValue, r)) continue;
+                if (!Matches(keeps, where, args.whereValue, r)) continue;
                 string key = group != null ? group.TextAt(r) ?? "(blank)" : "";
                 if (!tallies.TryGetValue(key, out Tally tally))
                 {
@@ -107,7 +122,7 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools.Chart
 
             if (group == null)
             {
-                result["value"] = tallies.TryGetValue("", out Tally only) ? Round(only.Read(args.read)) : Round(0d);
+                result["value"] = Round((tallies.TryGetValue("", out Tally only) ? only : new Tally()).Read(args.read));
                 result["count"] = only != null ? only.Count : 0;
                 return;
             }
@@ -124,13 +139,13 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools.Chart
             if (order.Count > MostGroups) result["note"] = $"Showing the first {MostGroups} of {order.Count} groups.";
         }
 
-        private static void ReadRows(CsvTable table, CsvField where, string value, Dictionary<string, object> result)
+        private static void ReadRows(CsvTable table, Func<int, bool> keeps, CsvField where, string value, Dictionary<string, object> result)
         {
             var rows = new List<object>();
             int matched = 0;
             for (int r = 0; r < table.RowCount; r++)
             {
-                if (!Matches(where, value, r)) continue;
+                if (!Matches(keeps, where, value, r)) continue;
                 matched++;
                 if (rows.Count >= MostRows) continue;
 
@@ -146,8 +161,9 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools.Chart
             if (matched > MostRows) result["note"] = $"Only the first {MostRows} of {matched} rows are listed; summarize for the rest.";
         }
 
-        private static bool Matches(CsvField where, string value, int row) =>
-            where == null || string.Equals(where.TextAt(row), value.Trim(), StringComparison.OrdinalIgnoreCase);
+        private static bool Matches(Func<int, bool> keeps, CsvField where, string value, int row) =>
+            (keeps == null || keeps(row)) &&
+            (where == null || string.Equals(where.TextAt(row), value.Trim(), StringComparison.OrdinalIgnoreCase));
 
         private static void ListColumns(CsvTable table, Dictionary<string, object> result)
         {
@@ -178,9 +194,9 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools.Chart
                 switch (read)
                 {
                     case "sum": return _sum;
-                    case "average": return Count > 0 ? _sum / Count : 0d;
-                    case "min": return _min;
-                    case "max": return _max;
+                    case "average": return Count > 0 ? _sum / Count : double.NaN;
+                    case "min": return Count > 0 ? _min : double.NaN;
+                    case "max": return Count > 0 ? _max : double.NaN;
                     default: return Count;
                 }
             }

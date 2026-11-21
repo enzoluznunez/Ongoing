@@ -116,6 +116,7 @@ namespace AccountingImmersiveAnalytics.UI.Charts
             }
             catch (Exception e)
             {
+                if (this == null || ticket != _ticket) return (null, Superseded, false);
                 return Unreadable($"\"{document.Title}\" could not be loaded: {e.Message}");
             }
             if (this == null || ticket != _ticket) return (null, Superseded, false);
@@ -233,6 +234,11 @@ namespace AccountingImmersiveAnalytics.UI.Charts
             _column?.Clear();
             DocumentsPanel documents = App.Scene.Documents;
             if (documents != null) documents.HideRightCard();
+        }
+
+        public void UnpinUnless(string file)
+        {
+            if (_pinnedEntry != null && _pinnedEntry.File != file) Pin(null, record: false);
         }
 
         public void SetPanelShown(bool on)
@@ -364,7 +370,7 @@ namespace AccountingImmersiveAnalytics.UI.Charts
                 {
                     int id = edit.PinnedBefore;
                     ChartEntry target = id >= 0 ? WithId(id) : null;
-                    if (id >= 0 && target == null) return false;
+                    if (id >= 0 && (target == null || !_shown.Contains(target))) return false;
                     Pin(target, record: false);
                     return true;
                 }

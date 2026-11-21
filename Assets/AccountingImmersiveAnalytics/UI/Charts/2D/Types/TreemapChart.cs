@@ -47,11 +47,12 @@ namespace AccountingImmersiveAnalytics.UI.Charts.TwoD.Types
                 restNames = rest.Select(t => item.Categories[t.Item]).Distinct().ToList();
             }
             var tileGroups = tiles.Where(t => t.Group != OthersTile).Select(t => t.Group).Distinct().ToList();
+            bool folded = tiles.Any(t => t.Group == OthersTile);
             int ColourFor(Tile t)
             {
                 if (t.Group == OthersTile) return ChartStyle.MostShown - 1;
                 if (group == null) return 0;
-                return allGroups.Count <= ChartStyle.MostShown ? allGroups.IndexOf(t.Group) : tileGroups.IndexOf(t.Group);
+                return !folded && allGroups.Count <= ChartStyle.MostShown ? allGroups.IndexOf(t.Group) : tileGroups.IndexOf(t.Group);
             }
             if (tiles.Count == 0) d.Notice = NothingShown;
 

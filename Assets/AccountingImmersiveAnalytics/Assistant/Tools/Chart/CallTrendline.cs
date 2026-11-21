@@ -29,7 +29,7 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools.Chart
         public override FunctionDeclaration Declaration => new FunctionDeclaration
         {
             Name = "CallTrendline",
-            Description = "Press the pinned chart's Trendline button, which opens its Trendline panel, and turn on, change or turn off the trend line a scatter or bubble chart draws. Charts start with no trend line; only the user or you can add one. Other charts have none. " +
+            Description = "Press the pinned chart's Trendline button, which opens its Trendline panel, and turn on, change or turn off the trend line a scatter or bubble chart draws. Charts start with no trend line; only the user or you can add one. Other charts have none. A chart in the column that is not pinned changes on its card, and no panel opens. " +
                           "Exponential needs every y above 0, logarithmic every x above 0, power both, polynomial three different x values, " +
                           "and smooth at least five rows. A trend the data cannot take is kept but draws nothing. " +
                           "The result says in plain words what the trend means.",
@@ -39,13 +39,13 @@ namespace AccountingImmersiveAnalytics.Assistant.Tools.Chart
         protected override void Run(Args args, Dictionary<string, object> result)
         {
             if (SwitchedOff(ToolType.Trendline, args.on, result)) return;
-            if (!TryChart(args.chart, result, out ChartEntry entry)) return;
+            if (!TryShownChart(args.chart, result, out ChartEntry entry)) return;
             if (!TrendFitter.Offered(entry.Spec))
             {
                 Refuse(result, "chart that takes a trend", $"A {entry.Spec.Describe()} has no trend line. Say so to the user.");
                 return;
             }
-            if (!EnsureToolSelected(ToolType.Trendline, result)) return;
+            if (!EnsureToolFor(ToolType.Trendline, entry, result)) return;
             if (args.trend == null)
             {
                 result["chart"] = entry.Title;

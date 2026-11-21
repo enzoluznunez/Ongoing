@@ -22,6 +22,7 @@ namespace AccountingImmersiveAnalytics.App
                 }
                 catch (Exception e)
                 {
+                    Debug.LogException(e);
                     tcs.SetException(e);
                 }
             });

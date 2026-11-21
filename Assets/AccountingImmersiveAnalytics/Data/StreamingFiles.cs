@@ -21,7 +21,7 @@ namespace AccountingImmersiveAnalytics.Data
         public static async Task<List<string>> List(string folder, string indexFile)
         {
             string[] found = LocalNames(folder) ?? PackedNames(folder);
-            if (found != null)
+            if (found != null && found.Length > 0)
             {
                 Array.Sort(found, StringComparer.OrdinalIgnoreCase);
                 return found.ToList();
@@ -36,7 +36,8 @@ namespace AccountingImmersiveAnalytics.Data
             }
             try
             {
-                foreach (JToken name in JArray.Parse(json)) names.Add((string)name);
+                foreach (JToken name in JArray.Parse(json))
+                    if (name.Type == JTokenType.String) names.Add((string)name);
             }
             catch (Exception e)
             {
@@ -49,7 +50,15 @@ namespace AccountingImmersiveAnalytics.Data
         {
             string local = Path.Combine(Application.streamingAssetsPath, folder);
             if (local.Contains("://") || !Directory.Exists(local)) return null;
-            return Directory.GetFiles(local).Select(Path.GetFileName).ToArray();
+            try
+            {
+                return Directory.GetFiles(local).Select(Path.GetFileName).ToArray();
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"[StreamingFiles] Could not list StreamingAssets/{folder}: {e.Message}");
+                return null;
+            }
         }
 
         private static string[] PackedNames(string folder)
@@ -74,7 +83,14 @@ namespace AccountingImmersiveAnalytics.Data
 
         public static Task<string> ReadText(string fileName) => Fetch(fileName, handler => handler.text);
 
-        public static async Task<string> ReadLine(string fileName) => (await ReadText(fileName))?.Trim();
+        public static async Task<string> ReadLine(string fileName)
+        {
+            string text = (await ReadText(fileName))?.TrimStart('﻿');
+            if (text == null) return null;
+            foreach (string line in text.Split('\n'))
+                if (!string.IsNullOrWhiteSpace(line)) return line.Trim();
+            return "";
+        }
 
         public static Task<byte[]> ReadBytes(string fileName) => Fetch(fileName, handler => handler.data);
 
@@ -84,8 +100,18 @@ namespace AccountingImmersiveAnalytics.Data
             var req = UnityWebRequest.Get(Url(fileName));
             req.SendWebRequest().completed += _ =>
             {
-                done.SetResult(req.result == UnityWebRequest.Result.Success ? read(req.downloadHandler) : default);
-                req.Dispose();
+                try
+                {
+                    done.TrySetResult(req.result == UnityWebRequest.Result.Success ? read(req.downloadHandler) : default);
+                }
+                catch (Exception e)
+                {
+                    done.TrySetException(e);
+                }
+                finally
+                {
+                    req.Dispose();
+                }
             };
             return done.Task;
         }

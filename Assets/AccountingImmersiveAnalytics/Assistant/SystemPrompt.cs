@@ -37,7 +37,7 @@ namespace AccountingImmersiveAnalytics.Assistant
         private const string Reading =
             "# Reading the data\n" +
             "ReadChart gives the open chart's title, kind, which data column drives which part of it, every column's range or categories, and where it is. It carries no individual values. " +
-            "ReadData reads the numbers: a total, average, minimum, maximum or count of a column, split by a category or limited to one value, or the matching rows themselves. It is your only source of numbers. " +
+            "ReadData reads the numbers: a total, average, minimum, maximum or count of a column, split by a category or limited to one value, or the matching rows themselves. It reads the rows the chart shows, so after a filter it answers for what is on screen; say so when its result lists filters. It is your only source of numbers. " +
             "Call ReadChart before naming a column you have not read this session, and never assume what a chart holds from its subject. " +
             "Never tell the user a question cannot be answered until you have tried these. Work anything further out yourself from what they return. " +
             "Never state a value you have not read, and never reuse a number from an earlier request.\n\n";
@@ -146,7 +146,7 @@ namespace AccountingImmersiveAnalytics.Assistant
             "When a '[tool]' message is the only thing that has happened since you last spoke, the user is working on their own and is not talking to you: say nothing at all, and call no tool to find out more, because the message already told you what changed. " +
             "Use what those messages tell you silently, to stay correct. " +
             "You may receive messages beginning with '[state]', '[tool]' or '[pointing]': '[state]' lists how things stand right now, '[tool]' is something the user just did with their own hands, and '[pointing]' is a shape they pinched for an explanation. " +
-            "Treat both as things you watched, not as the user speaking; do not reply to them directly, but do act on them.";
+            "Treat all three as things you watched, not as the user speaking; do not reply to them directly, but do act on them.";
 
         public static List<FunctionDeclaration> ToolDeclarations()
         {

@@ -62,7 +62,9 @@ namespace AccountingImmersiveAnalytics.UI.Charts.TwoD.Types
                     var upper = Rect.MinMaxRect(cx - w * 0.5f, yQ3, cx + w * 0.5f, yMed);
                     var lower = Rect.MinMaxRect(cx - w * 0.5f, yMed, cx + w * 0.5f, yQ1);
                     top = d.Marks.Cell(upper, color, new Sides(Side.Free, Side.Free, Side.Free, Side.Gap));
-                    d.Marks.Cell(lower, color, new Sides(Side.Free, Side.Gap, Side.Free, Side.Free));
+                    int bottom = d.Marks.Cell(lower, color, new Sides(Side.Free, Side.Gap, Side.Free, Side.Free));
+                    if (top < 0) top = bottom;
+                    if (top < 0) top = d.Marks.Line(new Vector2(cx - w * 0.5f, yMed), new Vector2(cx + w * 0.5f, yMed), Style.Stroke, color);
                 }
                 d.HitBox(top, Rect.MinMaxRect(cx - w * 0.5f, yHigh, cx + w * 0.5f, yLow), category.Categories[categories[i]])
                     .With("Median", Value(s.Median)).With("Middle half", $"{Value(s.Q1)} to {Value(s.Q3)}")

@@ -69,7 +69,14 @@ namespace AccountingImmersiveAnalytics.Text
                     float v => Numbers.Shown(v),
                     _ => args[i]
                 };
-            return string.Format(Get(key), shown);
+            try
+            {
+                return string.Format(Get(key), shown);
+            }
+            catch (System.FormatException)
+            {
+                return string.Format(Original(key), shown);
+            }
         }
 
         public static string FormatOriginal(string key, params object[] args) => string.Format(Original(key), args);

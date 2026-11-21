@@ -1,3 +1,4 @@
+using System;
 using System.Text;
 using System.Threading.Tasks;
 using AccountingImmersiveAnalytics.Assistant;
@@ -54,7 +55,13 @@ namespace AccountingImmersiveAnalytics.Documents
             text.Append("Title: ").Append(page.Title).Append('\n');
             text.Append("\nParagraphs:\n");
             for (int i = 0; i < page.Passages.Count && text.Length < MostPageText; i++)
-                text.Append('[').Append(i).Append("] ").Append(page.Passages[i].Text).Append("\n\n");
+            {
+                string passage = page.Passages[i].Text;
+                text.Append('[').Append(i).Append("] ");
+                int room = Math.Max(0, MostPageText - text.Length);
+                if (passage.Length > room) text.Append(passage, 0, room).Append("\n(The document goes on past this point.)");
+                else text.Append(passage).Append("\n\n");
+            }
             return text.ToString();
         }
     }

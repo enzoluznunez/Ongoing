@@ -69,6 +69,7 @@ namespace AccountingImmersiveAnalytics.Text
         private static readonly HashSet<string> Fetching = new HashSet<string>();
         private static readonly HashSet<string> LoadedFromDisk = new HashSet<string>();
         private static readonly HashSet<string> Saving = new HashSet<string>();
+        private static readonly HashSet<string> Unsaved = new HashSet<string>();
         private static readonly HashSet<(string target, string original)> Retried = new HashSet<(string, string)>();
         private static string _folder;
         private static bool _pumping;
@@ -84,7 +85,11 @@ namespace AccountingImmersiveAnalytics.Text
             if (TryCached(original, source, target, out string translated)) return translated;
 
             Misses++;
-            if (!Asking.Contains((target, original)) && QueueFor(target).Add(new Item(original, source, context))) StartPump();
+            if (!Asking.Contains((target, original)))
+            {
+                QueueFor(target).Add(new Item(original, source, context));
+                StartPump();
+            }
             return original;
         }
 
@@ -161,6 +166,7 @@ namespace AccountingImmersiveAnalytics.Text
                 RetryAt[target] = Time.realtimeSinceStartup + RetrySeconds;
                 Queue queue = QueueFor(target);
                 foreach (string original in batch) queue.Add(new Item(original, source, context));
+                StartPump();
                 return;
             }
 
@@ -168,7 +174,8 @@ namespace AccountingImmersiveAnalytics.Text
             for (int i = 0; i < batch.Count; i++)
             {
                 string original = batch[i], translated = translations[i];
-                if (Markers.Signature(original) == Markers.Signature(translated))
+                if (string.IsNullOrWhiteSpace(translated)) translated = null;
+                if (translated != null && Markers.Signature(original) == Markers.Signature(translated))
                 {
                     found[original] = translated;
                     continue;
@@ -179,7 +186,7 @@ namespace AccountingImmersiveAnalytics.Text
                     StartPump();
                     continue;
                 }
-                found[original] = Markers.KeepSealed(translated);
+                found[original] = translated == null ? original : Markers.KeepSealed(translated);
             }
             Store(target, found);
         }
@@ -314,25 +321,29 @@ namespace AccountingImmersiveAnalytics.Text
 
         private static async void SaveSoon(string target)
         {
+            Unsaved.Add(target);
             if (!Saving.Add(target)) return;
             string file = FileOf(target);
             try
             {
-                await Task.Delay(SaveDelayMilliseconds);
-                if (!Cache.TryGetValue(target, out Dictionary<string, string> known)) return;
-                var snapshot = new Dictionary<string, string>(known);
-                await Task.Run(() =>
+                while (Unsaved.Remove(target))
                 {
-                    try
+                    await Task.Delay(SaveDelayMilliseconds);
+                    if (!Cache.TryGetValue(target, out Dictionary<string, string> known)) return;
+                    var snapshot = new Dictionary<string, string>(known);
+                    await Task.Run(() =>
                     {
-                        Directory.CreateDirectory(Path.GetDirectoryName(file));
-                        File.WriteAllText(file, JsonConvert.SerializeObject(snapshot));
-                    }
-                    catch (Exception e)
-                    {
-                        Debug.LogWarning($"[Translator] could not save translations for {target}: {e.Message}");
-                    }
-                });
+                        try
+                        {
+                            Directory.CreateDirectory(Path.GetDirectoryName(file));
+                            File.WriteAllText(file, JsonConvert.SerializeObject(snapshot));
+                        }
+                        catch (Exception e)
+                        {
+                            Debug.LogWarning($"[Translator] could not save translations for {target}: {e.Message}");
+                        }
+                    });
+                }
             }
             finally
             {
@@ -370,6 +381,7 @@ namespace AccountingImmersiveAnalytics.Text
             Fetching.Clear();
             LoadedFromDisk.Clear();
             Saving.Clear();
+            Unsaved.Clear();
             Retried.Clear();
             _folder = null;
             _pumping = false;

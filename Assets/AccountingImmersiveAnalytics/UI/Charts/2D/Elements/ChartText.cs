@@ -53,7 +53,7 @@ namespace AccountingImmersiveAnalytics.UI.Charts.TwoD.Elements
             Boundaries.Clear();
             OneText.Unicode.TextSegmenter.GraphemeBoundaries(text, Boundaries);
             if (Boundaries.Count - 1 <= most) return text;
-            return Whole(text, Boundaries[System.Math.Max(1, most - 3)]).TrimEnd() + Ellipsis;
+            return Whole(text, Boundaries[System.Math.Max(1, most - 1)]).TrimEnd() + Ellipsis;
         }
 
         public static string Fit(string text, float size, float room, float weight = Style.NormalWeight) =>

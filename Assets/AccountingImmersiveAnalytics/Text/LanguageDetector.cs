@@ -1,3 +1,4 @@
+using System.Globalization;
 using AccountingImmersiveAnalytics.Assistant.FlashLite;
 using Newtonsoft.Json.Linq;
 using UnityEngine;
@@ -44,7 +45,7 @@ namespace AccountingImmersiveAnalytics.Text
                 Debug.Log($"[LanguageDetector] Not sure enough ({answer["language"]}, {confidence:F2}); staying in {Language.CurrentName}.");
                 return;
             }
-            Debug.Log($"[LanguageDetector] Heard {Language.NameOf(code)} ({confidence:F2}) in \"{transcript}\"; showing {Language.CurrentName}.");
+            Debug.Log($"[LanguageDetector] Heard {Language.NameOf(code)} ({confidence:F2}) in \"{transcript}\".");
             LanguageSwitch.To(code);
         }
 
@@ -57,11 +58,18 @@ namespace AccountingImmersiveAnalytics.Text
             {
                 bool letter = char.IsLetter(c);
                 if (letter && !inWord) words++;
-                inWord = letter;
-                if (letter && c > '⹿') unspaced++;
+                inWord = letter || (inWord && IsMark(c));
+                if (letter && Unspaced(c)) unspaced++;
             }
             return words >= FewestWords || unspaced >= FewestUnspacedLetters;
         }
+
+        private static bool IsMark(char c) =>
+            CharUnicodeInfo.GetUnicodeCategory(c) is UnicodeCategory.NonSpacingMark
+                or UnicodeCategory.SpacingCombiningMark or UnicodeCategory.EnclosingMark;
+
+        private static bool Unspaced(char c) =>
+            c >= '\u2e80' || (c >= '\u0e00' && c <= '\u0eff') || (c >= '\u1000' && c <= '\u109f') || (c >= '\u1780' && c <= '\u17ff');
 
         private static readonly string Instructions =
             "You identify the language a person spoke, from a transcript of their speech to a voice assistant. " +

@@ -13,6 +13,12 @@ namespace AccountingImmersiveAnalytics.Editor
         public static void Build()
         {
             var profile = AssetDatabase.LoadAssetAtPath<BuildProfile>(ProfilePath);
+            if (profile == null)
+            {
+                Debug.LogError($"[ExperimentBuild] No build profile at {ProfilePath}.");
+                EditorApplication.Exit(1);
+                return;
+            }
             BuildReport report = BuildPipeline.BuildPlayer(new BuildPlayerWithProfileOptions
             {
                 buildProfile = profile,

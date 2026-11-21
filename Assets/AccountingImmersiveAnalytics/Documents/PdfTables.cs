@@ -11,6 +11,7 @@ namespace AccountingImmersiveAnalytics.Documents
         private const double CellGap = 1.2;
         private const double SameLine = 0.35;
         private const double StepSlack = 0.25;
+        private const double HeaderReach = 2.5;
         private const double CaptionReach = 4;
         private const double CaptionLeading = 1.8;
         private const int FewestRows = 2;
@@ -50,11 +51,16 @@ namespace AccountingImmersiveAnalytics.Documents
             int columns = lines[start].Cells.Count;
             if (columns < 2) return start;
             int end = start + 1;
-            double step = 0;
+            double step = 0, header = 0;
             while (end < lines.Count && lines[end].Cells.Count == columns)
             {
                 double gap = lines[end - 1].Baseline - lines[end].Baseline;
-                if (step == 0) step = gap;
+                if (end == start + 1) header = gap;
+                else if (step == 0)
+                {
+                    if (header < gap * (1 - StepSlack) || header > gap * HeaderReach) break;
+                    step = gap;
+                }
                 else if (Math.Abs(gap - step) > step * StepSlack) break;
                 end++;
             }

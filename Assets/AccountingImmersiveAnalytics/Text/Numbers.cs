@@ -15,7 +15,7 @@ namespace AccountingImmersiveAnalytics.Text
         private static readonly string SuffixClass = "[" + Regex.Escape(string.Concat(SuffixSizes.Keys)) + "]";
 
         private static readonly Regex Token = new Regex(
-            @"(?<![\p{L}\p{N}_.,])(-?)(\d{1,3}(?:,\d{3})+|\d+)(\.\d+)?(" + SuffixClass + @")?(%)?(?![\p{L}\p{N}_])", RegexOptions.CultureInvariant);
+            @"(?<![\p{L}\p{N}_.,])(-?)(\d{1,3}(?:,\d{3})+|\d+)(\.\d+)?(" + SuffixClass + @")?(%)?(?![\p{L}\p{N}_]|[.,]\d)", RegexOptions.CultureInvariant);
 
         private static readonly Regex OnlyNumber = new Regex(
             @"^\s*-?(\d{1,3}(?:,\d{3})+|\d+)(\.\d+)?" + SuffixClass + @"?%?\s*$", RegexOptions.CultureInvariant);
@@ -81,15 +81,23 @@ namespace AccountingImmersiveAnalytics.Text
             {
                 shown = (sign.Length > 0 ? style.Minus : "") + style.Native(digits);
             }
+            else if (suffix.Length == 0)
+            {
+                if (!double.TryParse(digits.Replace(",", ""), NumberStyles.Float, CultureInfo.InvariantCulture, out double whole))
+                    return m.Value;
+                shown = AxisFormat.Plain(whole, 1d, style);
+                if (fraction.Length > 1) shown += style.Decimal + style.Native(fraction.Substring(1));
+                if (sign.Length > 0 && (whole != 0d || fraction.Trim('.', '0').Length > 0)) shown = style.Minus + shown;
+            }
             else
             {
                 if (!double.TryParse(digits.Replace(",", "") + fraction, NumberStyles.Float, CultureInfo.InvariantCulture, out double number))
                     return m.Value;
-                double size = suffix.Length > 0 ? SuffixSizes[suffix] : 1d;
+                double size = SuffixSizes[suffix];
                 int decimals = fraction.Length > 0 ? fraction.Length - 1 : 0;
                 double value = (sign.Length > 0 ? -number : number) * size;
                 double step = Math.Pow(10d, -decimals) * size;
-                shown = suffix.Length > 0 ? AxisFormat.Number(value, step, style) : AxisFormat.Plain(value, step, style);
+                shown = AxisFormat.Number(value, step, style);
             }
             return percent ? style.Percent(shown) : shown;
         }
@@ -97,7 +105,11 @@ namespace AccountingImmersiveAnalytics.Text
         private static Dictionary<string, double> BuildSuffixSizes()
         {
             var sizes = new Dictionary<string, double>();
-            foreach (NumberUnit unit in NumberStyle.Invariant.Units) sizes[unit.Suffix] = unit.Divisor;
+            foreach (NumberUnit unit in NumberStyle.Invariant.Units)
+            {
+                sizes[unit.Suffix] = unit.Divisor;
+                sizes[unit.Suffix.ToUpperInvariant()] = unit.Divisor;
+            }
             return sizes;
         }
 
